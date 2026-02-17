@@ -88,6 +88,7 @@ python -m src.main run-daily --date 2026-02-16
 python -m src.main icp-report --date 2026-02-16
 python -m src.main crawl-diagnostics --date 2026-02-16
 python -m src.main calibrate-thresholds --date 2026-02-16
+python -m src.main tune-profile --date 2026-02-16
 ```
 
 ## Runtime Configuration
@@ -122,6 +123,7 @@ Typical outputs in `data/out/`:
 - `config/seed_accounts.csv`
 - `config/account_source_handles.csv`
 - `config/icp_reference_accounts.csv`
+- `config/profile_scenarios.csv`
 
 ## Scheduler Example
 

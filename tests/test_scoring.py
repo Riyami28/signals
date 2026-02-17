@@ -127,3 +127,51 @@ def test_disabled_source_from_registry_does_not_contribute():
     )
 
     assert len(output.account_scores) == 0
+
+
+def test_registry_reliability_caps_observation_reliability():
+    rules = {
+        "kubernetes_detected": SignalRule(
+            signal_code="kubernetes_detected",
+            product_scope="zopdev",
+            category="technographic",
+            base_weight=10,
+            half_life_days=30,
+            min_confidence=0.5,
+            enabled=True,
+        )
+    }
+    observations = [
+        {
+            "account_id": "acc_cap",
+            "signal_code": "kubernetes_detected",
+            "product": "shared",
+            "source": "website_scan",
+            "observed_at": "2026-02-16T00:00:00Z",
+            "evidence_url": "",
+            "evidence_text": "kubernetes",
+            "confidence": 1.0,
+            "source_reliability": 0.9,
+        }
+    ]
+
+    capped = run_scoring(
+        run_id="run_cap_1",
+        run_date=date(2026, 2, 16),
+        observations=observations,
+        rules=rules,
+        thresholds=Thresholds(high=70, medium=45, low=0),
+        source_reliability_defaults={"website_scan": 0.3},
+    )
+    uncapped = run_scoring(
+        run_id="run_cap_2",
+        run_date=date(2026, 2, 16),
+        observations=observations,
+        rules=rules,
+        thresholds=Thresholds(high=70, medium=45, low=0),
+        source_reliability_defaults={"website_scan": 1.0},
+    )
+
+    assert len(capped.account_scores) == 1
+    assert len(uncapped.account_scores) == 1
+    assert capped.account_scores[0].score < uncapped.account_scores[0].score

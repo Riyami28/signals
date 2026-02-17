@@ -1,0 +1,6 @@
+scenario_name,max_score,expected_min_tier,expected_max_tier,weight
+strong_buying_signal,14,high,high,1.0
+credible_signal_bundle,9,medium,high,1.0
+borderline_interest,5,low,medium,1.0
+weak_signal_noise,2,low,low,1.0
+ambient_noise,0.8,low,low,1.0

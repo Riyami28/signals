@@ -90,6 +90,8 @@ def run_scoring(
         if source_reliability is None:
             source_reliability = registry_reliability if registry_reliability is not None else 0.6
         source_reliability = float(source_reliability)
+        if registry_reliability is not None:
+            source_reliability = min(source_reliability, float(registry_reliability))
 
         component = (
             rule.base_weight
