@@ -63,7 +63,18 @@ def load_csv_rows(path: Path) -> list[dict[str, str]]:
         return []
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        return [{k: (v or "").strip() for k, v in row.items()} for row in reader]
+        rows: list[dict[str, str]] = []
+        for row in reader:
+            normalized: dict[str, str] = {}
+            for key, value in row.items():
+                if key is None:
+                    continue
+                if isinstance(value, list):
+                    normalized[str(key)] = ",".join(str(item).strip() for item in value if str(item).strip())
+                else:
+                    normalized[str(key)] = str(value or "").strip()
+            rows.append(normalized)
+        return rows
 
 
 def load_account_source_handles(path: Path) -> dict[str, dict[str, str]]:
