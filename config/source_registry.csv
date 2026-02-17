@@ -1,0 +1,14 @@
+source,reliability,enabled
+jobs_csv,0.75,true
+careers_live,0.65,true
+greenhouse_api,0.8,true
+lever_api,0.8,true
+news_csv,0.75,true
+rss_feed,0.7,true
+google_news_rss,0.72,true
+technographics_csv,0.8,true
+website_scan,0.6,true
+community_csv,0.65,true
+reddit_rss,0.62,true
+first_party_csv,0.9,true
+manual_review_import,0.95,true

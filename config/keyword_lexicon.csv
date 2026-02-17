@@ -1,0 +1,65 @@
+source,signal_code,keyword,confidence
+jobs,devops_role_open,devops engineer,0.7
+jobs,devops_role_open,site reliability engineer,0.75
+jobs,platform_role_open,platform engineer,0.7
+jobs,platform_role_open,internal developer platform,0.8
+jobs,platform_role_open,cloud platform engineer,0.75
+jobs,finops_role_open,finops,0.8
+jobs,finops_role_open,cloud cost management,0.8
+jobs,finops_role_open,cost governance,0.8
+jobs,devops_bottleneck_language,reduce devops toil,0.8
+jobs,idp_golden_path_initiative,golden path,0.8
+jobs,idp_golden_path_initiative,paved road,0.8
+jobs,idp_golden_path_initiative,self-serve environments,0.8
+news,compliance_initiative,soc 2,0.8
+news,compliance_initiative,iso 27001,0.8
+news,compliance_initiative,hipaa,0.8
+news,compliance_initiative,pci,0.8
+news,compliance_initiative,data privacy compliance,0.75
+news,audit_date_announced,audit date,0.8
+news,audit_date_announced,compliance audit,0.75
+news,launch_or_scale_event,product launch,0.7
+news,launch_or_scale_event,region expansion,0.7
+news,launch_or_scale_event,new distribution center,0.72
+news,launch_or_scale_event,new fulfillment center,0.72
+news,cost_reduction_mandate,reduce cloud cost,0.8
+news,cost_reduction_mandate,cost optimization program,0.82
+news,cost_reduction_mandate,efficiency program,0.7
+news,governance_enforcement_need,budgets and quotas,0.7
+news,governance_enforcement_need,policy-based controls,0.78
+news,governance_enforcement_need,audit logs,0.72
+news,governance_enforcement_need,unit economics,0.75
+news,high_intent_phrase_cost_control,cost is out of control,0.8
+news,high_intent_phrase_production_fast,production-ready fast,0.75
+technographics,kubernetes_detected,kubernetes,0.7
+technographics,kubernetes_detected,eks,0.7
+technographics,kubernetes_detected,gke,0.7
+technographics,kubernetes_detected,aks,0.7
+technographics,terraform_detected,terraform,0.7
+technographics,gitops_detected,argocd,0.7
+technographics,gitops_detected,flux,0.7
+technographics,tooling_sprawl_detected,rancher,0.6
+technographics,tooling_sprawl_detected,helm,0.6
+technographics,tooling_sprawl_detected,spacelift,0.65
+technographics,tooling_sprawl_detected,atlantis,0.65
+technographics,enterprise_modernization_program,digital transformation,0.6
+technographics,data_platform_initiative,data platform,0.62
+technographics,cloud_platform_messaging,cloud platform,0.6
+technographics,compliance_governance_messaging,security compliance,0.58
+technographics,compliance_governance_messaging,data governance,0.6
+technographics,cost_reduction_mandate,cost optimization,0.62
+community,high_intent_phrase_production_fast,production-ready fast,0.8
+community,high_intent_phrase_devops_toil,devops is a ticketing system,0.8
+community,high_intent_phrase_devops_toil,infra is the bottleneck,0.8
+community,high_intent_phrase_cost_control,cost is out of control,0.8
+community,env_spinup_requests,spin up staging,0.7
+community,env_spinup_requests,new cluster,0.7
+community,env_spinup_requests,preview environments,0.75
+community,governance_enforcement_need,continuous enforcement,0.8
+community,governance_enforcement_need,rightsizing with confidence,0.75
+community,idp_golden_path_initiative,golden paths,0.78
+news,enterprise_modernization_program,digital transformation,0.62
+news,data_platform_initiative,data platform,0.62
+news,cloud_platform_messaging,cloud platform,0.6
+news,compliance_governance_messaging,data governance,0.62
+news,compliance_governance_messaging,security compliance,0.6

@@ -1,0 +1,11 @@
+company_name,domain,feed_url
+Tata Consumer Products,tataconsumer.com,https://news.google.com/rss/search?q=%22Tata%20Consumer%20Products%22%20(cloud%20OR%20platform%20OR%20digital%20OR%20compliance%20OR%20cost)&hl=en-IN&gl=IN&ceid=IN:en
+Coca-Cola India,coca-colaindia.com,https://news.google.com/rss/search?q=%22Coca-Cola%20India%22%20(cloud%20OR%20digital%20transformation%20OR%20platform%20OR%20cost%20optimization)&hl=en-IN&gl=IN&ceid=IN:en
+Diageo India,diageoindia.com,https://news.google.com/rss/search?q=%22Diageo%20India%22%20(cloud%20OR%20digital%20transformation%20OR%20platform%20engineering%20OR%20compliance)&hl=en-IN&gl=IN&ceid=IN:en
+Tata Digital,tatadigital.com,https://news.google.com/rss/search?q=%22Tata%20Digital%22%20(platform%20engineering%20OR%20SRE%20OR%20cloud%20cost%20OR%20compliance)&hl=en-IN&gl=IN&ceid=IN:en
+Conde Nast,condenast.com,https://news.google.com/rss/search?q=%22Conde%20Nast%22%20(platform%20engineering%20OR%20cloud%20cost%20OR%20kubernetes%20OR%20security)&hl=en-US&gl=US&ceid=US:en
+Hindustan Unilever,hul.co.in,https://news.google.com/rss/search?q=%22Hindustan%20Unilever%22%20(cloud%20OR%20digital%20transformation%20OR%20compliance%20OR%20cost%20optimization)&hl=en-IN&gl=IN&ceid=IN:en
+PepsiCo India,pepsicoindia.co.in,https://news.google.com/rss/search?q=%22PepsiCo%20India%22%20(cloud%20OR%20data%20platform%20OR%20finops%20OR%20governance)&hl=en-IN&gl=IN&ceid=IN:en
+Britannia Industries,britannia.co.in,https://news.google.com/rss/search?q=%22Britannia%20Industries%22%20(cloud%20OR%20digital%20transformation%20OR%20compliance%20OR%20cost)&hl=en-IN&gl=IN&ceid=IN:en
+Dabur India,dabur.com,https://news.google.com/rss/search?q=%22Dabur%22%20(cloud%20OR%20digital%20transformation%20OR%20compliance%20OR%20platform)&hl=en-IN&gl=IN&ceid=IN:en
+Marico,marico.com,https://news.google.com/rss/search?q=%22Marico%22%20(cloud%20OR%20platform%20engineering%20OR%20cost%20governance)&hl=en-IN&gl=IN&ceid=IN:en

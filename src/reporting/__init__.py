@@ -1,0 +1,1 @@
+"""Quality and promotion reporting."""

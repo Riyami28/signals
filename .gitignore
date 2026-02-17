@@ -1,0 +1,28 @@
+.DS_Store
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Build/package metadata
+build/
+dist/
+*.egg-info/
+
+# Local environment overrides
+.env
+
+# SQLite runtime files
+data/signals.db
+data/signals.db-shm
+data/signals.db-wal
+
+# Generated outputs and logs
+data/out/*.csv
+data/out/*.log
