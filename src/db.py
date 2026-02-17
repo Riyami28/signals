@@ -103,6 +103,19 @@ CREATE TABLE IF NOT EXISTS crawl_checkpoints (
   last_crawled_at TEXT NOT NULL,
   PRIMARY KEY (source, account_id, endpoint)
 );
+
+CREATE TABLE IF NOT EXISTS crawl_attempts (
+  attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  attempted_at TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('success', 'http_error', 'exception', 'skipped')),
+  error_summary TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_crawl_attempts_attempted_at ON crawl_attempts(attempted_at);
+CREATE INDEX IF NOT EXISTS idx_crawl_attempts_source_attempted_at ON crawl_attempts(source, attempted_at);
 """
 
 
@@ -608,3 +621,50 @@ def mark_crawled(
         (source, account_id, endpoint, utc_now_iso()),
     )
     conn.commit()
+
+
+def record_crawl_attempt(
+    conn: sqlite3.Connection,
+    source: str,
+    account_id: str,
+    endpoint: str,
+    status: str,
+    error_summary: str = "",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO crawl_attempts (source, account_id, endpoint, attempted_at, status, error_summary)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (source, account_id, endpoint, utc_now_iso(), status, (error_summary or "")[:500]),
+    )
+    conn.commit()
+
+
+def fetch_crawl_attempt_summary(conn: sqlite3.Connection, run_date: str) -> list[sqlite3.Row]:
+    cur = conn.execute(
+        """
+        SELECT source, status, COUNT(*) AS attempt_count
+        FROM crawl_attempts
+        WHERE date(attempted_at) = date(?)
+        GROUP BY source, status
+        ORDER BY source, status
+        """,
+        (run_date,),
+    )
+    return list(cur.fetchall())
+
+
+def fetch_latest_crawl_failures(conn: sqlite3.Connection, run_date: str, limit: int = 10) -> list[sqlite3.Row]:
+    cur = conn.execute(
+        """
+        SELECT source, account_id, endpoint, status, error_summary, attempted_at
+        FROM crawl_attempts
+        WHERE date(attempted_at) = date(?)
+          AND status IN ('http_error', 'exception')
+        ORDER BY attempted_at DESC
+        LIMIT ?
+        """,
+        (run_date, max(1, int(limit))),
+    )
+    return list(cur.fetchall())

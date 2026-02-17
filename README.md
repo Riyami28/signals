@@ -86,6 +86,8 @@ python -m src.main sync-sheet --date 2026-02-16
 python -m src.main import-reviews --date 2026-02-16
 python -m src.main run-daily --date 2026-02-16
 python -m src.main icp-report --date 2026-02-16
+python -m src.main crawl-diagnostics --date 2026-02-16
+python -m src.main calibrate-thresholds --date 2026-02-16
 ```
 
 ## Runtime Configuration
