@@ -192,13 +192,49 @@ def collect(
                 scanned.add(url)
 
                 if db.was_crawled_today(conn, source=scan_source, account_id=account_id, endpoint=url):
+                    db.record_crawl_attempt(
+                        conn,
+                        source=scan_source,
+                        account_id=account_id,
+                        endpoint=url,
+                        status="skipped",
+                        error_summary="checkpoint_recent",
+                    )
                     continue
 
                 try:
                     page_text, discovered_links = _fetch_page_profile(url, settings)
-                except Exception:
+                except requests.HTTPError as exc:
+                    status_code = exc.response.status_code if exc.response is not None else 0
+                    db.record_crawl_attempt(
+                        conn,
+                        source=scan_source,
+                        account_id=account_id,
+                        endpoint=url,
+                        status="http_error",
+                        error_summary=f"status_code={status_code}",
+                    )
                     db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url)
                     continue
+                except Exception as exc:
+                    db.record_crawl_attempt(
+                        conn,
+                        source=scan_source,
+                        account_id=account_id,
+                        endpoint=url,
+                        status="exception",
+                        error_summary=str(exc),
+                    )
+                    db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url)
+                    continue
+                db.record_crawl_attempt(
+                    conn,
+                    source=scan_source,
+                    account_id=account_id,
+                    endpoint=url,
+                    status="success",
+                    error_summary="",
+                )
                 db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url)
 
                 matches = classify_text(page_text, lexicon_rows)

@@ -254,12 +254,48 @@ def collect(
 
             try:
                 if db.was_crawled_today(conn, source=source_name, account_id=account_id, endpoint=feed_url):
+                    db.record_crawl_attempt(
+                        conn,
+                        source=source_name,
+                        account_id=account_id,
+                        endpoint=feed_url,
+                        status="skipped",
+                        error_summary="checkpoint_recent",
+                    )
                     continue
                 xml_text = _request_text(feed_url, settings)
                 parsed = feedparser.parse(xml_text)
-            except Exception:
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else 0
+                db.record_crawl_attempt(
+                    conn,
+                    source=source_name,
+                    account_id=account_id,
+                    endpoint=feed_url,
+                    status="http_error",
+                    error_summary=f"status_code={status_code}",
+                )
                 db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url)
                 continue
+            except Exception as exc:
+                db.record_crawl_attempt(
+                    conn,
+                    source=source_name,
+                    account_id=account_id,
+                    endpoint=feed_url,
+                    status="exception",
+                    error_summary=str(exc),
+                )
+                db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url)
+                continue
+            db.record_crawl_attempt(
+                conn,
+                source=source_name,
+                account_id=account_id,
+                endpoint=feed_url,
+                status="success",
+                error_summary="",
+            )
             db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url)
 
             local_inserted, local_seen = _ingest_feed_entries(

@@ -224,16 +224,48 @@ def _collect_greenhouse(
         tried.add(candidate)
         url = f"https://boards-api.greenhouse.io/v1/boards/{candidate}/jobs?content=true"
         if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=url):
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=url,
+                status="skipped",
+                error_summary="checkpoint_recent",
+            )
             continue
         try:
             response = _request(url, settings)
             if response.status_code >= 400:
+                db.record_crawl_attempt(
+                    conn,
+                    source=source,
+                    account_id=account_id,
+                    endpoint=url,
+                    status="http_error",
+                    error_summary=f"status_code={response.status_code}",
+                )
                 db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
                 continue
             payload = response.json()
-        except Exception:
+        except Exception as exc:
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=url,
+                status="exception",
+                error_summary=str(exc),
+            )
             db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
             continue
+        db.record_crawl_attempt(
+            conn,
+            source=source,
+            account_id=account_id,
+            endpoint=url,
+            status="success",
+            error_summary="",
+        )
         db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
 
         jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
@@ -305,16 +337,48 @@ def _collect_lever(
 
         url = f"https://api.lever.co/v0/postings/{candidate}?mode=json"
         if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=url):
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=url,
+                status="skipped",
+                error_summary="checkpoint_recent",
+            )
             continue
         try:
             response = _request(url, settings)
             if response.status_code >= 400:
+                db.record_crawl_attempt(
+                    conn,
+                    source=source,
+                    account_id=account_id,
+                    endpoint=url,
+                    status="http_error",
+                    error_summary=f"status_code={response.status_code}",
+                )
                 db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
                 continue
             postings = response.json()
-        except Exception:
+        except Exception as exc:
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=url,
+                status="exception",
+                error_summary=str(exc),
+            )
             db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
             continue
+        db.record_crawl_attempt(
+            conn,
+            source=source,
+            account_id=account_id,
+            endpoint=url,
+            status="success",
+            error_summary="",
+        )
         db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
 
         if not isinstance(postings, list):
@@ -383,7 +447,24 @@ def _collect_careers_pages(
     # don't expose /careers or /jobs directly.
     try:
         homepage_response = _request(homepage_url, settings)
+        if homepage_response.status_code >= 400:
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=homepage_url,
+                status="http_error",
+                error_summary=f"status_code={homepage_response.status_code}",
+            )
         if homepage_response.status_code < 400:
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=homepage_url,
+                status="success",
+                error_summary="",
+            )
             soup = BeautifulSoup(homepage_response.text, "html.parser")
             for anchor in soup.find_all("a", href=True):
                 href = str(anchor.get("href", "")).strip()
@@ -391,8 +472,15 @@ def _collect_careers_pages(
                 href_lower = href.lower()
                 if any(token in href_lower or token in label for token in ("career", "job", "hiring", "work-with-us")):
                     candidates.append(urljoin(homepage_url, href))
-    except Exception:
-        pass
+    except Exception as exc:
+        db.record_crawl_attempt(
+            conn,
+            source=source,
+            account_id=account_id,
+            endpoint=homepage_url,
+            status="exception",
+            error_summary=str(exc),
+        )
 
     if website_url:
         candidates.extend([
@@ -412,17 +500,49 @@ def _collect_careers_pages(
         tried.add(normalized_url)
 
         if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=normalized_url):
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=normalized_url,
+                status="skipped",
+                error_summary="checkpoint_recent",
+            )
             continue
 
         try:
             response = _request(normalized_url, settings)
             if response.status_code >= 400:
+                db.record_crawl_attempt(
+                    conn,
+                    source=source,
+                    account_id=account_id,
+                    endpoint=normalized_url,
+                    status="http_error",
+                    error_summary=f"status_code={response.status_code}",
+                )
                 db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url)
                 continue
             html = response.text
-        except Exception:
+        except Exception as exc:
+            db.record_crawl_attempt(
+                conn,
+                source=source,
+                account_id=account_id,
+                endpoint=normalized_url,
+                status="exception",
+                error_summary=str(exc),
+            )
             db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url)
             continue
+        db.record_crawl_attempt(
+            conn,
+            source=source,
+            account_id=account_id,
+            endpoint=normalized_url,
+            status="success",
+            error_summary="",
+        )
         db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url)
 
         soup = BeautifulSoup(html, "html.parser")

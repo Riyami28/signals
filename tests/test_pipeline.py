@@ -85,3 +85,36 @@ def test_prepare_review_input_command_creates_local_template(tmp_path, monkeypat
     assert result.exit_code == 0
     assert "prepared_review_rows=1" in result.stdout
     assert (root / "data" / "raw" / "review_input.csv").exists()
+
+
+def test_crawl_diagnostics_command_handles_empty_day(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["crawl-diagnostics", "--date", "2026-02-16"])
+
+    assert result.exit_code == 0
+    assert "crawl_attempts=0" in result.stdout
+
+
+def test_calibrate_thresholds_command_emits_suggestion(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(
+        root / "config" / "icp_reference_accounts.csv",
+        "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
+
+    runner = CliRunner()
+    daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert daily_result.exit_code == 0
+
+    result = runner.invoke(app, ["calibrate-thresholds", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+    assert "suggested_high=" in result.stdout
+    assert "suggested_medium=" in result.stdout

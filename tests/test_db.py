@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime, timezone
 
 from src import db
 from src.models import SignalObservation
@@ -32,3 +33,36 @@ def test_signal_observation_dedupe(tmp_path: Path):
 
     assert first is True
     assert second is False
+
+
+def test_crawl_attempt_summary_and_failures(tmp_path: Path):
+    conn = db.get_connection(tmp_path / "signals.db")
+    db.init_db(conn)
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    db.record_crawl_attempt(
+        conn,
+        source="google_news_rss",
+        account_id="acc_1",
+        endpoint="https://example.com/rss",
+        status="success",
+        error_summary="",
+    )
+    db.record_crawl_attempt(
+        conn,
+        source="google_news_rss",
+        account_id="acc_1",
+        endpoint="https://example.com/rss",
+        status="exception",
+        error_summary="timeout",
+    )
+
+    summary_rows = db.fetch_crawl_attempt_summary(conn, today)
+    by_status = {str(row["status"]): int(row["attempt_count"]) for row in summary_rows}
+    assert by_status["success"] == 1
+    assert by_status["exception"] == 1
+
+    failures = db.fetch_latest_crawl_failures(conn, today, limit=5)
+    assert len(failures) == 1
+    assert str(failures[0]["status"]) == "exception"
+    assert str(failures[0]["error_summary"]) == "timeout"
