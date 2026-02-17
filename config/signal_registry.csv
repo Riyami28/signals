@@ -2,9 +2,12 @@ signal_code,product_scope,category,base_weight,half_life_days,min_confidence,ena
 compliance_initiative,zopdev,trigger_events,18,30,0.6,true
 audit_date_announced,zopdev,trigger_events,16,30,0.6,true
 launch_or_scale_event,zopdev,trigger_events,12,21,0.5,true
+erp_s4_migration_milestone,zopdev,trigger_events,16,30,0.6,true
+supply_chain_platform_rollout,zopday,platform_demand,15,30,0.6,true
 cloud_cost_spike,zopnight,spend_variance,18,14,0.6,true
 cost_reduction_mandate,zopnight,spend_variance,17,21,0.6,true
 finops_tool_eval,zopnight,tooling_eval,10,30,0.5,true
+vendor_consolidation_program,zopnight,tooling_eval,14,30,0.6,true
 governance_enforcement_need,zopnight,governance,14,30,0.6,true
 env_spinup_requests,zopday,env_speed,16,14,0.6,true
 idp_golden_path_initiative,zopday,platform_demand,15,30,0.6,true
@@ -15,6 +18,7 @@ audit_viewed,shared,pql,12,14,0.7,true
 teammate_invited,shared,pql,10,21,0.7,true
 repo_added_deploy_attempted,shared,pql,14,14,0.7,true
 sso_rbac_audit_controls_request,shared,pql,15,21,0.6,true
+poc_stage_progression,shared,pql,20,14,0.7,true
 devops_role_open,zopdev,hiring,8,30,0.5,true
 finops_role_open,zopnight,hiring,8,30,0.5,true
 platform_role_open,zopday,hiring,8,30,0.5,true
@@ -29,3 +33,4 @@ enterprise_modernization_program,zopdev,trigger_events,12,30,0.55,true
 data_platform_initiative,zopday,platform_demand,11,30,0.55,true
 compliance_governance_messaging,zopnight,governance,10,30,0.55,true
 cloud_platform_messaging,zopdev,technographic,9,30,0.55,true
+media_traffic_reliability_pressure,zopdev,trigger_events,13,21,0.6,true

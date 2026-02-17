@@ -1,1 +1,6 @@
 company_name,domain,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at
+Tata Consumer Products,,zopdev,poc_stage_progression,first_party_csv,internal://crm/opportunity/tataconsumer-security-review,template: security review started in procurement cycle,0.9,2026-02-17T00:00:00Z
+Coca-Cola India,,zopdev,poc_stage_progression,first_party_csv,internal://crm/opportunity/cocacola-procurement-opened,template: procurement process initiated for rollout,0.9,2026-02-17T00:00:00Z
+Diageo India,,zopday,supply_chain_platform_rollout,first_party_csv,internal://pm/diageo-control-tower-rollout,template: control tower rollout milestone reached,0.88,2026-02-17T00:00:00Z
+Tata Digital,,zopnight,vendor_consolidation_program,first_party_csv,internal://strategy/tatadigital-vendor-consolidation,template: vendor consolidation workstream approved,0.86,2026-02-17T00:00:00Z
+Conde Nast,,zopdev,media_traffic_reliability_pressure,first_party_csv,internal://incident/condenast-ad-stack,template: ad stack reliability issue during traffic surge,0.9,2026-02-17T00:00:00Z

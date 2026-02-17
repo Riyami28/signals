@@ -22,15 +22,32 @@ news,launch_or_scale_event,product launch,0.7
 news,launch_or_scale_event,region expansion,0.7
 news,launch_or_scale_event,new distribution center,0.72
 news,launch_or_scale_event,new fulfillment center,0.72
+news,erp_s4_migration_milestone,s/4hana rollout,0.82
+news,erp_s4_migration_milestone,sap s/4 migration,0.82
+news,erp_s4_migration_milestone,ecc modernization,0.76
+news,supply_chain_platform_rollout,supply chain control tower,0.8
+news,supply_chain_platform_rollout,demand planning platform,0.78
+news,supply_chain_platform_rollout,warehouse digitization,0.76
 news,cost_reduction_mandate,reduce cloud cost,0.8
 news,cost_reduction_mandate,cost optimization program,0.82
 news,cost_reduction_mandate,efficiency program,0.7
+news,cost_reduction_mandate,margin improvement program,0.8
+news,cost_reduction_mandate,cost transformation office,0.82
+news,vendor_consolidation_program,tool consolidation,0.78
+news,vendor_consolidation_program,vendor consolidation,0.82
+news,vendor_consolidation_program,platform standardization,0.8
 news,governance_enforcement_need,budgets and quotas,0.7
 news,governance_enforcement_need,policy-based controls,0.78
 news,governance_enforcement_need,audit logs,0.72
 news,governance_enforcement_need,unit economics,0.75
+news,governance_enforcement_need,risk controls,0.75
+news,governance_enforcement_need,audit readiness,0.78
 news,high_intent_phrase_cost_control,cost is out of control,0.8
 news,high_intent_phrase_production_fast,production-ready fast,0.75
+news,poc_stage_progression,pilot expanded,0.85
+news,poc_stage_progression,go-live date set,0.88
+news,poc_stage_progression,security review started,0.84
+news,poc_stage_progression,procurement process initiated,0.85
 technographics,kubernetes_detected,kubernetes,0.7
 technographics,kubernetes_detected,eks,0.7
 technographics,kubernetes_detected,gke,0.7
@@ -48,6 +65,11 @@ technographics,cloud_platform_messaging,cloud platform,0.6
 technographics,compliance_governance_messaging,security compliance,0.58
 technographics,compliance_governance_messaging,data governance,0.6
 technographics,cost_reduction_mandate,cost optimization,0.62
+technographics,supply_chain_platform_rollout,supply chain platform,0.74
+technographics,supply_chain_platform_rollout,control tower platform,0.74
+technographics,erp_s4_migration_milestone,s/4hana,0.78
+technographics,vendor_consolidation_program,platform standardization,0.74
+technographics,vendor_consolidation_program,tool consolidation,0.74
 community,high_intent_phrase_production_fast,production-ready fast,0.8
 community,high_intent_phrase_devops_toil,devops is a ticketing system,0.8
 community,high_intent_phrase_devops_toil,infra is the bottleneck,0.8
@@ -58,8 +80,17 @@ community,env_spinup_requests,preview environments,0.75
 community,governance_enforcement_need,continuous enforcement,0.8
 community,governance_enforcement_need,rightsizing with confidence,0.75
 community,idp_golden_path_initiative,golden paths,0.78
+community,poc_stage_progression,pilot expanded,0.82
+community,poc_stage_progression,go-live date,0.82
+community,poc_stage_progression,security review,0.8
+community,vendor_consolidation_program,tool consolidation,0.75
+community,vendor_consolidation_program,single control plane,0.8
 news,enterprise_modernization_program,digital transformation,0.62
 news,data_platform_initiative,data platform,0.62
 news,cloud_platform_messaging,cloud platform,0.6
 news,compliance_governance_messaging,data governance,0.62
 news,compliance_governance_messaging,security compliance,0.6
+news,media_traffic_reliability_pressure,traffic surge,0.8
+news,media_traffic_reliability_pressure,ad stack outage,0.82
+news,media_traffic_reliability_pressure,cdn reliability incident,0.84
+news,media_traffic_reliability_pressure,paywall performance,0.8
