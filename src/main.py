@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 import sqlite3
 
 import typer
@@ -380,6 +381,77 @@ def calibrate_thresholds(
                     f"non_icp_accounts={suggestion.non_icp_accounts}",
                     f"non_icp_high_hit_rate={suggestion.non_icp_high_hit_rate}",
                     f"non_icp_medium_hit_rate={suggestion.non_icp_medium_hit_rate}",
+                    f"written={int(write)}",
+                ]
+            )
+        )
+    finally:
+        conn.close()
+
+
+@app.command("tune-profile")
+def tune_profile(
+    date_str: str = typer.Option(None, "--date", help="Tuning date YYYY-MM-DD"),
+    min_icp_medium_coverage: float = typer.Option(0.6, "--min-icp-medium-coverage", min=0.0, max=1.0),
+    max_non_icp_medium_hit_rate: float = typer.Option(0.5, "--max-non-icp-medium-hit-rate", min=0.0, max=1.0),
+    max_non_icp_high_hit_rate: float = typer.Option(0.25, "--max-non-icp-high-hit-rate", min=0.0, max=1.0),
+    min_scenario_pass_rate: float = typer.Option(0.9, "--min-scenario-pass-rate", min=0.0, max=1.0),
+    scenarios_path: str = typer.Option(
+        "config/profile_scenarios.csv",
+        "--scenarios-path",
+        help="Scenario CSV path relative to project root (or absolute path)",
+    ),
+    write: bool = typer.Option(False, "--write", help="Persist tuned thresholds into config/thresholds.csv"),
+) -> None:
+    settings, conn, seeded = _bootstrap()
+    run_date = parse_date(date_str, settings.run_timezone)
+    del seeded
+    try:
+        run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
+        if not run_id:
+            raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
+
+        raw_scenario_path = Path(scenarios_path)
+        scenario_path = raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        scenarios = calibration.load_scenarios(scenario_path)
+        current_thresholds = load_thresholds(settings.thresholds_path)
+
+        suggestion = calibration.suggest_profile_for_run(
+            conn=conn,
+            run_id=run_id,
+            reference_csv_path=settings.config_dir / "icp_reference_accounts.csv",
+            scenarios=scenarios,
+            min_icp_medium_coverage=min_icp_medium_coverage,
+            max_non_icp_medium_hit_rate=max_non_icp_medium_hit_rate,
+            max_non_icp_high_hit_rate=max_non_icp_high_hit_rate,
+            min_scenario_pass_rate=min_scenario_pass_rate,
+            current_thresholds=current_thresholds,
+        )
+
+        if write:
+            calibration.write_thresholds(
+                settings.thresholds_path,
+                high=suggestion.high,
+                medium=suggestion.medium,
+                low=suggestion.low,
+            )
+
+        typer.echo(
+            " ".join(
+                [
+                    f"run_id={run_id}",
+                    f"suggested_high={suggestion.high}",
+                    f"suggested_medium={suggestion.medium}",
+                    f"suggested_low={suggestion.low}",
+                    f"icp_accounts={suggestion.icp_accounts}",
+                    f"icp_medium_coverage={suggestion.icp_medium_coverage}",
+                    f"icp_high_coverage={suggestion.icp_high_coverage}",
+                    f"non_icp_accounts={suggestion.non_icp_accounts}",
+                    f"non_icp_medium_hit_rate={suggestion.non_icp_medium_hit_rate}",
+                    f"non_icp_high_hit_rate={suggestion.non_icp_high_hit_rate}",
+                    f"scenario_count={suggestion.scenario_count}",
+                    f"scenario_pass_rate={suggestion.scenario_pass_rate}",
+                    f"constraints_satisfied={int(suggestion.constraints_satisfied)}",
                     f"written={int(write)}",
                 ]
             )

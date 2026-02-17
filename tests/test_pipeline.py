@@ -118,3 +118,23 @@ def test_calibrate_thresholds_command_emits_suggestion(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "suggested_high=" in result.stdout
     assert "suggested_medium=" in result.stdout
+
+
+def test_tune_profile_command_emits_profile_suggestion(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(
+        root / "config" / "icp_reference_accounts.csv",
+        "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
+
+    runner = CliRunner()
+    daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert daily_result.exit_code == 0
+
+    result = runner.invoke(app, ["tune-profile", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+    assert "suggested_high=" in result.stdout
+    assert "scenario_pass_rate=" in result.stdout
