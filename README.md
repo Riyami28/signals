@@ -20,10 +20,11 @@ This repo implements a daily pipeline that:
 1. `ingest` (all collectors)
 2. `score`
 3. `export`
-4. `sync-sheet` (best effort; non-blocking if not configured)
-5. `import-reviews`
-6. quality + promotion report refresh
-7. ICP coverage report generation
+4. `prepare-review-input` (merge today’s review queue into `data/raw/review_input.csv`)
+5. `sync-sheet` (best effort; non-blocking if not configured)
+6. `import-reviews`
+7. quality + promotion report refresh
+8. ICP coverage report generation
 
 ## Sources
 
@@ -80,6 +81,7 @@ Generated output:
 python -m src.main ingest --all
 python -m src.main score --date 2026-02-16
 python -m src.main export --date 2026-02-16
+python -m src.main prepare-review-input --date 2026-02-16
 python -m src.main sync-sheet --date 2026-02-16
 python -m src.main import-reviews --date 2026-02-16
 python -m src.main run-daily --date 2026-02-16

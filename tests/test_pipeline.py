@@ -67,3 +67,21 @@ def test_ingest_no_all_rejected(tmp_path, monkeypatch):
     result = runner.invoke(app, ["ingest", "--no-all"])
 
     assert result.exit_code == 2
+
+
+def test_prepare_review_input_command_creates_local_template(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _write(
+        root / "data" / "out" / "review_queue_20260216.csv",
+        "run_date,account_id,company_name,domain,product,score,tier,top_reason_1,top_reason_2,top_reason_3,evidence_links\n"
+        "2026-02-16,acc_1,Acme,acme.example,zopdev,80,high,cloud_connected,,,\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+    monkeypatch.setenv("SIGNALS_RUN_TIMEZONE", "America/Los_Angeles")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["prepare-review-input", "--date", "2026-02-16"])
+
+    assert result.exit_code == 0
+    assert "prepared_review_rows=1" in result.stdout
+    assert (root / "data" / "raw" / "review_input.csv").exists()

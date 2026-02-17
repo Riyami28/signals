@@ -9,7 +9,7 @@ from src import db
 from src.collectors import community, first_party, jobs, news, technographics
 from src.export import csv_exporter
 from src.reporting import quality
-from src.review.import_reviews import import_reviews_for_date
+from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
 from src.scoring.engine import run_scoring
 from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry, load_thresholds
 from src.settings import Settings, load_settings
@@ -243,6 +243,22 @@ def import_reviews(date_str: str = typer.Option(None, "--date", help="Import dat
         conn.close()
 
 
+@app.command("prepare-review-input")
+def prepare_review_input(date_str: str = typer.Option(None, "--date", help="Review date YYYY-MM-DD")) -> None:
+    settings = load_settings()
+    ensure_project_directories(
+        [
+            settings.project_root,
+            settings.data_dir,
+            settings.raw_dir,
+            settings.out_dir,
+        ]
+    )
+    run_date = parse_date(date_str, settings.run_timezone)
+    prepared = prepare_review_input_for_date(settings, run_date)
+    typer.echo(f"prepared_review_rows={prepared}")
+
+
 @app.command("run-daily")
 def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD")) -> None:
     settings, conn, seeded = _bootstrap()
@@ -253,6 +269,7 @@ def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-M
 
         run_id = _run_scoring(conn, settings, run_date)
         export_result = _run_exports(conn, settings, run_date, run_id)
+        prepared_reviews = prepare_review_input_for_date(settings, run_date)
 
         sync_error = ""
         try:
@@ -278,6 +295,7 @@ def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-M
                     f"review_queue_rows={export_result['review_queue']}",
                     f"daily_scores_rows={export_result['daily_scores']}",
                     f"source_quality_rows={export_result['source_quality']}",
+                    f"prepared_review_rows={prepared_reviews}",
                     f"imported_reviews={imported}",
                     f"synced_review_queue_rows={sync_result['review_queue_rows']}",
                     f"icp_accounts={icp_report['total_accounts']}",
