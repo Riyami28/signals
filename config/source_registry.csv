@@ -12,3 +12,6 @@ community_csv,0.65,true
 reddit_rss,0.62,true
 first_party_csv,0.9,true
 manual_review_import,0.95,true
+huginn_webhook,0.72,true
+story_hunt,0.78,true
+story_hunt_js,0.74,true

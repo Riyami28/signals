@@ -22,6 +22,7 @@ dist/
 data/signals.db
 data/signals.db-shm
 data/signals.db-wal
+data/local/
 
 # Generated outputs and logs
 data/out/*.csv

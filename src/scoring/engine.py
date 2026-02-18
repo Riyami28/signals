@@ -113,6 +113,16 @@ def run_scoring(
                     "source": source,
                     "evidence_url": str(observation["evidence_url"] or ""),
                     "evidence_text": str(observation["evidence_text"] or "")[:280],
+                    "evidence_sentence": str(observation.get("evidence_sentence", "") or "")[:500],
+                    "evidence_sentence_en": str(observation.get("evidence_sentence_en", "") or "")[:500],
+                    "matched_phrase": str(observation.get("matched_phrase", "") or "")[:200],
+                    "language": str(observation.get("language", "") or "")[:20],
+                    "speaker_name": str(observation.get("speaker_name", "") or "")[:120],
+                    "speaker_role": str(observation.get("speaker_role", "") or "")[:80],
+                    "evidence_quality": float(observation.get("evidence_quality", 0.0) or 0.0),
+                    "relevance_score": float(observation.get("relevance_score", 0.0) or 0.0),
+                    "document_id": str(observation.get("document_id", "") or "")[:64],
+                    "mention_id": str(observation.get("mention_id", "") or "")[:64],
                 }
             )
 
@@ -144,6 +154,16 @@ def run_scoring(
             "source": str(best["source"]),
             "evidence_url": str(best["evidence_url"]),
             "evidence_text": str(best["evidence_text"]),
+            "evidence_sentence": str(best.get("evidence_sentence", "")),
+            "evidence_sentence_en": str(best.get("evidence_sentence_en", "")),
+            "matched_phrase": str(best.get("matched_phrase", "")),
+            "language": str(best.get("language", "")),
+            "speaker_name": str(best.get("speaker_name", "")),
+            "speaker_role": str(best.get("speaker_role", "")),
+            "evidence_quality": float(best.get("evidence_quality", 0.0) or 0.0),
+            "relevance_score": float(best.get("relevance_score", 0.0) or 0.0),
+            "document_id": str(best.get("document_id", "")),
+            "mention_id": str(best.get("mention_id", "")),
         }
 
     grouped_components: dict[tuple[str, str], list[tuple[str, float]]] = defaultdict(list)

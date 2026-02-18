@@ -1,0 +1,1001 @@
+company_name,domain,source_type,country,region_group,industry_label,website_url,wikidata_id,sitelinks,revenue_usd,employees,ranking_score,data_source,last_refreshed_on
+PepsiCo,pepsico.com,seed,United States,us,fast-moving consumer goods,https://www.pepsico.com/,Q334800,65,91854000000.0,309000,61.8695,wikidata,2026-02-18
+The Coca-Cola Company,coca-colacompany.com,seed,United States,us,fast-moving consumer goods,https://www.coca-colacompany.com/,Q3295867,73,47061000000.0,69700,61.0813,wikidata,2026-02-18
+Procter & Gamble,pg.com,seed,United States,us,fast-moving consumer goods,http://www.pg.com/,Q212405,62,84284000000.0,105000,60.906,wikidata,2026-02-18
+Unilever,unilever.com,seed,United Kingdom,uk,fast-moving consumer goods,https://unilever.com,Q157062,65,60073000000.0,148000,59.59,wikidata,2026-02-18
+Philip Morris International,pmi.com,seed,United States,us,fast-moving consumer goods,https://www.pmi.com/,Q1852556,38,31762000000.0,79800,58.0562,wikidata,2026-02-18
+3M,3m.com,seed,United States,us,consumer goods industry,https://www.3m.com/,Q159433,45,34229000000.0,94987,57.7806,wikidata,2026-02-18
+Kraft Heinz,kraftheinzcompany.com,seed,United States,us,fast-moving consumer goods,http://www.kraftheinzcompany.com,Q19681433,34,26485000000.0,36000,57.1102,wikidata,2026-02-18
+Kellanova,kelloggcompany.com,seed,United States,us,fast-moving consumer goods,https://www.kelloggcompany.com/en_US/home.html,Q856897,39,15315000000.0,33577,57.0397,wikidata,2026-02-18
+"Mars, Incorporated",mars.com,seed,United States,us,food processing,http://www.mars.com/,Q695087,46,35000000000.0,80000,55.7737,wikidata,2026-02-18
+Archer Daniels Midland,adm.com,seed,United States,us,food processing,https://adm.com/,Q632694,27,101556000000.0,31600,54.5217,wikidata,2026-02-18
+General Mills,generalmills.com,seed,United States,us,food industry,http://www.generalmills.com,Q629998,36,18992800000.0,35000,53.9932,wikidata,2026-02-18
+Avon Products Inc.,avonworldwide.com,seed,United States,us,cosmetics industry,https://www.avonworldwide.com/,Q791285,32,5718000000.0,36700,53.7636,wikidata,2026-02-18
+Nestlé,nestle.com,seed,Switzerland,europe,food industry,https://www.nestle.com/,Q160746,90,91354000000.0,270000,53.2832,wikidata,2026-02-18
+Virgin Group,virgin.com,seed,United Kingdom,uk,food industry,http://www.virgin.com,Q494917,42,16600000000.0,69000,53.2806,wikidata,2026-02-18
+British American Tobacco,bat.com,seed,United Kingdom,uk,tobacco industry,https://bat.com,Q856411,37,25776000000.0,55000,53.0867,wikidata,2026-02-18
+Bunge Limited,bunge.com,seed,United States,us,food industry,http://www.bunge.com/,Q1009458,15,67232000000.0,22706,53.0383,wikidata,2026-02-18
+Diageo,diageo.com,seed,United Kingdom,uk,beverage industry,http://www.diageo.com,Q161140,40,28270000000.0,29860,53.0275,wikidata,2026-02-18
+Altria,altria.com,seed,United States,us,food industry,http://www.altria.com,Q445007,30,24018000000.0,9900,52.9289,wikidata,2026-02-18
+SABMiller,sabmiller.com,seed,United Kingdom,uk,brewery,http://www.sabmiller.com/,Q4995,33,15300000000.0,70000,52.5056,wikidata,2026-02-18
+L'Oréal,loreal.com,seed,France,europe,fast-moving consumer goods,http://www.loreal.com,Q156077,58,41182500000.0,88000,52.4188,wikidata,2026-02-18
+Herbalife,iamherbalifenutrition.com,seed,United States,us,food industry,https://iamherbalifenutrition.com,Q572948,34,4890000000.0,7800,51.8598,wikidata,2026-02-18
+Danone,danone.com,seed,France,europe,fast-moving consumer goods,https://www.danone.com/,Q329426,50,27619000000.0,98105,51.5325,wikidata,2026-02-18
+Arla Foods,arla.com,seed,United Kingdom,uk,food industry,https://www.arla.com,Q674575,28,11200000000.0,20020,51.1007,wikidata,2026-02-18
+Simplot,simplot.com,seed,United States,us,food industry,https://simplot.com,Q3484788,9,11000000000.0,13000,50.8041,wikidata,2026-02-18
+Coca-Cola Europacific Partners,cocacolaep.com,seed,United Kingdom,uk,beverage industry,https://www.cocacolaep.com/,Q20811256,11,20438000000.0,41000,50.6467,wikidata,2026-02-18
+Colgate-Palmolive Company,colgatepalmolive.com,seed,United States,us,personal care product,http://www.colgatepalmolive.com/,Q609466,46,17967000000.0,0,49.3881,wikidata,2026-02-18
+Schwarz Gruppe,gruppe.schwarz,seed,Germany,europe,food industry,https://gruppe.schwarz/,Q712034,16,175400000000.0,442000,48.1728,wikidata,2026-02-18
+Mondelez International,mondelezinternational.com,seed,United States,us,food industry,https://www.mondelezinternational.com/,Q12857502,36,31496000000.0,0,48.0269,wikidata,2026-02-18
+Kimberly-Clark,kimberly-clark.com,seed,United States,us,personal care product,https://www.kimberly-clark.com/ar-sa/,Q1741634,26,20175000000.0,0,47.8787,wikidata,2026-02-18
+Estée Lauder Companies,elcompanies.com,seed,United States,us,cosmetics industry,http://www.elcompanies.com/,Q1260606,24,17737000000.0,0,47.618,wikidata,2026-02-18
+Hormel,hormel.com,seed,United States,us,food processing,http://www.hormel.com/,Q1454852,36,12458806000.0,0,47.3019,wikidata,2026-02-18
+Ferrero SpA,ferrero.com.cn,seed,Italy,europe,food industry,https://www.ferrero.com.cn,Q269792,43,19000000000.0,47212,47.2354,wikidata,2026-02-18
+Ferrero SpA,ferrero.com.tw,seed,Italy,europe,food industry,https://www.ferrero.com.tw,Q269792,43,19000000000.0,47212,47.2354,wikidata,2026-02-18
+Ferrero SpA,ferrero.com,seed,Italy,europe,food industry,https://www.ferrero.com/,Q269792,43,19000000000.0,47212,47.2354,wikidata,2026-02-18
+Nature's Sunshine Products,naturessunshine.com,seed,United States,us,personal care product,https://www.naturessunshine.com,Q4045079,6,324705000.0,901,47.188,wikidata,2026-02-18
+Nissin Food Products,nissin.com,seed,Japan,apac,food industry,https://www.nissin.com/,Q53293,29,204710000000.0,7408,46.8477,wikidata,2026-02-18
+The Hershey Company,thehersheycompany.com,seed,United States,us,"manufacture of cocoa, chocolate and sugar confectionery",https://www.thehersheycompany.com/en_us/home.html,Q1056637,30,10419294000.0,0,46.6821,wikidata,2026-02-18
+Beiersdorf,beiersdorf.com,seed,Germany,europe,cosmetics industry,https://www.beiersdorf.com,Q201691,31,9447000000.0,21743,46.2578,wikidata,2026-02-18
+CHS Inc.,chsinc.com,seed,United States,us,food industry,http://www.chsinc.com,Q5011381,10,38448033000.0,0,46.1028,wikidata,2026-02-18
+Pernod Ricard,pernod-ricard.com,seed,France,europe,food and tobacco industry,http://pernod-ricard.com/,Q837049,37,11598000000.0,18421,45.7974,wikidata,2026-02-18
+Dr Pepper Snapple Group,drpeppersnapplegroup.com,seed,United States,us,beverage industry,http://www.drpeppersnapplegroup.com/,Q1254149,14,14057000000.0,0,45.6362,wikidata,2026-02-18
+Bath & Body Works,bathandbodyworks.com,seed,United States,us,cosmetics industry,https://www.bathandbodyworks.com,Q810773,7,2300000000.0,0,44.6611,wikidata,2026-02-18
+Stock Spirits Group,stockspirits.com,seed,United Kingdom,uk,beverage industry,http://www.stockspirits.com/,Q17489012,5,274601000.0,980,44.528,wikidata,2026-02-18
+Haribo,haribo.com,seed,Germany,europe,confectionery industry,https://www.haribo.com,Q169552,40,2889000000.0,7000,44.3626,wikidata,2026-02-18
+The Ordinary,theordinary.com,seed,United Kingdom,uk,cosmetics industry,https://theordinary.com/en-de,Q126595227,0,15910000000.0,0,44.113,wikidata,2026-02-18
+Südzucker,suedzuckergroup.com,seed,Germany,europe,food and tobacco industry,https://www.suedzuckergroup.com/,Q474565,13,9694000000.0,18459,43.7384,wikidata,2026-02-18
+Dr. Oetker,oetker.de,seed,Germany,europe,food industry,https://www.oetker.de/,Q688668,24,2930000000.0,11617,43.4015,wikidata,2026-02-18
+Dr. Oetker,oetker-gruppe.de,seed,Germany,europe,food industry,https://oetker-gruppe.de,Q688668,24,2930000000.0,11617,43.4015,wikidata,2026-02-18
+Dr. Oetker,oetker.com,seed,Germany,europe,food industry,https://oetker.com,Q688668,24,2930000000.0,11617,43.4015,wikidata,2026-02-18
+Tchibo,tchibo.com,seed,Germany,europe,food industry,https://www.tchibo.com/,Q564213,19,3400000000.0,12000,43.1376,wikidata,2026-02-18
+China Feihe,feihe.com,seed,China,apac,dairy industry,http://www.feihe.com/,Q97348109,2,22770000000.0,9140,43.0986,wikidata,2026-02-18
+Douglas Holding,douglas.de,seed,Germany,europe,cosmetics industry,https://www.douglas.de/,Q2052213,4,2795000000.0,20000,43.095,wikidata,2026-02-18
+Douglas Holding,douglas.it,seed,Germany,europe,cosmetics industry,https://www.douglas.it,Q2052213,4,2795000000.0,20000,43.095,wikidata,2026-02-18
+Douglas Holding,douglas.nl,seed,Germany,europe,cosmetics industry,https://www.douglas.nl,Q2052213,4,2795000000.0,20000,43.095,wikidata,2026-02-18
+Douglas Holding,douglas.pl,seed,Germany,europe,cosmetics industry,https://www.douglas.pl,Q2052213,4,2795000000.0,20000,43.095,wikidata,2026-02-18
+Tönnies Holding,toennies.de,seed,Germany,europe,food industry,http://www.toennies.de,Q2464046,6,7300000000.0,19640,42.9944,wikidata,2026-02-18
+Bright Food,brightfood.com,seed,China,apac,fast-moving consumer goods,http://www.brightfood.com/,Q2925357,11,158007520000.0,0,42.7876,wikidata,2026-02-18
+Lekkerland,lekkerland.com,seed,Germany,europe,stimulant foodstuff,https://www.lekkerland.com/,Q1816527,4,13003000000.0,4801,42.4293,wikidata,2026-02-18
+Lekkerland,lekkerland.de,seed,Germany,europe,stimulant foodstuff,https://www.lekkerland.de/,Q1816527,4,13003000000.0,4801,42.4293,wikidata,2026-02-18
+Almarai Company,almarai.com,seed,Saudi Arabia,gulf,food industry,https://www.almarai.com/,Q3535226,10,5366674000.0,0,42.3135,wikidata,2026-02-18
+Weleda,weleda.com,seed,Switzerland,europe,cosmetics industry,http://www.weleda.com/,Q687934,18,424059000.0,2512,41.4796,wikidata,2026-02-18
+COFCO Group,cofco.com,seed,China,apac,food processing,https://www.cofco.com/en,Q4382137,15,471119900000.0,0,40.9616,wikidata,2026-02-18
+Ezaki Glico,glico.com,seed,Japan,apac,food industry,https://www.glico.com/jp/,Q391534,18,338571000000.0,0,40.9434,wikidata,2026-02-18
+Asahi Group Holdings,asahigroup-holdings.com,seed,Japan,apac,beverage industry,http://www.asahigroup-holdings.com/,Q11283168,2,1706901000000.0,0,40.928,wikidata,2026-02-18
+Europastry,europastry.com,seed,Spain,europe,food industry,https://www.europastry.com/,Q20106305,3,1506000000.0,4890,40.6752,wikidata,2026-02-18
+illy,illy.com,seed,Italy,europe,food industry,https://www.illy.com/,Q969999,20,568000000.0,1230,40.4342,wikidata,2026-02-18
+Meiji Corporation,meiji.co.jp,seed,Japan,apac,food industry,https://www.meiji.co.jp/,Q11512281,4,727838000000.0,0,40.4217,wikidata,2026-02-18
+Meggle AG,meggle.de,seed,Germany,europe,dairy,http://www.meggle.de/,Q1489981,7,1100000000.0,2700,40.3886,wikidata,2026-02-18
+Casa Tarradellas,casatarradellas.es,seed,Spain,europe,food industry,http://www.casatarradellas.es/ca/,Q8341680,3,1500000000.0,2500,40.2643,wikidata,2026-02-18
+Calbee,calbee.co.jp,seed,Japan,apac,confectionery,http://www.calbee.co.jp/index.php,Q846834,11,279315000000.0,0,40.233,wikidata,2026-02-18
+Verbund Katholischer Kliniken Düsseldorf,vkkd-kliniken.de,seed,Germany,europe,advancement of public health and of public hygiene,http://www.vkkd-kliniken.de,Q47523604,1,297660576.0,3443,40.0346,wikidata,2026-02-18
+Henkell & Co. Sektkellerei,henkell-freixenet.com,seed,Germany,europe,beverage industry,https://www.henkell-freixenet.com/de/,Q199239,9,689900000.0,2028,40.01,wikidata,2026-02-18
+Grupa Żywiec,grupazywiec.pl,seed,Poland,europe,food industry,http://www.grupazywiec.pl,Q1028326,7,773000000.0,2020,39.9365,wikidata,2026-02-18
+Barry Callebaut,barry-callebaut.com,seed,Switzerland,europe,food industry,https://www.barry-callebaut.com/,Q809018,15,14788600000.0,13,39.8604,wikidata,2026-02-18
+Barry Callebaut,wholefruitchocolate.com,seed,Switzerland,europe,food industry,https://www.wholefruitchocolate.com/,Q809018,15,14788600000.0,13,39.8604,wikidata,2026-02-18
+Charoen Pokphand,cpthailand.com,seed,Thailand,apac,food industry,http://www.cpthailand.com/,Q611064,18,41000000000.0,0,39.293,wikidata,2026-02-18
+Coppenrath & Wiese,coppenrath-wiese.com,seed,Germany,europe,food industry,https://www.coppenrath-wiese.com,Q1131390,3,420000000.0,2600,39.293,wikidata,2026-02-18
+Coppenrath & Wiese,coppenrath-wiese.de,seed,Germany,europe,food industry,https://www.coppenrath-wiese.de/,Q1131390,3,420000000.0,2600,39.293,wikidata,2026-02-18
+Halwani Bros. Co.,halwani.com.sa,seed,Saudi Arabia,gulf,food industry,http://www.halwani.com.sa,Q12208618,1,266212000.0,0,39.2454,wikidata,2026-02-18
+Adam Foods,adamfoods.com,seed,Spain,europe,food industry,http://www.adamfoods.com/es/,Q59316397,3,350000000.0,1400,38.7743,wikidata,2026-02-18
+Augustiner Bräu,augustiner-braeu.de,seed,Germany,europe,food and tobacco industry,http://www.augustiner-braeu.de,Q153546,15,191000000.0,443,38.5622,wikidata,2026-02-18
+Maspex,maspex.com,seed,Poland,europe,food industry,https://maspex.com/,Q576340,6,602000000.0,323,38.548,wikidata,2026-02-18
+The Quality Group,tqgg.de,seed,Germany,europe,food processing,https://www.tqgg.de,Q125212756,1,450000000.0,900,38.5424,wikidata,2026-02-18
+Munich Markets,markthallen-muenchen.de,seed,Germany,europe,food industry,http://markthallen-muenchen.de,Q1901049,2,2000000000.0,102,38.4698,wikidata,2026-02-18
+Import Parfumerie,impo.ch,seed,Switzerland,europe,cosmetics industry,https://www.impo.ch/de,Q1660352,1,131000000.0,670,38.3985,wikidata,2026-02-18
+Kulmbacher Brewery,kulmbacher.de,seed,Germany,europe,food and tobacco industry,http://www.kulmbacher.de,Q1742438,4,231700000.0,927,38.2814,wikidata,2026-02-18
+Myojo Foods,myojofoods.co.jp,seed,Japan,apac,food industry,https://www.myojofoods.co.jp/,Q1710181,3,47911000000.0,0,38.2148,wikidata,2026-02-18
+Idilia Foods,idilia.es,seed,Spain,europe,food industry,http://www.idilia.es/,Q39047644,4,260000000.0,700,38.201,wikidata,2026-02-18
+Spadel,spadel.com,seed,Belgium,europe,beverage industry,http://www.spadel.com/,Q3492634,2,241988000.0,733,38.0128,wikidata,2026-02-18
+Koikeya,koikeya.co.jp,seed,Japan,apac,confectionery,https://koikeya.co.jp/,Q11563252,3,33965000000.0,0,37.9459,wikidata,2026-02-18
+Venchi,venchi.com,seed,Italy,europe,food industry,https://venchi.com,Q4009482,8,80000000.0,950,37.785,wikidata,2026-02-18
+Hofpfisterei,hofpfisterei.de,seed,Germany,europe,food industry,https://www.hofpfisterei.de,Q1623217,3,62976000.0,910,37.1718,wikidata,2026-02-18
+Adelholzener Alpenquellen,adelholzener.de,seed,Germany,europe,beverage industry,http://www.adelholzener.de/,Q355041,3,126000000.0,347,37.1289,wikidata,2026-02-18
+Cooperativa La Fageda,fageda.cat,seed,Spain,europe,dairy,http://www.fageda.cat/,Q5963343,4,28500000.0,500,36.2685,wikidata,2026-02-18
+Cobega Group,cobega.com,seed,Spain,europe,beverage industry,https://www.cobega.com/,Q99520031,1,4230000000.0,0,36.1574,wikidata,2026-02-18
+Nadec,nadec.com,seed,Saudi Arabia,gulf,food industry,https://nadec.com/,Q12188937,4,3219000.0,0,36.0339,wikidata,2026-02-18
+PM-International,pm-international.com,seed,Germany,europe,food industry,http://www.pm-international.com,Q28719676,7,1710000000.0,0,35.9294,wikidata,2026-02-18
+Amway,amwayglobal.com,seed,United States,us,cosmetics industry,https://www.amwayglobal.com,Q481800,34,0.0,17000,35.8927,wikidata,2026-02-18
+Forever Living Products,foreverliving.com,seed,United States,us,personal care product,https://www.foreverliving.com,Q1002866,16,0.0,100000,35.53,wikidata,2026-02-18
+Whole Foods Market,wholefoodsmarket.com,seed,United States,us,food industry,https://www.wholefoodsmarket.com/,Q1809448,27,0.0,91000,35.3527,wikidata,2026-02-18
+Newell Brands,newellbrands.com,seed,United States,us,consumer goods industry,https://www.newellbrands.com/,Q667599,14,0.0,17200,35.2998,wikidata,2026-02-18
+R. J. Reynolds Tobacco Company,rjrt.com,seed,United States,us,tobacco industry,http://www.rjrt.com/,Q1759032,14,0.0,400000,35.2129,wikidata,2026-02-18
+Cadbury,cadbury.co.uk,seed,United Kingdom,uk,"manufacture of cocoa, chocolate and sugar confectionery",https://cadbury.co.uk/,Q6677525,38,0.0,71657,34.5874,wikidata,2026-02-18
+Agristo,agristo.com,seed,Belgium,europe,food industry,http://www.agristo.com/,Q15781867,3,459124739.0,0,34.5815,wikidata,2026-02-18
+Chiquita Brands International,chiquita.com,seed,United States,us,agricultural and food trade,http://www.chiquita.com,Q1074666,28,0.0,20000,34.5115,wikidata,2026-02-18
+The Body Shop,thebodyshop.com,seed,United Kingdom,uk,cosmetics industry,https://www.thebodyshop.com,Q837851,30,0.0,22000,34.2294,wikidata,2026-02-18
+Schwarzwaldmilch,schwarzwaldmilch.de,seed,Germany,europe,food industry,https://www.schwarzwaldmilch.de/,Q1441291,4,248000000.0,0,34.18,wikidata,2026-02-18
+Wrigley Company,wrigley.com,seed,United States,us,food industry,http://www.wrigley.com/,Q819241,24,0.0,16000,34.0558,wikidata,2026-02-18
+Plusfresc,plusfresc.cat,seed,Spain,europe,food industry,https://www.plusfresc.cat/,Q111373081,1,202900000.0,0,33.7831,wikidata,2026-02-18
+Associated British Foods,abf.co.uk,seed,United Kingdom,uk,food processing,http://abf.co.uk,Q117059,24,0.0,102000,33.682,wikidata,2026-02-18
+Imperial Brands,imperialbrandsplc.com,seed,United Kingdom,uk,food and tobacco industry,https://www.imperialbrandsplc.com/index.html,Q1471161,26,0.0,35300,33.1969,wikidata,2026-02-18
+Waitrose & Partners,waitrose.com,seed,United Kingdom,uk,food industry,https://waitrose.com,Q771734,14,0.0,150000,33.1165,wikidata,2026-02-18
+Steak 'n Shake,steaknshake.com,seed,United States,us,food industry,https://www.steaknshake.com/,Q7605233,7,0.0,20000,32.8315,wikidata,2026-02-18
+Hostess Brands,hostesscakes.com,seed,United States,us,food industry,http://hostesscakes.com,Q1630598,5,0.0,20000,32.6715,wikidata,2026-02-18
+Philip Morris USA,philipmorrisusa.com,seed,United States,us,tobacco industry,http://philipmorrisusa.com,Q1726300,5,0.0,7500,32.0752,wikidata,2026-02-18
+Pinnacle Foods,pinnaclefoods.com,seed,United States,us,food processing,http://www.pinnaclefoods.com/,Q16983587,8,0.0,4000,31.933,wikidata,2026-02-18
+Fuze Beverage,fuzebev.com,seed,United States,us,beverage industry,https://www.fuzebev.com/,Q21178899,14,0.0,1500,31.8169,wikidata,2026-02-18
+Fenty Beauty,fentybeauty.com,seed,United States,us,cosmetics industry,https://www.fentybeauty.com/,Q51135597,16,0.0,200,31.7545,wikidata,2026-02-18
+Odwalla,odwalla.com,seed,United States,us,beverage industry,http://www.odwalla.com/,Q3031783,10,0.0,900,31.1866,wikidata,2026-02-18
+Font-Sans,fontsans.com,seed,Spain,europe,food industry,https://www.fontsans.com/,Q129294725,0,7000000.0,0,31.0712,wikidata,2026-02-18
+Stew Leonard's,stewleonards.com,seed,United States,us,dairy product,http://www.stewleonards.com,Q7615653,1,0.0,2226,31.0168,wikidata,2026-02-18
+S. C. Johnson & Son,scjohnson.com,seed,United States,us,fast-moving consumer goods,http://www.scjohnson.com/,Q683170,22,0.0,0,31.01,wikidata,2026-02-18
+Hindustan Unilever,hul.co.in,seed,India,india,fast-moving consumer goods industry,https://www.hul.co.in/,Q1619376,16,0.0,0,30.53,wikidata,2026-02-18
+Coca-Cola Amatil,ccamatil.com,seed,Australia,australia,beverage industry,http://ccamatil.com,Q2981189,8,0.0,16100,30.5296,wikidata,2026-02-18
+MonaVie,monavie.com,seed,United States,us,food industry,https://monavie.com/,Q2597545,7,0.0,450,30.5258,wikidata,2026-02-18
+Sugar Foods Corporation,sugarfoods.com,seed,United States,us,food industry,https://www.sugarfoods.com/,Q137070534,1,0.0,901,30.4673,wikidata,2026-02-18
+Neutrogena,neutrogena.com,seed,United States,us,fast-moving consumer goods,http://www.neutrogena.com/,Q2451589,15,0.0,0,30.45,wikidata,2026-02-18
+Kylie Cosmetics,kyliecosmetics.com,seed,United States,us,cosmetics industry,https://www.kyliecosmetics.com,Q28859450,20,0.0,12,30.4095,wikidata,2026-02-18
+Hensley & Co.,hensley.com,seed,United States,us,beverage industry,http://www.hensley.com,Q5731372,1,0.0,800,30.3951,wikidata,2026-02-18
+Dabur,dabur.com,seed,India,india,fast-moving consumer goods,https://www.dabur.com/,Q2723075,13,0.0,0,30.29,wikidata,2026-02-18
+Sara Lee Corporation,saralee.com,seed,United States,us,fast-moving consumer goods,http://www.saralee.com/,Q660309,12,0.0,0,30.21,wikidata,2026-02-18
+Brihans Natural Products,brihansnatural.com,seed,India,india,cosmetics industry,https://brihansnatural.com/,Q27863816,3,0.0,65,30.0374,wikidata,2026-02-18
+Erewhon,erewhonmarket.com,seed,United States,us,health food,https://www.erewhonmarket.com/,Q105628552,4,0.0,216,29.841,wikidata,2026-02-18
+Nirma,nirma.co.in,seed,India,india,fast-moving consumer goods,http://www.nirma.co.in,Q12435810,7,0.0,0,29.81,wikidata,2026-02-18
+Icon Undies,iconundies.com,seed,United States,us,personal care product,https://www.iconundies.com/,Q50826450,1,0.0,49,29.7086,wikidata,2026-02-18
+A.G. Barr,agbarr.co.uk,seed,United Kingdom,uk,beverage industry,http://www.agbarr.co.uk,Q4647179,10,0.0,930,29.7065,wikidata,2026-02-18
+FreeLife,freelife.com,seed,United States,us,food industry,http://www.freelife.com,Q5499653,2,0.0,220,29.6921,wikidata,2026-02-18
+Maybelline,maybelline.com.br,seed,United States,us,cosmetics industry,https://www.maybelline.com.br/,Q1351054,30,0.0,0,29.65,wikidata,2026-02-18
+Maybelline,maybelline.com,seed,United States,us,cosmetics industry,https://www.maybelline.com/,Q1351054,30,0.0,0,29.65,wikidata,2026-02-18
+Diamond Foods,diamondfoods.com,seed,United States,us,fast-moving consumer goods,http://www.diamondfoods.com/,Q5270794,5,0.0,0,29.65,wikidata,2026-02-18
+Marico,marico.com,seed,India,india,fast-moving consumer goods,http://www.marico.com,Q13120120,3,0.0,0,29.49,wikidata,2026-02-18
+Bajaj Corp Ltd,bajajcorp.com,seed,India,india,fast-moving consumer goods,http://www.bajajcorp.com,Q4848821,3,0.0,0,29.49,wikidata,2026-02-18
+Godrej Consumer Products Limited,godrejcp.com,seed,India,india,fast-moving consumer goods,http://godrejcp.com/,Q5576809,2,0.0,0,29.41,wikidata,2026-02-18
+Tasty Bite,tastybite.com,seed,India,india,fast-moving consumer goods,http://www.tastybite.com,Q7687744,1,0.0,0,29.33,wikidata,2026-02-18
+Reddy Ice,reddyice.com,seed,United States,us,fast-moving consumer goods,https://www.reddyice.com/,Q7305666,1,0.0,0,29.33,wikidata,2026-02-18
+Naterra,naterra.com,seed,United States,us,fast-moving consumer goods,http://www.naterra.com/,Q6968763,1,0.0,0,29.33,wikidata,2026-02-18
+Coca-Cola India,coca-colaindia.com,seed,India,india,fast-moving consumer goods,http://www.coca-colaindia.com,Q28173816,1,0.0,0,29.33,wikidata,2026-02-18
+Revlon,revlon.com,seed,United States,us,cosmetics industry,http://www.revlon.com/,Q1459595,25,0.0,0,29.25,wikidata,2026-02-18
+Wave Soda,wavesoda.com,seed,United States,us,fast-moving consumer goods,https://wavesoda.com,Q66310385,0,0.0,0,29.25,wikidata,2026-02-18
+Supermarket News,supermarketnews.com,seed,United States,us,fast-moving consumer goods,https://www.supermarketnews.com/,Q108279742,0,0.0,0,29.25,wikidata,2026-02-18
+KS Oils,ksoils.com,seed,India,india,fast-moving consumer goods,http://www.ksoils.com/,Q6338436,0,0.0,0,29.25,wikidata,2026-02-18
+Häagen-Dazs,icecream.com,seed,United States,us,food industry,https://www.icecream.com/us/en/brands/haagen-dazs,Q1143333,36,0.0,0,29.13,wikidata,2026-02-18
+H. J. Heinz Company,heinz.com,seed,United States,us,food processing,http://www.heinz.com,Q850324,36,0.0,0,29.13,wikidata,2026-02-18
+good2grow,good2grow.com,seed,United States,us,beverage industry,https://good2grow.com/,Q131717113,0,0.0,110,29.1135,wikidata,2026-02-18
+Make-up Art Cosmetics,maccosmetics.com,seed,United States,us,cosmetics industry,https://www.maccosmetics.com/,Q2624442,23,0.0,0,29.09,wikidata,2026-02-18
+Ted Drewes,teddrewes.com,seed,United States,us,dairy industry,http://www.teddrewes.com,Q7693148,2,0.0,65,28.9574,wikidata,2026-02-18
+NYX Professional Makeup,nyxcosmetics.com,seed,United States,us,consumer goods industry,https://www.nyxcosmetics.com,Q23671513,7,0.0,0,28.81,wikidata,2026-02-18
+NYX Professional Makeup,nyxcosmetics.fr,seed,United States,us,consumer goods industry,https://www.nyxcosmetics.fr/,Q23671513,7,0.0,0,28.81,wikidata,2026-02-18
+Max Factor,maxfactor.com,seed,United States,us,personal care product,http://www.maxfactor.com/,Q2354647,19,0.0,0,28.77,wikidata,2026-02-18
+Dolce & Gabbana,dolcegabbana.com,seed,Italy,europe,cosmetics industry,https://www.dolcegabbana.com/,Q214480,53,0.0,2000,28.6117,wikidata,2026-02-18
+Sunbeam Products,sunbeam.com,seed,United States,us,consumer goods industry,https://www.sunbeam.com/,Q7638903,4,0.0,0,28.57,wikidata,2026-02-18
+Karlsberg,karlsberg.de,seed,Germany,europe,beverage industry,https://karlsberg.de/,Q520174,10,394.0,1063,28.4616,wikidata,2026-02-18
+Graco,gracobaby.com,seed,United States,us,consumer goods industry,http://www.gracobaby.com/,Q5591658,2,0.0,0,28.41,wikidata,2026-02-18
+Unicharm,unicharm.co.jp,seed,Japan,apac,fast-moving consumer goods,http://www.unicharm.co.jp/,Q5361268,13,0.0,10287,28.4073,wikidata,2026-02-18
+Ulta Beauty,ulta.com,seed,United States,us,cosmetics industry,https://www.ulta.com/,Q7880076,14,0.0,0,28.37,wikidata,2026-02-18
+Nu Skin Enterprises,nuskin.com,seed,United States,us,personal care product,http://www.nuskin.com/,Q1764040,14,0.0,0,28.37,wikidata,2026-02-18
+Mary Kay,marykay.com,seed,United States,us,cosmetics industry,http://www.marykay.com/,Q470196,14,0.0,0,28.37,wikidata,2026-02-18
+Mary Kay,marykay.ca,seed,United States,us,cosmetics industry,https://www.marykay.ca/,Q470196,14,0.0,0,28.37,wikidata,2026-02-18
+Mary Kay,marykay.com.br,seed,United States,us,cosmetics industry,https://www.marykay.com.br,Q470196,14,0.0,0,28.37,wikidata,2026-02-18
+Mary Kay,marykay.pl,seed,United States,us,cosmetics industry,https://www.marykay.pl/,Q470196,14,0.0,0,28.37,wikidata,2026-02-18
+Mary Kay,marykay.ru,seed,United States,us,cosmetics industry,https://www.marykay.ru/,Q470196,14,0.0,0,28.37,wikidata,2026-02-18
+Lofthouse of Fleetwood,fishermansfriend.com,seed,United Kingdom,uk,food industry,http://www.fishermansfriend.com,Q1867912,2,0.0,280,28.3382,wikidata,2026-02-18
+Gatorade,gatorade.com,seed,United States,us,food industry,https://gatorade.com/,Q304992,26,0.0,0,28.33,wikidata,2026-02-18
+Libman Company,libman.com,seed,United States,us,consumer goods industry,http://www.libman.com/,Q65079102,1,0.0,0,28.33,wikidata,2026-02-18
+Good Store,good.store,seed,United States,us,consumer goods industry,https://good.store/,Q135102254,1,0.0,0,28.33,wikidata,2026-02-18
+Yorkville Advisors,yorkvilleadvisors.com,seed,United States,us,consumer goods industry,http://www.yorkvilleadvisors.com/,Q112388702,0,0.0,0,28.25,wikidata,2026-02-18
+Thriving Brands LLC,thriving-brands.com,seed,United States,us,consumer goods industry,https://thriving-brands.com/,Q123556050,0,0.0,0,28.25,wikidata,2026-02-18
+GoSun,gosun.co,seed,United States,us,consumer goods,https://gosun.co,Q129005172,0,0.0,0,28.25,wikidata,2026-02-18
+Reckitt,reckitt.com,seed,United Kingdom,uk,personal care product,https://www.reckitt.com/,Q1190881,31,0.0,0,28.23,wikidata,2026-02-18
+Benefit Cosmetics,benefitcosmetics.com,seed,United States,us,cosmetics industry,https://www.benefitcosmetics.com/,Q2895769,12,0.0,0,28.21,wikidata,2026-02-18
+Nabisco,nabisco.com,seed,United States,us,food processing,http://www.nabisco.com/,Q1545718,24,0.0,0,28.17,wikidata,2026-02-18
+Beyond Meat,beyondmeat.com,seed,United States,us,food industry,https://beyondmeat.com/,Q18205509,24,0.0,0,28.17,wikidata,2026-02-18
+Kiehl's,kiehls.com,seed,United States,us,cosmetics industry,https://www.kiehls.com/,Q3196447,11,0.0,0,28.13,wikidata,2026-02-18
+Quaker Oats Company,quakeroats.com,seed,United States,us,food industry,https://www.quakeroats.com/,Q2699694,23,0.0,0,28.09,wikidata,2026-02-18
+Shiseido,shiseido.com,seed,Japan,apac,cosmetics industry,https://corp.shiseido.com/,Q728185,26,0.0,28793,28.073,wikidata,2026-02-18
+Campbell's,campbells.com,seed,United States,us,food industry,https://www.campbells.com/,Q1030544,22,0.0,0,28.01,wikidata,2026-02-18
+Sun Mark,sunmark.co.uk,seed,United Kingdom,uk,fast-moving consumer goods,http://www.sunmark.co.uk,Q22032163,1,0.0,0,27.83,wikidata,2026-02-18
+Minute Maid,minutemaid.com,seed,United States,us,beverage industry,https://www.minutemaid.com/,Q1206056,19,0.0,0,27.77,wikidata,2026-02-18
+Frito-Lay,fritolay.com,seed,United States,us,food industry,https://fritolay.com/,Q1221751,19,0.0,0,27.77,wikidata,2026-02-18
+Amul,amul.com,seed,India,india,dairy industry,http://www.amul.com/,Q2721482,19,0.0,0,27.77,wikidata,2026-02-18
+R.E.M. Beauty,rembeauty.com,seed,United States,us,cosmetics industry,https://rembeauty.com,Q117086143,6,0.0,0,27.73,wikidata,2026-02-18
+Edgewell Personal Care,edgewell.com,seed,United States,us,personal care product,https://edgewell.com/,Q5337641,6,0.0,0,27.73,wikidata,2026-02-18
+Anastasia Beverly Hills,anastasiabeverlyhills.com,seed,United States,us,cosmetics industry,https://www.anastasiabeverlyhills.com,Q56274930,6,0.0,0,27.73,wikidata,2026-02-18
+Young Living,youngliving.com,seed,United States,us,personal care product,https://www.youngliving.com/,Q18067581,5,0.0,0,27.65,wikidata,2026-02-18
+Supercuts,supercuts.com,seed,United States,us,beauty salon,http://www.supercuts.com,Q7643239,5,0.0,0,27.65,wikidata,2026-02-18
+Remington Products,remingtonproducts.com,seed,United States,us,personal care product,http://www.remingtonproducts.com,Q825258,5,0.0,0,27.65,wikidata,2026-02-18
+OPI Products,opi.com,seed,United States,us,cosmetics industry,https://www.opi.com,Q15982607,5,0.0,0,27.65,wikidata,2026-02-18
+Modere,modere.com,seed,United States,us,personal care product,https://www.modere.com/,Q620881,5,0.0,0,27.65,wikidata,2026-02-18
+Aveda,aveda.com,seed,United States,us,cosmetics industry,http://www.aveda.com/,Q4827965,5,0.0,0,27.65,wikidata,2026-02-18
+Aveda,aveda.ca,seed,United States,us,cosmetics industry,https://www.aveda.ca/,Q4827965,5,0.0,0,27.65,wikidata,2026-02-18
+"Conagra Brands, Inc.",conagrabrands.com,seed,United States,us,food industry,https://www.conagrabrands.com/,Q1123399,17,0.0,0,27.61,wikidata,2026-02-18
+Great Clips,greatclips.com,seed,United States,us,beauty salon,https://www.greatclips.com/,Q5598967,4,0.0,0,27.57,wikidata,2026-02-18
+e.l.f. Cosmetics,elfcosmetics.com,seed,United States,us,cosmetics industry,https://www.elfcosmetics.com/,Q5422801,4,0.0,0,27.57,wikidata,2026-02-18
+AdvoCare,advocare.com,seed,United States,us,personal care product,https://www.advocare.com,Q4686868,4,0.0,0,27.57,wikidata,2026-02-18
+Tropicana Products,tropicana.com,seed,United States,us,food industry,https://www.tropicana.com,Q1846049,16,0.0,0,27.53,wikidata,2026-02-18
+Clorox,thecloroxcompany.com,seed,United States,us,food industry,http://www.thecloroxcompany.com,Q910368,16,0.0,0,27.53,wikidata,2026-02-18
+Unicorn Grocery,unicorn-grocery.coop,seed,United Kingdom,uk,food industry,http://www.unicorn-grocery.coop/,Q7884777,3,0.0,64,27.5281,wikidata,2026-02-18
+Thinx,shethinx.com,seed,United States,us,personal care product,https://www.shethinx.com/,Q28402777,3,0.0,0,27.49,wikidata,2026-02-18
+Sunrider,sunrider.com,seed,United States,us,personal care product,http://www.sunrider.com,Q7641005,3,0.0,0,27.49,wikidata,2026-02-18
+Shaklee,shaklee.com,seed,United States,us,cosmetics industry,http://www.shaklee.com/,Q7462961,3,0.0,0,27.49,wikidata,2026-02-18
+"Origins Natural Resources, Inc.",origins.com,seed,United States,us,cosmetics industry,https://www.origins.com/,Q6643229,3,0.0,0,27.49,wikidata,2026-02-18
+Jeffree Star Cosmetics,jeffreestarcosmetics.com,seed,United States,us,cosmetics industry,https://jeffreestarcosmetics.com/,Q72342808,3,0.0,0,27.49,wikidata,2026-02-18
+Japan Tobacco,jti.co.jp,seed,Japan,apac,tobacco industry,https://www.jti.co.jp/,Q898568,25,0.0,63969,27.4784,wikidata,2026-02-18
+Japan Tobacco,jt.com,seed,Japan,apac,tobacco industry,http://www.jt.com/,Q898568,25,0.0,63969,27.4784,wikidata,2026-02-18
+Feastables,feastables.com,seed,United States,us,food processing,https://feastables.com/,Q115273234,15,0.0,0,27.45,wikidata,2026-02-18
+Din Tai Fung,dintaifung.com.tw,seed,United States,us,food industry,http://www.dintaifung.com.tw,Q699142,15,0.0,0,27.45,wikidata,2026-02-18
+Din Tai Fung,dintaifungusa.com,seed,United States,us,food industry,https://dintaifungusa.com/,Q699142,15,0.0,0,27.45,wikidata,2026-02-18
+Younique,youniqueproducts.com,seed,United States,us,cosmetics industry,https://www.youniqueproducts.com/,Q85816886,2,0.0,0,27.41,wikidata,2026-02-18
+Nerium International,nerium.com,seed,United States,us,cosmetics industry,https://www.nerium.com/,Q48180428,2,0.0,0,27.41,wikidata,2026-02-18
+Merle Norman Cosmetics,merlenorman.com,seed,United States,us,cosmetics industry,https://www.merlenorman.com,Q104844059,2,0.0,0,27.41,wikidata,2026-02-18
+Merle Norman Cosmetics,merlenormanstudio.com,seed,United States,us,cosmetics industry,https://www.merlenormanstudio.com,Q104844059,2,0.0,0,27.41,wikidata,2026-02-18
+Madame C.J. Walker Manufacturing Company,madamewalker.net,seed,United States,us,cosmetics industry,http://www.madamewalker.net,Q6726282,2,0.0,0,27.41,wikidata,2026-02-18
+Madame C.J. Walker Manufacturing Company,madamcjwalker.com,seed,United States,us,cosmetics industry,https://madamcjwalker.com,Q6726282,2,0.0,0,27.41,wikidata,2026-02-18
+Julep,julep.com,seed,United States,us,personal care product,http://www.julep.com,Q21750314,2,0.0,0,27.41,wikidata,2026-02-18
+Hair Cuttery,haircuttery.com,seed,United States,us,beauty salon,https://www.haircuttery.com/,Q5639484,2,0.0,0,27.41,wikidata,2026-02-18
+Envision Healthcare,envisionhealthcare.com,seed,United States,us,beauty,http://www.envisionhealthcare.com,Q28155562,2,0.0,0,27.41,wikidata,2026-02-18
+Bluemercury,bluemercury.com,seed,United States,us,cosmetics industry,https://www.bluemercury.com,Q4930376,2,0.0,0,27.41,wikidata,2026-02-18
+Seagram Company Ltd.,seagramsgin.com,seed,United States,us,beverage industry,http://www.seagramsgin.com/,Q1969696,14,0.0,0,27.37,wikidata,2026-02-18
+Monster Beverage,monsterbevcorp.com,seed,United States,us,beverage industry,http://www.monsterbevcorp.com/,Q1945295,14,0.0,0,27.37,wikidata,2026-02-18
+Trixie Cosmetics,trixiecosmetics.com,seed,United States,us,cosmetics industry,https://trixiecosmetics.com,Q119862489,1,0.0,0,27.33,wikidata,2026-02-18
+Rodan + Fields,rodanandfields.com,seed,United States,us,personal care product,http://www.rodanandfields.com,Q24915149,1,0.0,0,27.33,wikidata,2026-02-18
+RealSelf,realself.com,seed,United States,us,cosmetics industry,https://www.realself.com,Q22908167,1,0.0,0,27.33,wikidata,2026-02-18
+NeoLife,neolife.com,seed,United States,us,cosmetics industry,http://www.neolife.com/,Q25429916,1,0.0,0,27.33,wikidata,2026-02-18
+Morphe,morphe.com,seed,United States,us,cosmetics industry,https://www.morphe.com/,Q85944707,1,0.0,0,27.33,wikidata,2026-02-18
+Monat,monatglobal.com,seed,United States,us,personal care product,https://monatglobal.com/,Q97174844,1,0.0,0,27.33,wikidata,2026-02-18
+Modelinia,modelinia.com,seed,United States,us,cosmetics industry,http://www.modelinia.com,Q6888376,1,0.0,0,27.33,wikidata,2026-02-18
+Lifeplus,lifeplus.com,seed,United States,us,personal care product,https://ww1.lifeplus.com/,Q60848202,1,0.0,0,27.33,wikidata,2026-02-18
+Jeunesse Global,jeunesseglobal.com,seed,United States,us,cosmetics industry,https://jeunesseglobal.com,Q23878133,1,0.0,0,27.33,wikidata,2026-02-18
+DEX New York,dexnewyork.com,seed,United States,us,personal care product,https://www.dexnewyork.com/,Q16835173,1,0.0,0,27.33,wikidata,2026-02-18
+Cbi Laboratories,cbiskincare.com,seed,United States,us,cosmetics industry,http://www.cbiskincare.com,Q5055620,1,0.0,0,27.33,wikidata,2026-02-18
+Bondi Sands,bondisands.co.uk,seed,United States,us,cosmetics industry,https://www.bondisands.co.uk/,Q85845553,1,0.0,0,27.33,wikidata,2026-02-18
+Beautycounter,beautycounter.com,seed,United States,us,cosmetics industry,http://beautycounter.com,Q28222828,1,0.0,0,27.33,wikidata,2026-02-18
+Arbonne International,arbonne.com,seed,United States,us,personal care product,http://www.arbonne.com,Q29964082,1,0.0,0,27.33,wikidata,2026-02-18
+America's Best Contacts & Eyeglasses,americasbest.com,seed,United States,us,Health and Personal Care Stores,https://www.americasbest.com/,Q4742504,1,0.0,0,27.33,wikidata,2026-02-18
+Adani Wilmar,awl.in,seed,India,india,personal care product,https://www.awl.in,Q109979847,1,0.0,0,27.33,wikidata,2026-02-18
+Yuengling,yuengling.com,seed,United States,us,beverage industry,http://www.yuengling.com/,Q844073,13,0.0,0,27.29,wikidata,2026-02-18
+Tata Consumer Products,tataconsumer.com,seed,India,india,food industry,https://www.tataconsumer.com,Q795622,13,0.0,0,27.29,wikidata,2026-02-18
+McCormick & Company,mccormickcorporation.com,seed,United States,us,food industry,http://www.mccormickcorporation.com,Q1915049,13,0.0,0,27.29,wikidata,2026-02-18
+Youngevity,youngevity.com,seed,United States,us,personal care product,https://youngevity.com/,Q33973342,0,0.0,0,27.25,wikidata,2026-02-18
+Ursa Major Skin Care,ursamajorvt.com,seed,United States,us,personal care product,https://www.ursamajorvt.com/,Q83549311,0,0.0,0,27.25,wikidata,2026-02-18
+Trek Alliance,trekalliance.com,seed,United States,us,personal care product,http://www.trekalliance.com,Q30060534,0,0.0,0,27.25,wikidata,2026-02-18
+Seint,seintofficial.com,seed,United States,us,cosmetics industry,https://www.seintofficial.com,Q123013585,0,0.0,0,27.25,wikidata,2026-02-18
+Rain International,rainintl.com,seed,United States,us,personal care product,https://rainintl.com,Q33849405,0,0.0,0,27.25,wikidata,2026-02-18
+Prose Beauty,prose.com,seed,United States,us,cosmetics industry,https://prose.com/,Q122050725,0,0.0,0,27.25,wikidata,2026-02-18
+"Phoenix Chemical, inc.",phoenix-chem.com,seed,United States,us,cosmetics industry,https://phoenix-chem.com/,Q89038817,0,0.0,0,27.25,wikidata,2026-02-18
+Perfumania,perfumania.com,seed,United States,us,cosmetics industry,https://www.perfumania.com,Q72983916,0,0.0,0,27.25,wikidata,2026-02-18
+Natural Escapes Body,naturalescapes.com,seed,United States,us,cosmetics industry,https://www.naturalescapes.com,Q135436937,0,0.0,0,27.25,wikidata,2026-02-18
+Mollagara Since 1895,mollagaraofficial.com,seed,United States,us,cosmetics industry,https://mollagaraofficial.com/,Q135678918,0,0.0,0,27.25,wikidata,2026-02-18
+Melaleuca,melaleuca.com,seed,United States,us,personal care product,http://www.melaleuca.com,Q30059390,0,0.0,0,27.25,wikidata,2026-02-18
+Mars Nails,marsnails.com,seed,United States,us,cosmetics industry,https://www.marsnails.com/,Q136676349,0,0.0,0,27.25,wikidata,2026-02-18
+Magic in Mohmaya,magicinmohmaya.com,seed,India,india,cosmetics industry,https://magicinmohmaya.com/,Q136675560,0,0.0,0,27.25,wikidata,2026-02-18
+LYLA BLANC PRIVATE LIMITED,lylablanc.in,seed,India,india,cosmetics industry,https://www.lylablanc.in/,Q105037683,0,0.0,0,27.25,wikidata,2026-02-18
+Juvia's Place,juviasplace.com,seed,United States,us,cosmetics industry,https://www.juviasplace.com/,Q111287993,0,0.0,0,27.25,wikidata,2026-02-18
+IWELL US,iwellus.com,seed,United States,us,cosmetics industry,https://iwellus.com,Q134007155,0,0.0,0,27.25,wikidata,2026-02-18
+Essanté Organics,essanteorganics.com,seed,United States,us,personal care product,http://www.essanteorganics.com/,Q33317675,0,0.0,0,27.25,wikidata,2026-02-18
+Credo,credobeauty.com,seed,United States,us,cosmetics industry,https://credobeauty.com,Q33308819,0,0.0,0,27.25,wikidata,2026-02-18
+Cleverman,cleverman.com,seed,United States,us,personal care product,https://cleverman.com,Q135642589,0,0.0,0,27.25,wikidata,2026-02-18
+Bolden,boldenusa.com,seed,United States,us,cosmetics industry,https://www.boldenusa.com/,Q29187775,0,0.0,0,27.25,wikidata,2026-02-18
+Pillsbury Company,pillsbury.ca,seed,United States,us,food industry,https://www.pillsbury.ca,Q1423726,12,0.0,0,27.21,wikidata,2026-02-18
+Pillsbury Company,pillsbury.com,seed,United States,us,food industry,https://www.pillsbury.com/,Q1423726,12,0.0,0,27.21,wikidata,2026-02-18
+Keurig Dr Pepper,keurigdrpepper.com,seed,United States,us,beverage industry,https://www.keurigdrpepper.com/,Q3116111,12,0.0,0,27.21,wikidata,2026-02-18
+Instacart,instacart.com,seed,United States,us,food product,https://instacart.com/,Q22909236,12,0.0,0,27.21,wikidata,2026-02-18
+Impossible Foods,impossiblefoods.com,seed,United States,us,food industry,http://impossiblefoods.com/,Q21515382,12,0.0,0,27.21,wikidata,2026-02-18
+Gerber Products Company,gerber.com,seed,United States,us,food industry,http://gerber.com/,Q523452,12,0.0,0,27.21,wikidata,2026-02-18
+Lotte,lotte.co.jp,seed,Japan,apac,beverage industry,https://www.lotte.co.jp/,Q482841,22,0.0,60000,27.1994,wikidata,2026-02-18
+Rimmel,rimmellondon.com,seed,United Kingdom,uk,cosmetics industry,https://www.rimmellondon.com,Q966846,18,0.0,0,27.19,wikidata,2026-02-18
+Lush,lush.com,seed,United Kingdom,uk,cosmetics industry,https://www.lush.com/,Q1585448,18,0.0,0,27.19,wikidata,2026-02-18
+Dean Foods,deanfoods.com,seed,United States,us,food industry,https://www.deanfoods.com/,Q645072,11,0.0,0,27.13,wikidata,2026-02-18
+Chobani,chobani.com,seed,United States,us,food processing,http://chobani.com/,Q5103456,11,0.0,0,27.13,wikidata,2026-02-18
+ASOS,asos.com,seed,United Kingdom,uk,cosmetics industry,https://www.asos.com,Q211951,17,0.0,0,27.11,wikidata,2026-02-18
+Unilever Australasia,unilever.com.au,seed,Australia,australia,fast-moving consumer goods,http://www.unilever.com.au/,Q7885206,1,0.0,0,27.08,wikidata,2026-02-18
+Twinings,twinings.co.uk,seed,United Kingdom,uk,food industry,https://www.twinings.co.uk/,Q1054692,29,0.0,0,27.07,wikidata,2026-02-18
+Suntory Global Spirits,beamsuntory.com,seed,United States,us,beverage industry,http://www.beamsuntory.com/,Q2892812,10,0.0,0,27.05,wikidata,2026-02-18
+Reynolds American,reynoldsamerican.com,seed,United States,us,tobacco industry,https://www.reynoldsamerican.com/,Q947718,10,0.0,0,27.05,wikidata,2026-02-18
+Mother Dairy,motherdairy.com,seed,India,india,food processing,http://www.motherdairy.com,Q6917320,10,0.0,0,27.05,wikidata,2026-02-18
+Jimmy John's,jimmyjohns.com,seed,United States,us,food industry,https://www.jimmyjohns.com/,Q1689380,10,0.0,0,27.05,wikidata,2026-02-18
+Arizona Beverage Company,drinkarizona.com,seed,United States,us,beverage industry,https://drinkarizona.com/,Q4791249,10,0.0,0,27.05,wikidata,2026-02-18
+US Foods,usfoods.com,seed,United States,us,foodservice distributor,https://www.usfoods.com/,Q1668265,9,0.0,0,26.97,wikidata,2026-02-18
+Haldiram's,haldirams.com,seed,India,india,food industry,https://www.haldirams.com,Q17054442,9,0.0,0,26.97,wikidata,2026-02-18
+Brown-Forman,brown-forman.com,seed,United States,us,beverage industry,http://www.brown-forman.com,Q392221,9,0.0,0,26.97,wikidata,2026-02-18
+Blue Bell Creameries,bluebell.com,seed,United States,us,food industry,http://www.bluebell.com/,Q4928865,9,0.0,0,26.97,wikidata,2026-02-18
+Melitta,melitta-group.com,seed,Germany,europe,consumer goods industry,http://www.melitta-group.com,Q566807,15,0.0,3672,26.941,wikidata,2026-02-18
+United Natural Foods,unfi.com,seed,United States,us,food distribution,https://www.unfi.com/,Q7888979,8,0.0,0,26.89,wikidata,2026-02-18
+Perdue Farms,perdue.com,seed,United States,us,food industry,http://www.perdue.com,Q7167716,8,0.0,0,26.89,wikidata,2026-02-18
+Brown & Williamson,archive.org,seed,United States,us,tobacco industry,https://web.archive.org/web/19980426143800/http://www.bw.com,Q2926338,8,0.0,0,26.89,wikidata,2026-02-18
+Britannia Industries,britannia.co.in,seed,India,india,food industry,http://www.britannia.co.in/,Q4969284,8,0.0,0,26.89,wikidata,2026-02-18
+Ülker,ulker.com.tr,seed,Turkey,europe,food industry,http://www.ulker.com.tr/,Q334789,32,0.0,8923,26.8408,wikidata,2026-02-18
+Zaxby's,zaxbys.com,seed,United States,us,food,http://www.zaxbys.com,Q8067525,7,0.0,0,26.81,wikidata,2026-02-18
+Land O'Lakes,landolakesinc.com,seed,United States,us,food industry,https://www.landolakesinc.com/,Q6483918,7,0.0,0,26.81,wikidata,2026-02-18
+Ingredion,ingredion.com,seed,United States,us,food industry,http://www.ingredion.com,Q8273105,7,0.0,0,26.81,wikidata,2026-02-18
+Hamdard Laboratories (India),hamdard.com,seed,India,india,food,http://www.hamdard.com,Q5644379,7,0.0,0,26.81,wikidata,2026-02-18
+Goya Foods,goya.com,seed,United States,us,food industry,http://www.goya.com/,Q5590161,7,0.0,0,26.81,wikidata,2026-02-18
+Dreyer's,dreyers.com,seed,United States,us,dairy,http://www.dreyers.com/,Q5307360,7,0.0,0,26.81,wikidata,2026-02-18
+NutriEnergized Ltd,nutrienergized.com,seed,United Kingdom,uk,consumer goods industry,https://www.nutrienergized.com/shop/,Q109680471,0,0.0,0,26.75,wikidata,2026-02-18
+ViSalus,visalus.com,seed,United States,us,food industry,http://www.visalus.com,Q7924313,6,0.0,0,26.73,wikidata,2026-02-18
+USANA Health Sciences,usana.com,seed,United States,us,food industry,https://www.usana.com/,Q2502355,6,0.0,0,26.73,wikidata,2026-02-18
+Pepperidge Farm,pepperidgefarm.com,seed,United States,us,food processing,https://www.pepperidgefarm.com/,Q2069747,6,0.0,0,26.73,wikidata,2026-02-18
+Morinda,morinda.com,seed,United States,us,food industry,https://morinda.com/,Q1426699,6,0.0,0,26.73,wikidata,2026-02-18
+Mannatech,mannatech.com,seed,United States,us,food industry,https://www.mannatech.com/,Q3372572,6,0.0,0,26.73,wikidata,2026-02-18
+Keebler Company,keebler.com,seed,United States,us,food processing,https://www.keebler.com/,Q6382670,6,0.0,0,26.73,wikidata,2026-02-18
+Gorton's of Gloucester,gortons.com,seed,United States,us,food processing,http://www.gortons.com/,Q3174352,6,0.0,0,26.73,wikidata,2026-02-18
+Dairy Farmers of America,dfamilk.com,seed,United States,us,dairy industry,http://www.dfamilk.com/,Q5209566,6,0.0,0,26.73,wikidata,2026-02-18
+Coca-Cola Bottling Co. Consolidated,cokeconsolidated.com,seed,United States,us,beverage industry,http://www.cokeconsolidated.com/,Q5139058,6,0.0,0,26.73,wikidata,2026-02-18
+Arcos Dorados Holdings,arcosdorados.com,seed,United States,us,beverage industry,https://www.arcosdorados.com/,Q15727302,6,0.0,0,26.73,wikidata,2026-02-18
+Kao Corporation,kao.com,seed,Japan,apac,cosmetics industry,https://www.kao.com/cn/,Q902855,21,0.0,5652,26.6832,wikidata,2026-02-18
+Wander,wander.ch,seed,United States,us,food industry,https://www.wander.ch,Q1286467,5,0.0,0,26.65,wikidata,2026-02-18
+Ralcorp,ralcorp.com,seed,United States,us,food industry,http://www.ralcorp.com/,Q16983982,5,0.0,0,26.65,wikidata,2026-02-18
+Post Holdings,postholdings.com,seed,United States,us,food processing,https://www.postholdings.com/,Q27988145,5,0.0,0,26.65,wikidata,2026-02-18
+Penn Station,penn-station.com,seed,United States,us,food industry,https://www.penn-station.com/,Q7163311,5,0.0,0,26.65,wikidata,2026-02-18
+Old Dutch Foods,olddutchfoods.com,seed,United States,us,food industry,http://www.olddutchfoods.com/,Q1743896,5,0.0,0,26.65,wikidata,2026-02-18
+MillerCoors,millercoors.com,seed,United States,us,brewery,http://www.millercoors.com/,Q6859054,5,0.0,0,26.65,wikidata,2026-02-18
+JBT Marel Corporation,jbtc.com,seed,United States,us,food processing industry,https://www.jbtc.com,Q3156864,5,0.0,0,26.65,wikidata,2026-02-18
+Huy Fong Foods,huyfong.com,seed,United States,us,food industry,http://www.huyfong.com/,Q10769810,5,0.0,0,26.65,wikidata,2026-02-18
+Hostess Brands,hostessbrands.com,seed,United States,us,food industry,http://www.hostessbrands.com,Q17068094,5,0.0,0,26.65,wikidata,2026-02-18
+Eat Just,ju.st,seed,United States,us,food industry,https://www.ju.st/,Q16994745,5,0.0,0,26.65,wikidata,2026-02-18
+Coca-Cola Enterprises,cokecce.com,seed,United States,us,beverage industry,http://www.cokecce.com/,Q2981188,5,0.0,0,26.65,wikidata,2026-02-18
+Boyer Brothers,boyercandies.com,seed,United States,us,food processing,http://www.boyercandies.com/,Q4952444,5,0.0,0,26.65,wikidata,2026-02-18
+Boudin Bakery,boudinbakery.com,seed,United States,us,food manufacturing,http://www.boudinbakery.com,Q510212,5,0.0,0,26.65,wikidata,2026-02-18
+B&G Foods,bgfoods.com,seed,United States,us,food industry,http://www.bgfoods.com/,Q54953653,5,0.0,0,26.65,wikidata,2026-02-18
+Armour and Company,armourmeats.com,seed,United States,us,food and tobacco industry,http://www.armourmeats.com,Q2862799,5,0.0,0,26.65,wikidata,2026-02-18
+Agel Enterprises,agel.com,seed,United States,us,food industry,http://www.agel.com/,Q3292600,5,0.0,0,26.65,wikidata,2026-02-18
+Jo Malone London,jomalone.fr,seed,United Kingdom,uk,cosmetics industry,http://www.jomalone.fr/#,Q20724743,11,0.0,0,26.63,wikidata,2026-02-18
+Jo Malone London,jomalone.com,seed,United Kingdom,uk,cosmetics industry,https://www.jomalone.com/,Q20724743,11,0.0,0,26.63,wikidata,2026-02-18
+United Spirits Limited,theubgroup.com,seed,India,india,beverage industry,http://www.theubgroup.com/,Q17086814,4,0.0,0,26.57,wikidata,2026-02-18
+The Icee Company,icee.com,seed,United States,us,beverage industry,http://www.ICEE.com,Q7741290,4,0.0,0,26.57,wikidata,2026-02-18
+Tapatío hot sauce,tapatiohotsauce.com,seed,United States,us,food industry,http://www.tapatiohotsauce.com,Q7684477,4,0.0,0,26.57,wikidata,2026-02-18
+Stonyfield Farm,stonyfield.com,seed,United States,us,dairy,http://www.stonyfield.com/,Q3499743,4,0.0,0,26.57,wikidata,2026-02-18
+Snyder's-Lance,campbellsoupcompany.com,seed,United States,us,food industry,https://www.campbellsoupcompany.com/our-food/campbell-snacks/,Q7548877,4,0.0,0,26.57,wikidata,2026-02-18
+Scharffen Berger,scharffenberger.com,seed,United States,us,food industry,https://www.scharffenberger.com/,Q7430969,4,0.0,0,26.57,wikidata,2026-02-18
+Saulo y Yairo,omnilife.com,seed,United States,us,food industry,http://www.omnilife.com,Q5612243,4,0.0,0,26.57,wikidata,2026-02-18
+Mother's Cookies,motherscookies.com,seed,United States,us,food industry,https://www.motherscookies.com/,Q6917238,4,0.0,0,26.57,wikidata,2026-02-18
+McLeod Russel,mcleodrussel.com,seed,India,india,food industry,http://www.mcleodrussel.com/,Q18127937,4,0.0,0,26.57,wikidata,2026-02-18
+Libby's,libbys.com,seed,United States,us,food processing,https://libbys.com/,Q6540405,4,0.0,0,26.57,wikidata,2026-02-18
+KMF Nandini Coop,kmfnandini.coop,seed,India,india,dairy,https://kmfnandini.coop/,Q11041431,4,0.0,0,26.57,wikidata,2026-02-18
+Jack Link's,jacklinks.com,seed,United States,us,food industry,https://www.jacklinks.com/,Q1677100,4,0.0,0,26.57,wikidata,2026-02-18
+Heaven Hill,heavenhill.com,seed,United States,us,beverage industry,http://heavenhill.com,Q5694665,4,0.0,0,26.57,wikidata,2026-02-18
+Eagle Brand,eaglebrand.com,seed,United States,us,food industry,http://www.eaglebrand.com/,Q5325032,4,0.0,0,26.57,wikidata,2026-02-18
+Celsius Holdings,celsiusholdingsinc.com,seed,United States,us,beverage industry,https://www.celsiusholdingsinc.com/,Q125030348,4,0.0,0,26.57,wikidata,2026-02-18
+BlueTriton Brands,bluetriton.com,seed,United States,us,beverage industry,https://bluetriton.com/,Q16242798,4,0.0,0,26.57,wikidata,2026-02-18
+ZICO,zico.com,seed,United States,us,beverage industry,http://zico.com/,Q17119355,3,0.0,0,26.49,wikidata,2026-02-18
+Zevia,zevia.com,seed,United States,us,beverage industry,http://www.zevia.com/,Q8069865,3,0.0,0,26.49,wikidata,2026-02-18
+Turkey Hill,turkeyhillcstores.com,seed,United States,us,beverage industry,https://www.turkeyhillcstores.com/,Q7855073,3,0.0,0,26.49,wikidata,2026-02-18
+Trumer Pils,trumer.at,seed,United States,us,brewery,http://www.trumer.at/,Q2456363,3,0.0,0,26.49,wikidata,2026-02-18
+TCHO,tcho.com,seed,United States,us,food,http://www.tcho.com,Q7669708,3,0.0,0,26.49,wikidata,2026-02-18
+Tampico Beverages,tampico.com,seed,United States,us,beverage industry,http://www.tampico.com,Q7681787,3,0.0,0,26.49,wikidata,2026-02-18
+Siggi's Dairy,siggisdairy.com,seed,United States,us,dairy,http://siggisdairy.com,Q28405746,3,0.0,0,26.49,wikidata,2026-02-18
+Sabra,sabra.com,seed,United States,us,food industry,https://sabra.com/,Q7396323,3,0.0,0,26.49,wikidata,2026-02-18
+Pulla Reddy Sweets,gpullareddysweets.com,seed,India,india,food industry,http://www.gpullareddysweets.com/,Q18340437,3,0.0,0,26.49,wikidata,2026-02-18
+Progresso,progresso.com,seed,United States,us,food processing,https://www.progresso.com/,Q88900689,3,0.0,0,26.49,wikidata,2026-02-18
+Port City Brewing Company,portcitybrewing.com,seed,United States,us,brewery,http://www.portcitybrewing.com,Q7230542,3,0.0,0,26.49,wikidata,2026-02-18
+North Coast Brewing Company,northcoastbrewing.com,seed,United States,us,beverage industry,https://northcoastbrewing.com/,Q7054850,3,0.0,0,26.49,wikidata,2026-02-18
+New Glarus Brewing Company,newglarusbrewing.com,seed,United States,us,beverage industry,https://newglarusbrewing.com/,Q17118795,3,0.0,0,26.49,wikidata,2026-02-18
+McKee Foods,mckeefoods.com,seed,United States,us,food processing,http://www.mckeefoods.com/,Q6801733,3,0.0,0,26.49,wikidata,2026-02-18
+Matt Brewing Company,saranac.com,seed,United States,us,beverage industry,http://www.saranac.com/,Q6788388,3,0.0,0,26.49,wikidata,2026-02-18
+LifeVantage,lifevantage.com,seed,United States,us,food industry,https://www.lifevantage.com,Q7251172,3,0.0,0,26.49,wikidata,2026-02-18
+Kentucky Bourbon Distillers,kentuckybourbonwhiskey.com,seed,United States,us,beverage industry,http://www.kentuckybourbonwhiskey.com/,Q6392184,3,0.0,0,26.49,wikidata,2026-02-18
+Just Born,justborn.com,seed,United States,us,food industry,http://www.justborn.com/,Q6315881,3,0.0,0,26.49,wikidata,2026-02-18
+Jones Soda,jonessoda.com,seed,United States,us,beverage industry,https://www.jonessoda.com/,Q12060899,3,0.0,0,26.49,wikidata,2026-02-18
+Johnsonville Foods,johnsonville.com,seed,United States,us,food processing,https://www.johnsonville.com/,Q6268564,3,0.0,0,26.49,wikidata,2026-02-18
+Isaly's,isalys.com,seed,United States,us,food processing,http://www.isalys.com/,Q6078721,3,0.0,0,26.49,wikidata,2026-02-18
+Isagenix International,isagenix.com,seed,United States,us,food industry,http://www.isagenix.com/,Q7583684,3,0.0,0,26.49,wikidata,2026-02-18
+Isac,treehousefoods.com,seed,United States,us,food industry,http://www.treehousefoods.com,Q16958009,3,0.0,0,26.49,wikidata,2026-02-18
+Guayakí,guayaki.com,seed,United States,us,beverage industry,http://www.guayaki.com,Q20714264,3,0.0,0,26.49,wikidata,2026-02-18
+Golden State Foods,goldenstatefoods.com,seed,United States,us,food packaging,http://www.goldenstatefoods.com,Q1535053,3,0.0,0,26.49,wikidata,2026-02-18
+Giant Food,giantfood.com,seed,United States,us,food industry,https://giantfood.com/,Q5558336,3,0.0,0,26.49,wikidata,2026-02-18
+Faubourg Brewing Company,faubourgbrewery.com,seed,United States,us,brewery,https://faubourgbrewery.com,Q5284812,3,0.0,0,26.49,wikidata,2026-02-18
+Fannie May,fanniemay.com,seed,United States,us,food industry,https://www.fanniemay.com/,Q5433964,3,0.0,0,26.49,wikidata,2026-02-18
+Danone North America,danonenorthamerica.com,seed,United States,us,food industry,https://www.danonenorthamerica.com/,Q18379350,3,0.0,0,26.49,wikidata,2026-02-18
+Coolhaus,cool.haus,seed,United States,us,dairy,https://cool.haus/,Q18149417,3,0.0,0,26.49,wikidata,2026-02-18
+Coca-Cola Bottling Company United Inc.,cocacolaunited.com,seed,United States,us,beverage industry,http://www.cocacolaunited.com/,Q5139061,3,0.0,0,26.49,wikidata,2026-02-18
+Bush Brothers and Company,bushbeans.com,seed,United States,us,food processing,http://www.bushbeans.com/,Q208997,3,0.0,0,26.49,wikidata,2026-02-18
+Brown and Haley,brown-haley.com,seed,United States,us,confectionery,http://www.brown-haley.com/,Q4976356,3,0.0,0,26.49,wikidata,2026-02-18
+Boylan Bottling Company,boylanbottling.com,seed,United States,us,beverage industry,https://www.boylanbottling.com,Q2345331,3,0.0,0,26.49,wikidata,2026-02-18
+Blue Sky Beverage Company,drinkbluesky.com,seed,United States,us,beverage industry,http://www.drinkbluesky.com/,Q4929861,3,0.0,0,26.49,wikidata,2026-02-18
+Birds Eye,birdseye.com,seed,United States,us,food industry,https://www.birdseye.com/,Q4916058,3,0.0,0,26.49,wikidata,2026-02-18
+"ASEA, LLC",aseaglobal.com,seed,United States,us,food industry,http://aseaglobal.com/,Q20714491,3,0.0,0,26.49,wikidata,2026-02-18
+American Snuff Company,americansnuffco.com,seed,United States,us,tobacco industry,https://americansnuffco.com/,Q261919,3,0.0,0,26.49,wikidata,2026-02-18
+Altmann & Kühne,altmann-kuehne.at,seed,United States,us,confectionery,http://www.altmann-kuehne.at/,Q442502,3,0.0,0,26.49,wikidata,2026-02-18
+Sobeys,sobeys.com,seed,Canada,americas,food trade,https://www.sobeys.com/,Q1143340,7,0.0,125000,26.4457,wikidata,2026-02-18
+Wise Foods,wisesnacks.com,seed,United States,us,food industry,https://www.wisesnacks.com/,Q8027447,2,0.0,0,26.41,wikidata,2026-02-18
+Western Sizzlin',western-sizzlin.com,seed,United States,us,food,https://www.western-sizzlin.com/,Q7988295,2,0.0,0,26.41,wikidata,2026-02-18
+Vienna Beef,viennabeef.com,seed,United States,us,food,https://www.viennabeef.com/,Q7928307,2,0.0,0,26.41,wikidata,2026-02-18
+United States Bakery,usbakery.com,seed,United States,us,food processing,http://www.usbakery.com/,Q7889571,2,0.0,0,26.41,wikidata,2026-02-18
+United States Bakery,franzbakery.com,seed,United States,us,food processing,https://franzbakery.com/,Q7889571,2,0.0,0,26.41,wikidata,2026-02-18
+Tillamook County Creamery Association,tillamook.com,seed,United States,us,dairy industry,https://www.tillamook.com,Q7802241,2,0.0,0,26.41,wikidata,2026-02-18
+Tiger Sugar,tigersugar.com,seed,United States,us,beverage industry,https://tigersugar.com/,Q76099070,2,0.0,0,26.41,wikidata,2026-02-18
+Tiger Sugar,tigersugarec.com,seed,United States,us,beverage industry,https://tigersugarec.com/,Q76099070,2,0.0,0,26.41,wikidata,2026-02-18
+Tiger Sugar,tigersugar.cn,seed,United States,us,beverage industry,https://www.tigersugar.cn,Q76099070,2,0.0,0,26.41,wikidata,2026-02-18
+Tastykake,tastykake.com,seed,United States,us,food industry,http://www.tastykake.com/,Q7687754,2,0.0,0,26.41,wikidata,2026-02-18
+T. Marzetti Company,marzetti.com,seed,United States,us,food processing,http://www.marzetti.com/,Q7668516,2,0.0,0,26.41,wikidata,2026-02-18
+Synergy WorldWide,synergyworldwide.com,seed,United States,us,food industry,http://www.synergyworldwide.com,Q19391497,2,0.0,0,26.41,wikidata,2026-02-18
+Streit's,streitsmatzos.com,seed,United States,us,food industry,https://www.streitsmatzos.com/,Q7623188,2,0.0,0,26.41,wikidata,2026-02-18
+Smarties Candy Company,smarties.com,seed,United States,us,food industry,https://www.smarties.com/,Q7544132,2,0.0,0,26.41,wikidata,2026-02-18
+Route 11 Potato Chips,rt11.com,seed,United States,us,food processing,http://www.rt11.com/,Q98072947,2,0.0,0,26.41,wikidata,2026-02-18
+"R. Torre & Company, Inc.",torani.com,seed,United States,us,beverage industry,http://www.torani.com/,Q7274059,2,0.0,0,26.41,wikidata,2026-02-18
+Post Consumer Brands,postconsumerbrands.com,seed,United States,us,food processing,https://www.postconsumerbrands.com/,Q7233641,2,0.0,0,26.41,wikidata,2026-02-18
+Polar Beverages,polarbeverages.com,seed,United States,us,beverage industry,https://polarbeverages.com/,Q7209020,2,0.0,0,26.41,wikidata,2026-02-18
+Pat LaFrieda Meat Purveyors,lafrieda.com,seed,United States,us,food processing,http://www.lafrieda.com/,Q17084930,2,0.0,0,26.41,wikidata,2026-02-18
+Orissa State Cooperative Milk Producers' Federation Limited,omfed.com,seed,India,india,dairy,http://www.omfed.com/,Q7102857,2,0.0,0,26.41,wikidata,2026-02-18
+Organic Valley,organicvalley.coop,seed,United States,us,beverage industry,http://www.organicvalley.coop,Q7101824,2,0.0,0,26.41,wikidata,2026-02-18
+Odell Brewing Company,odellbrewing.com,seed,United States,us,microbrewery,http://odellbrewing.com/,Q7077636,2,0.0,0,26.41,wikidata,2026-02-18
+Oberweis Dairy,oberweis.com,seed,United States,us,beverage industry,https://www.oberweis.com/,Q7074835,2,0.0,0,26.41,wikidata,2026-02-18
+Oberto Sausage Company,oberto.com,seed,United States,us,food processing,http://www.oberto.com/,Q7074829,2,0.0,0,26.41,wikidata,2026-02-18
+Oakhurst Dairy,oakhurstdairy.com,seed,United States,us,dairy,http://www.oakhurstdairy.com,Q7073914,2,0.0,0,26.41,wikidata,2026-02-18
+Nantucket Nectars,juiceguys.com,seed,United States,us,beverage industry,http://www.juiceguys.com/,Q17109641,2,0.0,0,26.41,wikidata,2026-02-18
+Naked Juice,nakedjuice.com,seed,United States,us,beverage industry,http://www.nakedjuice.com/,Q17082362,2,0.0,0,26.41,wikidata,2026-02-18
+MTR Foods,mtrfoods.com,seed,India,india,food,http://www.mtrfoods.com/,Q28169242,2,0.0,0,26.41,wikidata,2026-02-18
+Monarch Beverage Company,monarchbeverages.com,seed,United States,us,beverage industry,http://www.monarchbeverages.com,Q6897995,2,0.0,0,26.41,wikidata,2026-02-18
+Milk Mantra,milkmantra.com,seed,India,india,food industry,http://www.milkmantra.com/,Q25245717,2,0.0,0,26.41,wikidata,2026-02-18
+MDH,mdhspices.com,seed,India,india,food,https://mdhspices.com/,Q6733451,2,0.0,0,26.41,wikidata,2026-02-18
+Mayfield Dairy,mayfielddairy.com,seed,United States,us,dairy industry,https://www.mayfielddairy.com/,Q6797168,2,0.0,0,26.41,wikidata,2026-02-18
+Macrina Bakery,macrinabakery.com,seed,United States,us,food industry,https://macrinabakery.com/,Q117788689,2,0.0,0,26.41,wikidata,2026-02-18
+Leaf Brands,leafbrands.com,seed,United States,us,food industry,http://leafbrands.com/,Q6508829,2,0.0,0,26.41,wikidata,2026-02-18
+KTA Super Stores,ktasuperstores.com,seed,United States,us,food industry,https://www.ktasuperstores.com,Q44361030,2,0.0,0,26.41,wikidata,2026-02-18
+Kitanda,kitanda.com,seed,United States,us,food industry,https://kitanda.com,Q124249667,2,0.0,0,26.41,wikidata,2026-02-18
+Kings County Distillery,kingscountydistillery.com,seed,United States,us,microdistillery,http://www.kingscountydistillery.com,Q6412888,2,0.0,0,26.41,wikidata,2026-02-18
+Il Fornaio,ilfornaio.com,seed,United States,us,beverage industry,https://www.ilfornaio.com/,Q5996553,2,0.0,0,26.41,wikidata,2026-02-18
+HP Hood,hphood.com,seed,United States,us,food,http://www.hphood.com,Q5635670,2,0.0,0,26.41,wikidata,2026-02-18
+Hickory Farms,hickoryfarms.com,seed,United States,us,food industry,https://www.hickoryfarms.com/,Q16995331,2,0.0,0,26.41,wikidata,2026-02-18
+H&H Bagels,hhbagels.nyc,seed,United States,us,food industry,http://www.hhbagels.nyc,Q5627793,2,0.0,0,26.41,wikidata,2026-02-18
+Foodstirs,foodstirs.com,seed,United States,us,food industry,http://foodstirs.com/,Q30588539,2,0.0,0,26.41,wikidata,2026-02-18
+Evil Twin Brewing,eviltwin.dk,seed,United States,us,brewery,http://eviltwin.dk/,Q15545089,2,0.0,0,26.41,wikidata,2026-02-18
+Erewhon Organic Cereal,attunefoods.com,seed,United States,us,food industry,http://www.attunefoods.com/products/erewhon-gluten-free,Q5385739,2,0.0,0,26.41,wikidata,2026-02-18
+Dot Foods,dotfoods.com,seed,United States,us,foodservice distributor,http://www.dotfoods.com/,Q5299388,2,0.0,0,26.41,wikidata,2026-02-18
+Dart Container,dartcontainer.com,seed,United States,us,disposable food packaging,https://dartcontainer.com,Q5225569,2,0.0,0,26.41,wikidata,2026-02-18
+Dagoba Chocolate,dagobachocolate.com,seed,United States,us,food industry,http://www.dagobachocolate.com,Q5208618,2,0.0,0,26.41,wikidata,2026-02-18
+Coca-Cola Beverages Northeast,cokenortheast.com,seed,United States,us,beverage industry,https://www.cokenortheast.com,Q5139063,2,0.0,0,26.41,wikidata,2026-02-18
+Coca-Cola Beverages Florida,cocacolaflorida.com,seed,United States,us,beverage industry,https://cocacolaflorida.com/,Q56301967,2,0.0,0,26.41,wikidata,2026-02-18
+Chameleon Cold-Brew,chameleoncoldbrew.com,seed,United States,us,list of coffee beverages,http://www.chameleoncoldbrew.com/,Q28403886,2,0.0,0,26.41,wikidata,2026-02-18
+Calumet Baking Powder Company,myfoodandfamily.com,seed,United States,us,food industry,https://www.myfoodandfamily.com/product/00043000289303/calumet-baking-powder-7-oz-cannister,Q5024066,2,0.0,0,26.41,wikidata,2026-02-18
+C.F. Mueller Company,muellerspasta.com,seed,United States,us,food industry,http://www.muellerspasta.com,Q5006096,2,0.0,0,26.41,wikidata,2026-02-18
+Bumble Bee Foods,bumblebee.com,seed,United States,us,seafood,http://www.bumblebee.com,Q4997245,2,0.0,0,26.41,wikidata,2026-02-18
+Boar's Head Provision Company,boarshead.com,seed,United States,us,food industry,https://boarshead.com/,Q4931262,2,0.0,0,26.41,wikidata,2026-02-18
+Beer Nuts,beernuts.com,seed,United States,us,food industry,https://beernuts.com/,Q4879955,2,0.0,0,26.41,wikidata,2026-02-18
+Bakeys,bakeys.com,seed,India,india,food industry,http://www.bakeys.com,Q24915902,2,0.0,0,26.41,wikidata,2026-02-18
+Bai Brands,drinkbai.com,seed,United States,us,beverage industry,http://www.drinkbai.com,Q23461338,2,0.0,0,26.41,wikidata,2026-02-18
+American Crystal Sugar Company,crystalsugar.com,seed,United States,us,food and tobacco industry,http://www.crystalsugar.com,Q4743569,2,0.0,0,26.41,wikidata,2026-02-18
+Alpenrose Dairy,alpenrose.com,seed,United States,us,beverage industry,http://www.alpenrose.com/,Q4734817,2,0.0,0,26.41,wikidata,2026-02-18
+Quorn,quorn.be,seed,United Kingdom,uk,food processing,https://fr.quorn.be,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.ch,seed,United Kingdom,uk,food processing,https://fr.quorn.ch,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.co.nz,seed,United Kingdom,uk,food processing,https://www.quorn.co.nz,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.co.uk,seed,United Kingdom,uk,food processing,https://www.quorn.co.uk/,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.com.au,seed,United Kingdom,uk,food processing,https://www.quorn.com.au,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.dk,seed,United Kingdom,uk,food processing,https://www.quorn.dk,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.fi,seed,United Kingdom,uk,food processing,https://www.quorn.fi,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.ie,seed,United Kingdom,uk,food processing,https://www.quorn.ie,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.nl,seed,United Kingdom,uk,food processing,https://www.quorn.nl,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.no,seed,United Kingdom,uk,food processing,https://www.quorn.no,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.ph,seed,United Kingdom,uk,food processing,https://www.quorn.ph,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.se,seed,United Kingdom,uk,food processing,https://www.quorn.se,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.sg,seed,United Kingdom,uk,food processing,https://www.quorn.sg,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Quorn,quorn.us,seed,United Kingdom,uk,food processing,https://www.quorn.us,Q2123676,20,0.0,0,26.35,wikidata,2026-02-18
+Zweigle's,zweigles.com,seed,United States,us,food processing,http://www.zweigles.com/,Q8075648,1,0.0,0,26.33,wikidata,2026-02-18
+Zija,zijainternational.com,seed,United States,us,food industry,https://www.zijainternational.com/,Q29914097,1,0.0,0,26.33,wikidata,2026-02-18
+White Rock Beverages,whiterockbeverages.com,seed,United States,us,beverage industry,http://www.whiterockbeverages.com/,Q13516752,1,0.0,0,26.33,wikidata,2026-02-18
+Westminster Cracker Company,westminstercrackers.com,seed,United States,us,food industry,http://www.westminstercrackers.com,Q7989157,1,0.0,0,26.33,wikidata,2026-02-18
+Voskos Greek Yogurt,voskos.com,seed,United States,us,food processing,http://voskos.com/,Q17108536,1,0.0,0,26.33,wikidata,2026-02-18
+Upslope Brewing Company,upslopebrewing.com,seed,United States,us,brewery,http://upslopebrewing.com,Q17107707,1,0.0,0,26.33,wikidata,2026-02-18
+Tuscan Dairy Farms,tuscandairy.com,seed,United States,us,dairy,https://tuscandairy.com/,Q7856660,1,0.0,0,26.33,wikidata,2026-02-18
+Tomorrow Farms,tomorrowfarms.co,seed,United States,us,dairy industry,https://tomorrowfarms.co,Q129162824,1,0.0,0,26.33,wikidata,2026-02-18
+Tom's Snacks,toms-snacks.com,seed,United States,us,food industry,http://www.toms-snacks.com,Q7814698,1,0.0,0,26.33,wikidata,2026-02-18
+The Trump Network,trumpnetwork.com,seed,United States,us,food industry,http://www.trumpnetwork.com/,Q39055042,1,0.0,0,26.33,wikidata,2026-02-18
+The Happy Egg Company,thehappyegg.co.uk,seed,United States,us,food industry,http://thehappyegg.co.uk/,Q19660600,1,0.0,0,26.33,wikidata,2026-02-18
+The Happy Egg Company,happyegg.com,seed,United States,us,food industry,https://happyegg.com/,Q19660600,1,0.0,0,26.33,wikidata,2026-02-18
+Thanasi Foods,thanasifoods.com,seed,United States,us,food processing,http://www.thanasifoods.com/,Q7710115,1,0.0,0,26.33,wikidata,2026-02-18
+Tastefully Simple,tastefullysimple.com,seed,United States,us,food industry,http://www.tastefullysimple.com,Q7687724,1,0.0,0,26.33,wikidata,2026-02-18
+Tall Guy Brewing,tallguybrewing.beer,seed,United States,us,beverage industry,https://tallguybrewing.beer/,Q124295611,1,0.0,0,26.33,wikidata,2026-02-18
+Talking Rain,sparklingice.com,seed,United States,us,beverage industry,http://www.SparklingICE.com,Q7679837,1,0.0,0,26.33,wikidata,2026-02-18
+T. G. Lee Dairy,tgleedairy.com,seed,United States,us,dairy industry,https://tgleedairy.com/,Q7668247,1,0.0,0,26.33,wikidata,2026-02-18
+Synutra,shengyuan.com,seed,United States,us,dairy industry,http://shengyuan.com/,Q23761655,1,0.0,0,26.33,wikidata,2026-02-18
+Sri Krishna Sweets,srikrishnasweets.com,seed,India,india,food industry,http://www.srikrishnasweets.com/,Q7585868,1,0.0,0,26.33,wikidata,2026-02-18
+Simmons Pet Food,simmonsglobal.com,seed,United States,us,food industry,http://simmonspetfood.simmonsglobal.com/,Q19903641,1,0.0,0,26.33,wikidata,2026-02-18
+Seamark Group,seamark.co.uk,seed,United States,us,food processing,http://www.seamark.co.uk/,Q18636333,1,0.0,0,26.33,wikidata,2026-02-18
+Russian River Brewing Company,russianriverbrewing.com,seed,United States,us,beverage industry,http://russianriverbrewing.com/,Q7382114,1,0.0,0,26.33,wikidata,2026-02-18
+Royal Tongan Limu,royaltonganlimu.com,seed,United States,us,food industry,http://www.royaltonganlimu.com,Q7374925,1,0.0,0,26.33,wikidata,2026-02-18
+Rovira Biscuits Corporation,rovirabiscuits.com,seed,United States,us,food,http://www.rovirabiscuits.com/,Q7371735,1,0.0,0,26.33,wikidata,2026-02-18
+Rick's Picks,rickspicks.com,seed,United States,us,food industry,https://rickspicks.com/,Q19885229,1,0.0,0,26.33,wikidata,2026-02-18
+Riceworks,riceworkssnacks.com,seed,United States,us,food,http://www.riceworkssnacks.com/new_index_USA.html,Q7323141,1,0.0,0,26.33,wikidata,2026-02-18
+Reyes Coca-Cola Bottling,reyescocacola.com,seed,United States,us,beverage industry,https://www.reyescocacola.com/,Q99566697,1,0.0,0,26.33,wikidata,2026-02-18
+Reser's Fine Foods,resers.com,seed,United States,us,food processing,http://www.resers.com/,Q7315215,1,0.0,0,26.33,wikidata,2026-02-18
+Parker House Sausage Company,parkerhousesausage.com,seed,United States,us,food industry,http://parkerhousesausage.com//,Q7138328,1,0.0,0,26.33,wikidata,2026-02-18
+Parag Milk Foods,paragmilkfoods.com,seed,India,india,dairy industry,http://www.paragmilkfoods.com/,Q65091087,1,0.0,0,26.33,wikidata,2026-02-18
+Otis Spunkmeyer,otisspunkmeyer.com,seed,United States,us,food processing,http://www.otisspunkmeyer.com/,Q7108827,1,0.0,0,26.33,wikidata,2026-02-18
+Norbest,norbest.com,seed,United States,us,food,http://www.norbest.com/,Q7050424,1,0.0,0,26.33,wikidata,2026-02-18
+Niman Ranch,nimanranch.com,seed,United States,us,food distribution,http://www.nimanranch.com,Q7037563,1,0.0,0,26.33,wikidata,2026-02-18
+Natural Balance Pet Foods,naturalbalanceinc.com,seed,United States,us,food industry,http://naturalbalanceinc.com/,Q6980434,1,0.0,0,26.33,wikidata,2026-02-18
+Natrona Bottling Company,natronabottlingcompany.com,seed,United States,us,beverage industry,http://www.natronabottlingcompany.com,Q6980240,1,0.0,0,26.33,wikidata,2026-02-18
+Mt. Olive Pickle Company,mtolivepickles.com,seed,United States,us,food processing,http://www.mtolivepickles.com/,Q17109777,1,0.0,0,26.33,wikidata,2026-02-18
+"Monarch Beverage, Inc.",monarch-beverage.com,seed,United States,us,beverage industry,http://www.monarch-beverage.com,Q6897997,1,0.0,0,26.33,wikidata,2026-02-18
+Miyoko's Creamery,miyokos.com,seed,United States,us,food industry,https://miyokos.com/,Q85846680,1,0.0,0,26.33,wikidata,2026-02-18
+Metabolife,metabolife.com,seed,United States,us,food industry,http://www.metabolife.com,Q6822354,1,0.0,0,26.33,wikidata,2026-02-18
+Mercury Brewing Company,ipswichalebrewery.com,seed,United States,us,brewery,https://www.ipswichalebrewery.com/,Q6818600,1,0.0,0,26.33,wikidata,2026-02-18
+"Marathon Enterprises, Inc.",sabrett.com,seed,United States,us,food industry,http://www.sabrett.com/,Q6755006,1,0.0,0,26.33,wikidata,2026-02-18
+Maola,maolamilk.com,seed,United States,us,food,http://www.maolamilk.com,Q6753646,1,0.0,0,26.33,wikidata,2026-02-18
+Manhattan Special,manhattanspecial.com,seed,United States,us,beverage industry,http://www.manhattanspecial.com/index.html,Q6749309,1,0.0,0,26.33,wikidata,2026-02-18
+Louis Trauth Dairy,trauthdairy.com,seed,United States,us,dairy,http://www.trauthdairy.com,Q6688287,1,0.0,0,26.33,wikidata,2026-02-18
+Lone Buffalo Winery,lonebuffalovineyards.com,seed,United States,us,beverage industry,http://www.lonebuffalovineyards.com/,Q17440883,1,0.0,0,26.33,wikidata,2026-02-18
+Little Duck Organics,littleduckorganics.com,seed,United States,us,organic food,http://www.littleduckorganics.com,Q25041525,1,0.0,0,26.33,wikidata,2026-02-18
+LightLife,lightlife.com,seed,United States,us,food manufacturing,http://lightlife.com/,Q17082168,1,0.0,0,26.33,wikidata,2026-02-18
+Lifeway Foods,lifewaykefir.com,seed,United States,us,food industry,http://www.lifewaykefir.com/,Q6545549,1,0.0,0,26.33,wikidata,2026-02-18
+Liberty Coca-Cola Beverages,libertycoke.com,seed,United States,us,beverage industry,http://www.libertycoke.com/,Q99964421,1,0.0,0,26.33,wikidata,2026-02-18
+LesserEvil,lesserevil.com,seed,United States,us,food industry,http://www.lesserevil.com/,Q6531463,1,0.0,0,26.33,wikidata,2026-02-18
+Leprino Foods,leprinofoods.com,seed,United States,us,food manufacturing,http://www.leprinofoods.com/,Q17039493,1,0.0,0,26.33,wikidata,2026-02-18
+Lava Lake Land & Livestock,lavalakelamb.com,seed,United States,us,food distribution,http://www.lavalakelamb.com,Q6502206,1,0.0,0,26.33,wikidata,2026-02-18
+Latin Flavors,latin-flavors.com,seed,United States,us,food industry,http://www.latin-flavors.com,Q6496318,1,0.0,0,26.33,wikidata,2026-02-18
+Lance Inc.,lance.com,seed,United States,us,food industry,https://www.lance.com/,Q6483430,1,0.0,0,26.33,wikidata,2026-02-18
+Kyäni,kyani.net,seed,United States,us,food industry,http://www.kyani.net/,Q11982768,1,0.0,0,26.33,wikidata,2026-02-18
+Kunzler & Company,kunzler.com,seed,United States,us,food processing,http://www.kunzler.com,Q6445190,1,0.0,0,26.33,wikidata,2026-02-18
+Kemps,kemps.com,seed,United States,us,food,http://www.kemps.com,Q19903369,1,0.0,0,26.33,wikidata,2026-02-18
+Justin's,justins.com,seed,United States,us,food industry,http://www.justins.com/,Q25326853,1,0.0,0,26.33,wikidata,2026-02-18
+Juice Plus+,juiceplus.com,seed,United States,us,food industry,http://www.juiceplus.com,Q6978224,1,0.0,0,26.33,wikidata,2026-02-18
+Jones Dairy Farm,jonesdairyfarm.com,seed,United States,us,dairy product,http://www.jonesdairyfarm.com/home.aspx,Q6275190,1,0.0,0,26.33,wikidata,2026-02-18
+Jennie-O,jennieo.com,seed,United States,us,food industry,https://www.jennieo.com,Q6177935,1,0.0,0,26.33,wikidata,2026-02-18
+Jel Sert,jelsert.com,seed,United States,us,beverage industry,http://www.jelsert.com,Q6176603,1,0.0,0,26.33,wikidata,2026-02-18
+Jefferson City Coca-Cola Bottling Company,jccoke.com,seed,United States,us,beverage industry,https://jccoke.com/,Q100934212,1,0.0,0,26.33,wikidata,2026-02-18
+Izze Beverage Company,izze.com,seed,United States,us,beverage industry,http://www.izze.com,Q16850746,1,0.0,0,26.33,wikidata,2026-02-18
+Imperial Sugar,imperialsugar.com,seed,United States,us,food industry,http://www.imperialsugar.com/,Q6006894,1,0.0,0,26.33,wikidata,2026-02-18
+Humboldt Creamery,humboldtcreamery.com,seed,United States,us,dairy,http://www.humboldtcreamery.com,Q5940314,1,0.0,0,26.33,wikidata,2026-02-18
+Horizon Organic,horizondairy.com,seed,United States,us,dairy,http://www.horizondairy.com/,Q5903464,1,0.0,0,26.33,wikidata,2026-02-18
+Hollandia Produce,livegourmet.com,seed,United States,us,food industry,http://livegourmet.com,Q5881168,1,0.0,0,26.33,wikidata,2026-02-18
+Hint Water,drinkhint.com,seed,United States,us,beverage industry,https://www.drinkhint.com/,Q5767501,1,0.0,0,26.33,wikidata,2026-02-18
+Herlocher Foods,herlocherfoods.com,seed,United States,us,food processing,http://herlocherfoods.com/,Q16995270,1,0.0,0,26.33,wikidata,2026-02-18
+Heluva Good!,heluvagood.com,seed,United States,us,food,http://www.heluvagood.com,Q19903318,1,0.0,0,26.33,wikidata,2026-02-18
+Grote & Weigel,groteandweigel.com,seed,United States,us,food processing,http://www.groteandweigel.com/,Q5610676,1,0.0,0,26.33,wikidata,2026-02-18
+Great Lakes Coca-Cola Bottling,greatlakescocacola.com,seed,United States,us,beverage industry,http://www.greatlakescocacola.com/,Q99561675,1,0.0,0,26.33,wikidata,2026-02-18
+Full Circle Brewing Co.,fullcirclebrewing.com,seed,United States,us,beverage industry,https://www.fullcirclebrewing.com/,Q111508787,1,0.0,0,26.33,wikidata,2026-02-18
+Foosackly's,foosacklys.net,seed,United States,us,food,https://foosacklys.net/,Q5465716,1,0.0,0,26.33,wikidata,2026-02-18
+Flagship Food Group,flagshipfoodgroup.com,seed,United States,us,food processing,http://www.flagshipfoodgroup.com/,Q21178732,1,0.0,0,26.33,wikidata,2026-02-18
+Finlandia Cheese,finlandiacheese.com,seed,United States,us,dairy industry,https://www.finlandiacheese.com/,Q11859611,1,0.0,0,26.33,wikidata,2026-02-18
+Empire Kosher,empirekosher.com,seed,United States,us,food distribution,http://www.empirekosher.com,Q5374091,1,0.0,0,26.33,wikidata,2026-02-18
+Dr. Praeger’s Sensible Foods,drpraegers.com,seed,United States,us,natural food,https://drpraegers.com/,Q5304329,1,0.0,0,26.33,wikidata,2026-02-18
+Doumak,doumak.com,seed,United States,us,food industry,https://www.doumak.com/,Q5302248,1,0.0,0,26.33,wikidata,2026-02-18
+Dog Rose Brewing Company,dogrosebrewing.com,seed,United States,us,brewery,https://www.dogrosebrewing.com/,Q126891184,1,0.0,0,26.33,wikidata,2026-02-18
+Dakota Growers,dakotagrowers.com,seed,United States,us,food industry,http://www.dakotagrowers.com/,Q5210016,1,0.0,0,26.33,wikidata,2026-02-18
+Crooked Goat Brewing,crookedgoatbrewing.com,seed,United States,us,beverage industry,https://www.crookedgoatbrewing.com/petaluma,Q123684013,1,0.0,0,26.33,wikidata,2026-02-18
+Country Crock,countrycrock.com,seed,United States,us,food,http://www.countrycrock.com/,Q5177262,1,0.0,0,26.33,wikidata,2026-02-18
+Cometeer,cometeer.com,seed,United States,us,food and beverage,https://cometeer.com/,Q111718008,1,0.0,0,26.33,wikidata,2026-02-18
+Clover Stornetta Farms,cloverstornetta.com,seed,United States,us,dairy,http://cloverstornetta.com/,Q5135909,1,0.0,0,26.33,wikidata,2026-02-18
+Clover Food Lab,cloverfoodlab.com,seed,United States,us,food industry,https://www.cloverfoodlab.com/,Q5135882,1,0.0,0,26.33,wikidata,2026-02-18
+Cawy Bottling Company,cawy.net,seed,United States,us,beverage industry,http://www.cawy.net,Q16956179,1,0.0,0,26.33,wikidata,2026-02-18
+Cabot Creamery,cabotcheese.coop,seed,United States,us,food processing,http://www.cabotcheese.coop/,Q5015773,1,0.0,0,26.33,wikidata,2026-02-18
+Bonn Group of Industries,bonn.in,seed,India,india,food industry,http://www.bonn.in/,Q17020632,1,0.0,0,26.33,wikidata,2026-02-18
+Big Heart Pet Brands,bigheartpet.com,seed,United States,us,food industry,http://www.bigheartpet.com/,Q16984318,1,0.0,0,26.33,wikidata,2026-02-18
+Bellisio Foods,bellisiofoods.com,seed,United States,us,food industry,http://www.bellisiofoods.com/,Q4884054,1,0.0,0,26.33,wikidata,2026-02-18
+Bebida Beverage Company,bebevco.com,seed,United States,us,beverage industry,http://bebevco.com/,Q16839622,1,0.0,0,26.33,wikidata,2026-02-18
+Balford Farms,balford.com,seed,United States,us,food,http://www.balford.com,Q19865511,1,0.0,0,26.33,wikidata,2026-02-18
+Archway Cookies,archwaycookies.com,seed,United States,us,food industry,http://www.archwaycookies.com,Q4787369,1,0.0,0,26.33,wikidata,2026-02-18
+American Manufacturing and Packaging,arcdiversified.com,seed,United States,us,food processing,http://www.arcdiversified.com/,Q4744396,1,0.0,0,26.33,wikidata,2026-02-18
+Adina World Beat Beverages,adinaworld.com,seed,United States,us,beverage industry,http://www.adinaworld.com/,Q4682884,1,0.0,0,26.33,wikidata,2026-02-18
+Abarta Coca-Cola Beverages,abartacocacola.com,seed,United States,us,beverage industry,https://abartacocacola.com/,Q101107971,1,0.0,0,26.33,wikidata,2026-02-18
+"A. Zerega's Sons, Inc.",zerega.com,seed,United States,us,food industry,http://www.zerega.com,Q4648552,1,0.0,0,26.33,wikidata,2026-02-18
+A-Treat Bottling Company,a-treat.com,seed,United States,us,beverage industry,https://www.a-treat.com/,Q4646953,1,0.0,0,26.33,wikidata,2026-02-18
+Unimer Group,unimergroup.com,seed,United States,us,seafood,http://www.unimergroup.com,Q114437297,0,0.0,0,26.25,wikidata,2026-02-18
+The Sola Company,thesolacompany.com,seed,United States,us,food industry,https://thesolacompany.com/,Q115216973,0,0.0,0,26.25,wikidata,2026-02-18
+Sartori Cheese,sartoricheese.com,seed,United States,us,dairy,https://www.sartoricheese.com/,Q130647027,0,0.0,0,26.25,wikidata,2026-02-18
+Real American Beer,therealamerican.com,seed,United States,us,beverage industry,https://therealamerican.com,Q136169052,0,0.0,0,26.25,wikidata,2026-02-18
+Pista House,pistahouse.in,seed,India,india,food industry,https://www.pistahouse.in,Q123377238,0,0.0,0,26.25,wikidata,2026-02-18
+Mama Faith’s LLC.,mamafaiths.com,seed,United States,us,food processing,https://mamafaiths.com/,Q98092804,0,0.0,0,26.25,wikidata,2026-02-18
+Loopini,eatloopini.com,seed,United States,us,food industry,https://eatloopini.com/,Q133823135,0,0.0,0,26.25,wikidata,2026-02-18
+Kamrupa Dairy,kamrupa.in,seed,India,india,dairy product,http://www.kamrupa.in,Q21121390,0,0.0,0,26.25,wikidata,2026-02-18
+Jusuru International,jusuru.com,seed,United States,us,food industry,http://www.jusuru.com/,Q30060777,0,0.0,0,26.25,wikidata,2026-02-18
+Ike's Love and Sandwiches,ikessandwich.com,seed,United States,us,food industry,https://www.ikessandwich.com/,Q112028897,0,0.0,0,26.25,wikidata,2026-02-18
+HLTH Code,gethlth.com,seed,United States,us,food industry,https://gethlth.com,Q137611657,0,0.0,0,26.25,wikidata,2026-02-18
+Hawksbill Brewing Company,hawksbillbrewing.com,seed,United States,us,brewery,https://www.hawksbillbrewing.com/,Q93763697,0,0.0,0,26.25,wikidata,2026-02-18
+HAP daily,hapdaily.com,seed,India,india,dairy industry,https://www.hapdaily.com/,Q127441800,0,0.0,0,26.25,wikidata,2026-02-18
+Gopal Snacks,gopalnamkeen.com,seed,India,india,food industry,https://www.gopalnamkeen.com,Q124813124,0,0.0,0,26.25,wikidata,2026-02-18
+GoodDot,gooddot.in,seed,India,india,food industry,https://gooddot.in/,Q111165780,0,0.0,0,26.25,wikidata,2026-02-18
+Golden State Trailers,goldenstatetrailers.com,seed,United States,us,food truck,https://goldenstatetrailers.com,Q137360815,0,0.0,0,26.25,wikidata,2026-02-18
+"Floyd Wilcox & Sons, Inc.",wilcoxfresh.com,seed,United States,us,food processing,http://www.wilcoxfresh.com/,Q5462569,0,0.0,0,26.25,wikidata,2026-02-18
+fleksa,fleksa.com,seed,India,india,food technology,https://www.fleksa.com,Q116685407,0,0.0,0,26.25,wikidata,2026-02-18
+Entirely Emmy,entirelyemmy.com,seed,United States,us,food blogging,https://entirelyemmy.com/,Q137927130,0,0.0,0,26.25,wikidata,2026-02-18
+Cirkul,drinkcirkul.com,seed,United States,us,beverage industry,https://www.drinkcirkul.com,Q126962896,0,0.0,0,26.25,wikidata,2026-02-18
+Chews-4-Health International,chews4health.com,seed,United States,us,food industry,http://www.chews4health.com,Q47034942,0,0.0,0,26.25,wikidata,2026-02-18
+Chaayos,chaayos.com,seed,India,india,food industry,https://chaayos.com/,Q117235235,0,0.0,0,26.25,wikidata,2026-02-18
+Casa de Montecristo Cigar Bar,seriouscigars.com,seed,United States,us,tobacco smoking,https://www.seriouscigars.com/,Q113384070,0,0.0,0,26.25,wikidata,2026-02-18
+Carrington Farms,carringtonfarms.com,seed,United States,us,food industry,https://www.carringtonfarms.com/,Q137481731,0,0.0,0,26.25,wikidata,2026-02-18
+Canidae Pet Food,canidae.com,seed,United States,us,food,https://www.canidae.com/,Q110153308,0,0.0,0,26.25,wikidata,2026-02-18
+Bar & Cocoa,barandcocoa.com,seed,United States,us,Specialty food,https://barandcocoa.com,Q135553212,0,0.0,0,26.25,wikidata,2026-02-18
+Back to the Roots,backtotheroots.com,seed,United States,us,food industry,http://backtotheroots.com/,Q36928077,0,0.0,0,26.25,wikidata,2026-02-18
+ARIIX,ariix.com,seed,United States,us,food industry,http://www.ariix.com,Q30222003,0,0.0,0,26.25,wikidata,2026-02-18
+AliveMax,alivemax.com,seed,United States,us,food industry,https://www.alivemax.com,Q33851944,0,0.0,0,26.25,wikidata,2026-02-18
+4Life Research,4life.com,seed,United States,us,food industry,http://www.4life.com,Q29964071,0,0.0,0,26.25,wikidata,2026-02-18
+Superdrug,superdrug.com,seed,United Kingdom,uk,cosmetics industry,https://superdrug.com,Q7643261,6,0.0,0,26.23,wikidata,2026-02-18
+Yardley of London,yardleylondon.com,seed,United Kingdom,uk,personal care product,http://www.yardleylondon.com/,Q8049290,5,0.0,0,26.15,wikidata,2026-02-18
+Puig,puig.com,seed,Spain,europe,cosmetics industry,https://www.puig.com,Q3410623,16,0.0,4483,26.1423,wikidata,2026-02-18
+Greggs,greggs.co.uk,seed,United Kingdom,uk,food industry,https://www.greggs.co.uk/,Q3403981,15,0.0,0,25.95,wikidata,2026-02-18
+Ahmad Tea,ahmadtea.com,seed,United Kingdom,uk,food industry,https://ahmadtea.com/,Q4033598,15,0.0,0,25.95,wikidata,2026-02-18
+The Perfume Shop,theperfumeshop.com,seed,United Kingdom,uk,cosmetics industry,https://www.theperfumeshop.com/,Q7756719,2,0.0,0,25.91,wikidata,2026-02-18
+Neal's Yard Remedies,nealsyardremedies.com,seed,United Kingdom,uk,personal care product,https://www.nealsyardremedies.com/,Q6984027,2,0.0,0,25.91,wikidata,2026-02-18
+Lipsy Limited,lipsy.co.uk,seed,United Kingdom,uk,cosmetics industry,http://www.lipsy.co.uk,Q107313639,2,0.0,0,25.91,wikidata,2026-02-18
+Lipsy Limited,next.co.uk,seed,United Kingdom,uk,cosmetics industry,https://www.next.co.uk/lipsy,Q107313639,2,0.0,0,25.91,wikidata,2026-02-18
+Tetley,tetley.com,seed,United Kingdom,uk,food,http://www.tetley.com/,Q2425276,14,0.0,0,25.87,wikidata,2026-02-18
+Vie at Home,vieathome.com,seed,United Kingdom,uk,cosmetics industry,http://www.vieathome.com/,Q7928246,1,0.0,0,25.83,wikidata,2026-02-18
+Montagne Jeunesse,montagnejeunesse.com,seed,United Kingdom,uk,cosmetics industry,http://www.montagnejeunesse.com,Q6904029,1,0.0,0,25.83,wikidata,2026-02-18
+United Biscuits,unitedbiscuits.com,seed,United Kingdom,uk,food processing,http://unitedbiscuits.com,Q3178170,13,0.0,0,25.79,wikidata,2026-02-18
+PURESEOUL,pureseoul.co.uk,seed,United Kingdom,uk,cosmetics industry,https://pureseoul.co.uk/,Q130304965,0,0.0,0,25.75,wikidata,2026-02-18
+Pippa of London,pippaoflondon.co.uk,seed,United Kingdom,uk,cosmetics industry,https://www.pippaoflondon.co.uk,Q97342443,0,0.0,0,25.75,wikidata,2026-02-18
+Fragrance Direct,fragrancedirect.co.uk,seed,United Kingdom,uk,cosmetics industry,http://www.fragrancedirect.co.uk,Q44941890,0,0.0,0,25.75,wikidata,2026-02-18
+Beauty Formulation Ltd,beautyformulation.com,seed,United Kingdom,uk,cosmetics industry,https://www.beautyformulation.com,Q134880590,0,0.0,0,25.75,wikidata,2026-02-18
+Beauty Favours,beautyfavours.com,seed,United Kingdom,uk,cosmetics industry,https://www.beautyfavours.com,Q134876991,0,0.0,0,25.75,wikidata,2026-02-18
+Kerry Group,kerrygroup.com,seed,Ireland,europe,food industry,https://www.kerrygroup.com,Q253967,11,0.0,23000,25.7364,wikidata,2026-02-18
+Marfrig,marfrig.com.br,seed,Brazil,americas,food industry,http://www.marfrig.com.br,Q3064573,8,0.0,33318,25.7218,wikidata,2026-02-18
+Aesop,aesop.com,seed,Australia,australia,cosmetics industry,https://www.aesop.com/,Q4688560,9,0.0,0,25.72,wikidata,2026-02-18
+Whyte and Mackay,whyteandmackay.co.uk,seed,United Kingdom,uk,beverage industry,http://www.whyteandmackay.co.uk/,Q1725351,12,0.0,0,25.71,wikidata,2026-02-18
+Walkers,walkers.co.uk,seed,United Kingdom,uk,food industry,https://walkers.co.uk/walkershome/,Q1296097,11,0.0,0,25.63,wikidata,2026-02-18
+Froneri,froneri.com,seed,United Kingdom,uk,food industry,https://www.froneri.com/,Q7273233,11,0.0,0,25.63,wikidata,2026-02-18
+William Grant & Sons,williamgrant.com,seed,United Kingdom,uk,beverage industry,http://www.williamgrant.com,Q2490031,10,0.0,0,25.55,wikidata,2026-02-18
+Tunnock's,tunnocks.co.uk,seed,United Kingdom,uk,food,http://www.tunnocks.co.uk/,Q7853348,10,0.0,0,25.55,wikidata,2026-02-18
+Nutricia,nutricia.com,seed,Netherlands,europe,dairy industry,https://www.nutricia.com/,Q2104662,13,0.0,12888,25.5443,wikidata,2026-02-18
+Friesland Foods,frieslandfoods.nl,seed,Netherlands,europe,dairy industry,http://www.frieslandfoods.nl,Q1332311,11,0.0,15312,25.4891,wikidata,2026-02-18
+Tate & Lyle,tateandlyle.co.uk,seed,United Kingdom,uk,food processing,http://www.tateandlyle.co.uk/,Q2395492,8,0.0,0,25.39,wikidata,2026-02-18
+Premier Foods,premierfoods.co.uk,seed,United Kingdom,uk,food industry,http://www.premierfoods.co.uk/,Q7240301,8,0.0,0,25.39,wikidata,2026-02-18
+Greene King,greeneking.co.uk,seed,United Kingdom,uk,food and tobacco industry,https://www.greeneking.co.uk/,Q5564162,8,0.0,0,25.39,wikidata,2026-02-18
+Britvic,britvic.com,seed,United Kingdom,uk,beverage industry,https://www.britvic.com/,Q4971696,8,0.0,0,25.39,wikidata,2026-02-18
+Bakkavör,bakkavor.com,seed,United Kingdom,uk,food manufacturing,https://www.bakkavor.com,Q2064018,8,0.0,0,25.39,wikidata,2026-02-18
+Thorntons,thorntons.co.uk,seed,United Kingdom,uk,food industry,https://www.thorntons.co.uk/,Q683102,7,0.0,0,25.31,wikidata,2026-02-18
+H. P. Bulmer,bulmers.co.uk,seed,United Kingdom,uk,beverage industry,http://www.bulmers.co.uk,Q1329485,7,0.0,0,25.31,wikidata,2026-02-18
+Jurlique,jurlique.com,seed,Australia,australia,cosmetics industry,https://jurlique.com,Q17008691,3,0.0,0,25.24,wikidata,2026-02-18
+Liebig's Extract of Meat Company,liebig.fr,seed,United Kingdom,uk,food and tobacco industry,https://www.liebig.fr,Q700517,6,0.0,0,25.23,wikidata,2026-02-18
+Lea & Perrins,leaandperrins.co.uk,seed,United Kingdom,uk,food industry,https://www.leaandperrins.co.uk/,Q6508164,6,0.0,0,25.23,wikidata,2026-02-18
+British Sugar,britishsugar.co.uk,seed,United Kingdom,uk,food and tobacco industry,http://www.britishsugar.co.uk,Q4971114,6,0.0,0,25.23,wikidata,2026-02-18
+Bass Brewery,bass.com,seed,United Kingdom,uk,food and tobacco industry,http://www.bass.com/,Q532084,6,0.0,0,25.23,wikidata,2026-02-18
+Jequiti,jequiti.com.br,seed,Brazil,americas,cosmetics industry,https://www.jequiti.com.br/,Q10306675,1,0.0,7000,25.2132,wikidata,2026-02-18
+Virgin Drinks,virgindrinks.com,seed,United Kingdom,uk,beverage industry,http://www.virgindrinks.com,Q4013949,5,0.0,0,25.15,wikidata,2026-02-18
+Innocent Drinks,innocentdrinks.co.uk,seed,United Kingdom,uk,beverage industry,https://www.innocentdrinks.co.uk/,Q1664118,5,0.0,0,25.15,wikidata,2026-02-18
+Huntley & Palmers,huntleyandpalmers.com,seed,United Kingdom,uk,food industry,https://www.huntleyandpalmers.com/,Q836679,5,0.0,0,25.15,wikidata,2026-02-18
+Ginsters,ginsters.co.uk,seed,United Kingdom,uk,food,https://www.ginsters.co.uk,Q5563270,5,0.0,0,25.15,wikidata,2026-02-18
+Dairy Crest,dairycrest.co.uk,seed,United Kingdom,uk,dairy industry,http://www.dairycrest.co.uk,Q5209561,5,0.0,0,25.15,wikidata,2026-02-18
+Indofarma,indofarma.id,seed,Indonesia,apac,consumer goods industry,http://www.indofarma.id,Q12486484,1,0.0,1179,25.1306,wikidata,2026-02-18
+Pescanova,nuevapescanova.com,seed,Spain,europe,food industry,http://www.nuevapescanova.com/,Q3326932,9,0.0,10000,25.0701,wikidata,2026-02-18
+Weetabix Limited,weetabix.com,seed,United Kingdom,uk,food industry,https://www.weetabix.com/,Q7979632,4,0.0,0,25.07,wikidata,2026-02-18
+Fever-Tree,fever-tree.com,seed,United Kingdom,uk,beverage industry,https://www.fever-tree.com/,Q16980636,4,0.0,0,25.07,wikidata,2026-02-18
+Crosse & Blackwell,crosseandblackwell.co.uk,seed,United Kingdom,uk,food and tobacco industry,https://www.crosseandblackwell.co.uk/,Q5188535,4,0.0,0,25.07,wikidata,2026-02-18
+Crosse & Blackwell,crosseandblackwell.co.za,seed,United Kingdom,uk,food and tobacco industry,https://www.crosseandblackwell.co.za/,Q5188535,4,0.0,0,25.07,wikidata,2026-02-18
+Crosse & Blackwell,crosseandblackwell.com,seed,United Kingdom,uk,food and tobacco industry,https://www.crosseandblackwell.com/,Q5188535,4,0.0,0,25.07,wikidata,2026-02-18
+Castle Rock Brewery,castlerockbrewery.co.uk,seed,United Kingdom,uk,beverage industry,https://www.castlerockbrewery.co.uk/,Q5050272,4,0.0,0,25.07,wikidata,2026-02-18
+Douwe Egberts,jacobsdouweegberts.com,seed,Netherlands,europe,food industry,https://www.jacobsdouweegberts.com/,Q1252809,11,0.0,7579,25.0615,wikidata,2026-02-18
+GoHygiene Australia,gohygiene.com.au,seed,Australia,australia,hygiene,https://gohygiene.com.au,Q137727385,0,0.0,0,25.0,wikidata,2026-02-18
+Become International,becomebeauty.com,seed,Australia,australia,personal care product,http://www.becomebeauty.com,Q33854128,0,0.0,0,25.0,wikidata,2026-02-18
+The Smith's Snackfood Company,smiths.com.au,seed,United Kingdom,uk,food and tobacco industry,http://www.smiths.com.au,Q7764913,3,0.0,0,24.99,wikidata,2026-02-18
+Samworth Brothers,samworthbrothers.co.uk,seed,United Kingdom,uk,food,https://www.samworthbrothers.co.uk/,Q7413153,3,0.0,0,24.99,wikidata,2026-02-18
+Rachel's Organic,rachelsorganic.co.uk,seed,United Kingdom,uk,organic food,http://www.rachelsorganic.co.uk/,Q7279122,3,0.0,0,24.99,wikidata,2026-02-18
+Jordans,jordanscereals.co.uk,seed,United Kingdom,uk,food industry,http://www.jordanscereals.co.uk,Q3183731,3,0.0,0,24.99,wikidata,2026-02-18
+Jacksons of Piccadilly,jacksonsofpiccadilly.co.uk,seed,United Kingdom,uk,beverage industry,http://www.jacksonsofpiccadilly.co.uk/,Q6117882,3,0.0,0,24.99,wikidata,2026-02-18
+Godfrey Phillips India,godfreyphillips.com,seed,United Kingdom,uk,tobacco industry,https://www.godfreyphillips.com/,Q17053668,3,0.0,0,24.99,wikidata,2026-02-18
+Fox's Biscuits,foxs-biscuits.co.uk,seed,United Kingdom,uk,food manufacturing,http://www.foxs-biscuits.co.uk,Q5476491,3,0.0,0,24.99,wikidata,2026-02-18
+Cranswick plc,cranswick.plc.uk,seed,United Kingdom,uk,food,http://www.cranswick.plc.uk/,Q5182270,3,0.0,0,24.99,wikidata,2026-02-18
+Copella,copellafruitjuice.co.uk,seed,United Kingdom,uk,beverage industry,https://copellafruitjuice.co.uk/,Q5168442,3,0.0,0,24.99,wikidata,2026-02-18
+2 Sisters Food Group,2sfg.com,seed,United Kingdom,uk,food manufacturing,http://www.2sfg.com/,Q4633377,3,0.0,0,24.99,wikidata,2026-02-18
+Campina,campina.com,seed,Netherlands,europe,food industry,http://www.campina.com/,Q1031144,10,0.0,7099,24.9418,wikidata,2026-02-18
+Wyke Farms,wykefarms.com,seed,United Kingdom,uk,dairy,https://www.wykefarms.com/,Q30686812,2,0.0,0,24.91,wikidata,2026-02-18
+VFC,vfcfoods.com,seed,United Kingdom,uk,vegan food,https://vfcfoods.com,Q110728545,2,0.0,0,24.91,wikidata,2026-02-18
+Upper Crust,uppercrust.co.uk,seed,United Kingdom,uk,Food and drink,https://uppercrust.co.uk/,Q7898585,2,0.0,0,24.91,wikidata,2026-02-18
+Upper Crust,uppercrust-baguettes.com,seed,United Kingdom,uk,Food and drink,https://www.uppercrust-baguettes.com,Q7898585,2,0.0,0,24.91,wikidata,2026-02-18
+Timothy Taylor's,timothytaylor.co.uk,seed,United Kingdom,uk,brewery,http://www.timothytaylor.co.uk/,Q7807560,2,0.0,0,24.91,wikidata,2026-02-18
+Scott's Porage Oats,scottsporage.com,seed,United Kingdom,uk,food industry,https://scottsporage.com/,Q7435826,2,0.0,0,24.91,wikidata,2026-02-18
+Riverford,riverford.co.uk,seed,United Kingdom,uk,food industry,https://www.riverford.co.uk,Q7338179,2,0.0,0,24.91,wikidata,2026-02-18
+Patak's,pataks.co.uk,seed,United Kingdom,uk,food processing,https://pataks.co.uk/,Q7144176,2,0.0,0,24.91,wikidata,2026-02-18
+Mr. Simm's Olde Sweet Shoppe,mrsimms.co,seed,United Kingdom,uk,confectionery store,https://mrsimms.co/,Q24960010,2,0.0,0,24.91,wikidata,2026-02-18
+Moy Park,moypark.com,seed,United Kingdom,uk,food industry,http://www.moypark.com/,Q23461796,2,0.0,0,24.91,wikidata,2026-02-18
+Milk Link,milklink.com,seed,United Kingdom,uk,dairy,http://www.milklink.com,Q6857995,2,0.0,0,24.91,wikidata,2026-02-18
+Hovis,hovisbakery.co.uk,seed,United Kingdom,uk,food and tobacco industry,http://www.hovisbakery.co.uk/,Q5917245,2,0.0,0,24.91,wikidata,2026-02-18
+Euro Foods,eurofoods.co.uk,seed,United Kingdom,uk,food distribution,http://www.eurofoods.co.uk/,Q18636302,2,0.0,0,24.91,wikidata,2026-02-18
+East of England Co-operative Society,eastofengland.coop,seed,United Kingdom,uk,food industry,https://www.eastofengland.coop,Q5329759,2,0.0,0,24.91,wikidata,2026-02-18
+Dalgety plc,picgenus.com,seed,United Kingdom,uk,agricultural and food trade,http://na.picgenus.com,Q5210845,2,0.0,0,24.91,wikidata,2026-02-18
+Compass Box,compassboxwhisky.com,seed,United Kingdom,uk,beverage industry,https://www.compassboxwhisky.com/,Q2990378,2,0.0,0,24.91,wikidata,2026-02-18
+Clydebank Co-operative Society,realco-op.co.uk,seed,United Kingdom,uk,food industry,https://www.realco-op.co.uk,Q5137069,2,0.0,0,24.91,wikidata,2026-02-18
+Birds Bakery,birdsbakery.com,seed,United Kingdom,uk,food industry,https://birdsbakery.com/,Q63001935,2,0.0,0,24.91,wikidata,2026-02-18
+BFS Group Ltd,3663.co.uk,seed,United Kingdom,uk,foodservice distributor,http://www.3663.co.uk,Q4835535,2,0.0,0,24.91,wikidata,2026-02-18
+Baxters,baxters.com,seed,United Kingdom,uk,food processing,http://www.baxters.com,Q4873875,2,0.0,0,24.91,wikidata,2026-02-18
+Titanic Brewery,titanicbrewery.co.uk,seed,United Kingdom,uk,brewery,http://www.titanicbrewery.co.uk/,Q16985637,1,0.0,0,24.83,wikidata,2026-02-18
+Square Pie,squarepie.com,seed,United Kingdom,uk,food,http://www.squarepie.com,Q7582045,1,0.0,0,24.83,wikidata,2026-02-18
+Russell Brewing Company,russellbeer.com,seed,United Kingdom,uk,alcoholic beverage,http://www.russellbeer.com/,Q17119226,1,0.0,0,24.83,wikidata,2026-02-18
+Rubicon Drinks,rubiconexotic.com,seed,United Kingdom,uk,beverage industry,http://www.rubiconexotic.com/,Q7376072,1,0.0,0,24.83,wikidata,2026-02-18
+Rowse Honey,rowsehoney.co.uk,seed,United Kingdom,uk,food processing,http://www.rowsehoney.co.uk,Q7372272,1,0.0,0,24.83,wikidata,2026-02-18
+Robert Wiseman Dairies,muller-wiseman.co.uk,seed,United Kingdom,uk,dairy,http://www.muller-wiseman.co.uk/,Q7351196,1,0.0,0,24.83,wikidata,2026-02-18
+Powwow Water,powwow.com,seed,United Kingdom,uk,beverage industry,http://www.powwow.com/,Q7236942,1,0.0,0,24.83,wikidata,2026-02-18
+Pork Farms,pork-farms.co.uk,seed,United Kingdom,uk,food,https://www.pork-farms.co.uk,Q7230126,1,0.0,0,24.83,wikidata,2026-02-18
+Phipps NBC,phipps-nbc.co.uk,seed,United Kingdom,uk,beverage industry,http://www.phipps-nbc.co.uk/,Q7186410,1,0.0,0,24.83,wikidata,2026-02-18
+Penpont Brewery,firebrandbrewing.co.uk,seed,United Kingdom,uk,beverage industry,https://firebrandbrewing.co.uk/,Q7164557,1,0.0,0,24.83,wikidata,2026-02-18
+Palmers Brewery,palmersbrewery.com,seed,United Kingdom,uk,brewery,https://palmersbrewery.com,Q108320017,1,0.0,0,24.83,wikidata,2026-02-18
+Oakham,oakhamales.com,seed,United Kingdom,uk,beverage industry,https://www.oakhamales.com/,Q7073885,1,0.0,0,24.83,wikidata,2026-02-18
+Noble Foods,noblefoods.co.uk,seed,United Kingdom,uk,food industry,https://www.noblefoods.co.uk/,Q84572451,1,0.0,0,24.83,wikidata,2026-02-18
+Jubel beer,jubelbeer.com,seed,United Kingdom,uk,brewery,https://jubelbeer.com,Q136513195,1,0.0,0,24.83,wikidata,2026-02-18
+Jorehaut Tea,jorehaut.com,seed,United Kingdom,uk,growing of beverage crops,https://www.jorehaut.com/,Q106825613,1,0.0,0,24.83,wikidata,2026-02-18
+Ian Macleod Distillers Limited,ianmacleod.com,seed,United Kingdom,uk,beverage industry,https://www.ianmacleod.com/,Q55177088,1,0.0,0,24.83,wikidata,2026-02-18
+Holland's Pies,hollandspies.co.uk,seed,United Kingdom,uk,food industry,http://www.hollandspies.co.uk,Q5880799,1,0.0,0,24.83,wikidata,2026-02-18
+Fuel Juice,fueljuicebars.com,seed,United Kingdom,uk,beverage industry,http://fueljuicebars.com/,Q24439142,1,0.0,0,24.83,wikidata,2026-02-18
+Farmdrop,farmdrop.com,seed,United Kingdom,uk,food industry,https://www.farmdrop.com,Q28404576,1,0.0,0,24.83,wikidata,2026-02-18
+F. Duerr & Sons,duerrs.co.uk,seed,United Kingdom,uk,food industry,https://duerrs.co.uk/,Q5423873,1,0.0,0,24.83,wikidata,2026-02-18
+Devro,devro.com,seed,United Kingdom,uk,food processing,http://www.devro.com/,Q16988731,1,0.0,0,24.83,wikidata,2026-02-18
+Cornish Orchards,cornishorchards.co.uk,seed,United Kingdom,uk,beverage industry,https://www.cornishorchards.co.uk/,Q21621747,1,0.0,0,24.83,wikidata,2026-02-18
+Cornish Cyder Farm,healeyscyder.co.uk,seed,United Kingdom,uk,beverage industry,https://healeyscyder.co.uk/,Q5171808,1,0.0,0,24.83,wikidata,2026-02-18
+BOCM Pauls,forfarmers.co.uk,seed,United Kingdom,uk,food and tobacco industry,http://www.forfarmers.co.uk/,Q4836187,1,0.0,0,24.83,wikidata,2026-02-18
+Beverage Brands,beverage-brands.co.uk,seed,United Kingdom,uk,beverage industry,http://www.beverage-brands.co.uk,Q4899364,1,0.0,0,24.83,wikidata,2026-02-18
+UCC Ueshima Coffee Co.,ucc.co.jp,seed,Japan,apac,food industry,https://www.ucc.co.jp/,Q1185060,13,0.0,3668,24.7804,wikidata,2026-02-18
+Intersnack,intersnack.de,seed,Germany,europe,food industry,http://www.intersnack.de,Q873618,7,0.0,8000,24.7744,wikidata,2026-02-18
+Wm Cadenhead Limited,wmcadenhead.com,seed,United Kingdom,uk,beverage industry,http://www.wmcadenhead.com/,Q29715620,0,0.0,0,24.75,wikidata,2026-02-18
+Winnow Solutions,winnowsolutions.com,seed,United Kingdom,uk,food industry,http://www.winnowsolutions.com/,Q50355553,0,0.0,0,24.75,wikidata,2026-02-18
+Watmuff and Beckett,watmuffandbeckett.co.uk,seed,United Kingdom,uk,food industry,http://www.watmuffandbeckett.co.uk/,Q28659645,0,0.0,0,24.75,wikidata,2026-02-18
+The Tribe Project,tribeproject.org,seed,United Kingdom,uk,home care,https://tribeproject.org,Q136310464,0,0.0,0,24.75,wikidata,2026-02-18
+The New Leaf Co-op,newleafcoop.co.uk,seed,United Kingdom,uk,food industry,https://newleafcoop.co.uk,Q106317743,0,0.0,0,24.75,wikidata,2026-02-18
+Sacred Microdistillery,sacredspiritscompany.com,seed,United Kingdom,uk,microdistillery,http://www.sacredspiritscompany.com,Q7397298,0,0.0,0,24.75,wikidata,2026-02-18
+Provexis,provexis.com,seed,United Kingdom,uk,food industry,http://www.provexis.com,Q7252347,0,0.0,0,24.75,wikidata,2026-02-18
+Moores Biscuits,moores-biscuits.co.uk,seed,United Kingdom,uk,food industry,http://www.moores-biscuits.co.uk/,Q51130310,0,0.0,0,24.75,wikidata,2026-02-18
+HB Clark,hbclark.co.uk,seed,United Kingdom,uk,beverage industry,https://www.hbclark.co.uk,Q117805991,0,0.0,0,24.75,wikidata,2026-02-18
+Half Million,halfm.sa,seed,United Kingdom,uk,food industry,https://halfm.sa,Q108537438,0,0.0,0,24.75,wikidata,2026-02-18
+GoodOaks Homecare,goodoakshomecare.co.uk,seed,United Kingdom,uk,home care,https://www.goodoakshomecare.co.uk,Q135391494,0,0.0,0,24.75,wikidata,2026-02-18
+Geon,geonlabs.com,seed,United Kingdom,uk,food industry,http://www.geonlabs.com,Q11971816,0,0.0,0,24.75,wikidata,2026-02-18
+Feel Good Drinks Co,feelgooddrinks.co.uk,seed,United Kingdom,uk,beverage industry,http://www.feelgooddrinks.co.uk/,Q5441282,0,0.0,0,24.75,wikidata,2026-02-18
+Eco Natural Products,econaturalproducts.co.uk,seed,United Kingdom,uk,health food store,https://econaturalproducts.co.uk,Q133848070,0,0.0,0,24.75,wikidata,2026-02-18
+Alexander & James,alexanderandjames.com,seed,United Kingdom,uk,beverage industry,http://www.alexanderandjames.com/,Q16974562,0,0.0,0,24.75,wikidata,2026-02-18
+M. Dias Branco,mdiasbranco.com.br,seed,Brazil,americas,food industry,http://www.mdiasbranco.com.br,Q10322293,2,0.0,14000,24.7146,wikidata,2026-02-18
+PHW-Gruppe,phw-gruppe.de,seed,Germany,europe,food industry,http://www.phw-gruppe.de/,Q2044167,8,0.0,5483,24.6247,wikidata,2026-02-18
+Alpro,alpro.com,seed,Belgium,europe,food industry,https://www.alpro.com/,Q498666,20,0.0,1100,24.6085,wikidata,2026-02-18
+J & J Snack Foods,jjsnack.com,seed,United States,us,snack,http://jjsnack.com/,Q6109309,4,0.0,0,24.57,wikidata,2026-02-18
+Arnott's Biscuits,arnotts.com.au,seed,Australia,australia,food manufacturing,http://www.arnotts.com.au/,Q4795387,6,0.0,0,24.48,wikidata,2026-02-18
+The a2 Milk Company,thea2milkcompany.com,seed,Australia,australia,dairy industry,https://thea2milkcompany.com,Q22909318,5,0.0,0,24.4,wikidata,2026-02-18
+NewBoy,newboystore.com,seed,United Arab Emirates,gulf,food,https://newboystore.com/,Q7005096,5,0.0,0,24.4,wikidata,2026-02-18
+Lion,lionco.com,seed,Australia,australia,food industry,http://www.lionco.com/,Q3241775,5,0.0,0,24.4,wikidata,2026-02-18
+Orion Corporation,orionworld.com,seed,South Korea,apac,confectionery,https://www.orionworld.com/,Q7102776,10,0.0,2310,24.2593,wikidata,2026-02-18
+Huon Aquaculture,huonaqua.com.au,seed,Australia,australia,food processing,http://huonaqua.com.au,Q18165919,3,0.0,0,24.24,wikidata,2026-02-18
+Sanitarium Health and Wellbeing Company,sanitarium.com.au,seed,Australia,australia,food industry,http://www.sanitarium.com.au/,Q7418311,2,0.0,0,24.16,wikidata,2026-02-18
+San Remo Macaroni Company,sanremo.com.au,seed,Australia,australia,food,http://www.sanremo.com.au,Q7415244,2,0.0,0,24.16,wikidata,2026-02-18
+Norco Co-operative,norco.com.au,seed,Australia,australia,dairy,http://www.norco.com.au,Q7050485,2,0.0,0,24.16,wikidata,2026-02-18
+Bellamy's Organic,bellamysorganic.com.au,seed,Australia,australia,food,http://bellamysorganic.com.au,Q17001303,2,0.0,0,24.16,wikidata,2026-02-18
+Bega Group,begacheese.com.au,seed,Australia,australia,dairy industry,http://www.begacheese.com.au/,Q22906698,2,0.0,0,24.16,wikidata,2026-02-18
+Calpis,calpis.co.jp,seed,Japan,apac,food industry,https://www.calpis.co.jp/,Q1027454,16,0.0,852,24.1333,wikidata,2026-02-18
+Calpis,calpis.info,seed,Japan,apac,food industry,https://www.calpis.info/,Q1027454,16,0.0,852,24.1333,wikidata,2026-02-18
+Nuttelex,nuttelex.com.au,seed,Australia,australia,food industry,http://www.nuttelex.com.au/,Q7070571,1,0.0,0,24.08,wikidata,2026-02-18
+National Foods,natfoods.com.au,seed,Australia,australia,food,http://www.natfoods.com.au/,Q6972725,1,0.0,0,24.08,wikidata,2026-02-18
+Dairy Industry Association of Australia,diaa.asn.au,seed,Australia,australia,food processing,http://www.diaa.asn.au,Q5209573,1,0.0,0,24.08,wikidata,2026-02-18
+Bellamy's Australia,bellamysaustralia.com.au,seed,Australia,australia,food,http://bellamysaustralia.com.au,Q19871236,1,0.0,0,24.08,wikidata,2026-02-18
+Tariq Pastries,tariqpastries.com,seed,Bahrain,gulf,food and beverage,https://www.tariqpastries.com/,Q138001899,0,0.0,0,24.0,wikidata,2026-02-18
+Peacock Alley DIFC,peacockalleydifc.com,seed,United Arab Emirates,gulf,food industry,https://www.peacockalleydifc.com/,Q136068078,0,0.0,0,24.0,wikidata,2026-02-18
+Nutura,nutura.com.au,seed,Australia,australia,food industry,https://nutura.com.au/,Q100964302,0,0.0,0,24.0,wikidata,2026-02-18
+Lamazani,lamazani.com,seed,Qatar,gulf,food,https://lamazani.com/,Q108747097,0,0.0,0,24.0,wikidata,2026-02-18
+HomeAid Services,homeaidservices.com.au,seed,Australia,australia,home care,https://homeaidservices.com.au/,Q135645309,0,0.0,0,24.0,wikidata,2026-02-18
+Bottlemart,bottlemart.com.au,seed,Australia,australia,spirits industry,https://bottlemart.com.au/,Q102863175,0,0.0,0,24.0,wikidata,2026-02-18
+Al Seedawi Food Industries,alseedawifood.com,seed,Kuwait,gulf,food industry,https://alseedawifood.com/,Q136658034,0,0.0,0,24.0,wikidata,2026-02-18
+Eckes-Granini Group,eckes-granini.com,seed,Germany,europe,beverage industry,http://eckes-granini.com,Q18411421,6,0.0,1846,23.8031,wikidata,2026-02-18
+AVEBE,avebe.com,seed,Netherlands,europe,food industry,https://www.avebe.com/,Q300137,8,0.0,1400,23.795,wikidata,2026-02-18
+Colian Holding,jutrzenka.com.pl,seed,Poland,europe,food industry,http://www.jutrzenka.com.pl,Q3162914,5,0.0,2000,23.7717,wikidata,2026-02-18
+Dr. Schär,drschaer.com,seed,Italy,europe,food industry,https://www.drschaer.com/de,Q1254040,4,0.0,1600,23.5561,wikidata,2026-02-18
+Wild,wild.de,seed,Germany,europe,food industry,http://www.wild.de/,Q2570276,6,0.0,1100,23.4885,wikidata,2026-02-18
+Ayam Brand,ayambrand.com,seed,Singapore,apac,food processing,http://ayambrand.com,Q792747,6,0.0,1000,23.4306,wikidata,2026-02-18
+Establiments Viena,viena.cat,seed,Spain,europe,food industry,http://www.viena.cat,Q11954717,2,0.0,1500,23.3569,wikidata,2026-02-18
+Braun,braun.com,seed,Germany,europe,consumer goods industry,https://www.braun.com/,Q631220,32,0.0,0,23.31,wikidata,2026-02-18
+Bauli,bauli.it,seed,Italy,europe,food processing,https://www.bauli.it/it,Q782064,3,0.0,1200,23.3014,wikidata,2026-02-18
+Berliner-Kindl-Schultheiss brewery,schultheiss.de,seed,Germany,europe,food and tobacco industry,http://www.schultheiss.de/,Q821384,6,0.0,560,23.0785,wikidata,2026-02-18
+Apollinaris,apollinaris.de,seed,Germany,europe,food and tobacco industry,http://apollinaris.de/,Q618909,7,0.0,450,23.0258,wikidata,2026-02-18
+Hela Gewürzwerk Hermann Laue,hela.eu,seed,Germany,europe,agricultural and food trade,https://www.hela.eu/,Q1601652,3,0.0,620,22.9003,wikidata,2026-02-18
+Hövelmann,mineralquellen-hoevelmann.de,seed,Germany,europe,beverage industry,https://www.mineralquellen-hoevelmann.de/,Q1651956,1,0.0,800,22.8951,wikidata,2026-02-18
+Ajinomoto,ajinomoto.co.jp,seed,France,europe,food industry,https://www.ajinomoto.co.jp/,Q412826,51,0.0,0,22.83,wikidata,2026-02-18
+König Brauerei,koenig.de,seed,Germany,europe,food and tobacco industry,http://www.koenig.de/,Q1795931,6,0.0,340,22.7759,wikidata,2026-02-18
+Mestemacher,mestemacher.de,seed,Germany,europe,food industry,http://www.mestemacher.de,Q1770034,2,0.0,572,22.7714,wikidata,2026-02-18
+Zamek,zamek.de,seed,Germany,europe,food industry,http://www.zamek.de/,Q145736,1,0.0,650,22.769,wikidata,2026-02-18
+Kimia Farma,kimiafarma.co.id,seed,Indonesia,apac,consumer goods industry,https://www.kimiafarma.co.id/,Q11264892,6,0.0,11,22.7409,wikidata,2026-02-18
+Wullbrandt + Seele,wullbrandtundseele.de,seed,Germany,europe,Wholesale of other household goods,http://wullbrandtundseele.de,Q15434453,1,0.0,112,22.7043,wikidata,2026-02-18
+Heineken International,heinekeninternational.com,seed,Netherlands,europe,beverage industry,https://www.heinekeninternational.com,Q180855,49,0.0,0,22.67,wikidata,2026-02-18
+Heineken International,theheinekencompany.com,seed,Netherlands,europe,beverage industry,https://www.theheinekencompany.com/,Q180855,49,0.0,0,22.67,wikidata,2026-02-18
+Marten,marten.de,seed,Germany,europe,food industry,http://www.marten.de,Q1307816,1,0.0,550,22.6676,wikidata,2026-02-18
+Böklunder Fleisch- und Wurstwaren GmbH & Co. KG,boeklunder.de,seed,Germany,europe,food industry,http://www.boeklunder.de/,Q1019836,1,0.0,550,22.6676,wikidata,2026-02-18
+Flora Food Group,upfield.com,seed,Netherlands,europe,fast-moving consumer goods,http://www.upfield.com/,Q60741602,11,0.0,0,22.63,wikidata,2026-02-18
+Einbecker Brewery,einbecker.de,seed,Germany,europe,food and tobacco industry,http://www.einbecker.de,Q323095,6,0.0,180,22.3908,wikidata,2026-02-18
+LG Household & Health Care,lghnh.com,seed,South Korea,apac,fast-moving consumer goods,http://www.lghnh.com/,Q16169971,8,0.0,0,22.39,wikidata,2026-02-18
+BEHER,beher.es,seed,Spain,europe,food industry,http://www.beher.es/,Q814474,11,0.0,90,22.3727,wikidata,2026-02-18
+Starke Bäcker,starke-baecker.de,seed,Germany,europe,food industry,https://www.starke-baecker.de,Q66133336,0,0.0,350,22.3134,wikidata,2026-02-18
+South African Breweries,sab.co.za,seed,South Africa,africa,fast-moving consumer goods,http://www.sab.co.za/,Q7565435,7,0.0,0,22.31,wikidata,2026-02-18
+Mayora Indah,mayoraindah.co.id,seed,Indonesia,apac,consumer goods industry,https://www.mayoraindah.co.id,Q12497654,19,0.0,0,22.27,wikidata,2026-02-18
+"MARUWAYUSHI CO.,LTD.",maruwayushi.com,seed,Japan,apac,food,http://www.maruwayushi.com/,Q105222327,1,0.0,278,22.2538,wikidata,2026-02-18
+Bäckerei Leifert,leifert.de,seed,Germany,europe,food industry,https://www.leifert.de/,Q66086129,0,0.0,300,22.22,wikidata,2026-02-18
+Goodman Fielder,goodmanfielder.com.au,seed,New Zealand,apac,fast-moving consumer goods,http://www.goodmanfielder.com.au/,Q1537565,5,0.0,0,22.15,wikidata,2026-02-18
+Wings,wingscorp.com,seed,Indonesia,apac,fast-moving consumer goods,http://www.wingscorp.com/,Q12524596,4,0.0,0,22.07,wikidata,2026-02-18
+Odega Group,odega.de,seed,Germany,europe,food processing,https://www.odega.de/,Q124100074,1,0.0,201,22.0575,wikidata,2026-02-18
+Hofbrauhaus Wolters,hofbrauhaus-wolters.de,seed,Germany,europe,food and tobacco industry,http://www.hofbrauhaus-wolters.de,Q1622956,3,0.0,150,22.0406,wikidata,2026-02-18
+Lindt & Sprüngli,lindt-spruengli.com,seed,Switzerland,europe,"manufacture of cocoa, chocolate and sugar confectionery",https://www.lindt-spruengli.com/,Q152822,41,0.0,0,22.03,wikidata,2026-02-18
+Gudang Garam,gudanggaramtbk.com,seed,Indonesia,apac,consumer goods industry,http://www.gudanggaramtbk.com,Q1553005,16,0.0,0,22.03,wikidata,2026-02-18
+Seitenbacher,seitenbacher.de,seed,Germany,europe,food industry,https://www.seitenbacher.de,Q2266946,3,0.0,140,21.9989,wikidata,2026-02-18
+Unilever (Indonesia),unilever.co.id,seed,Indonesia,apac,fast-moving consumer goods industry,http://www.unilever.co.id/,Q7885208,3,0.0,0,21.99,wikidata,2026-02-18
+Clover,clover.co.za,seed,South Africa,africa,fast-moving consumer goods,http://www.clover.co.za,Q5135861,2,0.0,0,21.91,wikidata,2026-02-18
+Genuport Trade GmbH,genuport.de,seed,Germany,europe,food industry,http://www.genuport.de/home/index.aspx,Q1502696,1,0.0,150,21.8806,wikidata,2026-02-18
+Richters Altstadt-Bäckerei,brotversteher.de,seed,Germany,europe,food industry,https://www.brotversteher.de,Q66212346,0,0.0,166,21.8618,wikidata,2026-02-18
+Milkau,milkau.de,seed,Germany,europe,food industry,https://www.milkau.de/,Q66208652,0,0.0,160,21.8396,wikidata,2026-02-18
+Paragon Technology and Innovation,paragon-innovation.com,seed,Indonesia,apac,fast-moving consumer goods,https://www.paragon-innovation.com,Q97213751,1,0.0,0,21.83,wikidata,2026-02-18
+Japan Crate,japancrate.com,seed,Japan,apac,fast-moving consumer goods,http://www.japancrate.com/,Q25111232,1,0.0,0,21.83,wikidata,2026-02-18
+Meli,meli.be,seed,Belgium,europe,food industry,https://meli.be/en/,Q23443533,2,0.0,115,21.8002,wikidata,2026-02-18
+Indofood,indofood.com,seed,Indonesia,apac,consumer goods industry,http://www.indofood.com,Q3930665,12,0.0,0,21.71,wikidata,2026-02-18
+Superverd,superverd.es,seed,Spain,europe,food industry,https://www.superverd.es/,Q11950546,1,0.0,95,21.6052,wikidata,2026-02-18
+Mauritius Brauerei Zwickau,mauritius-brauerei.de,seed,Germany,europe,food and tobacco industry,http://www.mauritius-brauerei.de,Q1516386,2,0.0,83,21.604,wikidata,2026-02-18
+BÄKO Ost eG Bakers' and Confectioners' CooperativeSaxony-Brandenburg,baeko-ost.de,seed,Germany,europe,food trade,https://www.baeko-ost.de,Q131143488,0,0.0,100,21.556,wikidata,2026-02-18
+Lippert Getränkefachgroßhandel & Logistik GmbH,getraenke-lippert.de,seed,Germany,europe,beverage industry,https://getraenke-lippert.de/,Q122914323,0,0.0,90,21.4927,wikidata,2026-02-18
+Sampoerna,sampoerna.com,seed,Indonesia,apac,consumer goods industry,http://www.sampoerna.com,Q7410186,9,0.0,0,21.47,wikidata,2026-02-18
+Born Feinkost,born-feinkost.de,seed,Germany,europe,food industry,http://www.born-feinkost.de,Q893917,4,0.0,50,21.4606,wikidata,2026-02-18
+Panaderías Bou,jaimebou.com,seed,Spain,europe,food industry,http://jaimebou.com/,Q55601405,0,0.0,80,21.4219,wikidata,2026-02-18
+Halberstädter Würstchen- und Konservenvertriebs GmbH,halberstaedter.de,seed,Germany,europe,food industry,http://www.halberstaedter.de,Q1570335,2,0.0,52,21.324,wikidata,2026-02-18
+Kalbe Farma,kalbe.co.id,seed,Indonesia,apac,consumer goods industry,https://www.kalbe.co.id,Q6351754,7,0.0,0,21.31,wikidata,2026-02-18
+Hokusetsu Brewery,sake-hokusetsu.com,seed,Japan,apac,sake brewery,https://sake-hokusetsu.com/,Q22127721,2,0.0,48,21.2763,wikidata,2026-02-18
+Nong Shim Ltd.,nongshim.com,seed,South Korea,apac,food industry,https://www.nongshim.com,Q483018,31,0.0,0,21.23,wikidata,2026-02-18
+Angelini Group,angeliniindustries.com,seed,Italy,europe,consumer goods industry,https://www.angeliniindustries.com/,Q1119001,6,0.0,0,21.23,wikidata,2026-02-18
+Suntory,suntory.co.jp,seed,Japan,apac,beverage industry,https://www.suntory.co.jp/,Q1345267,30,0.0,0,21.15,wikidata,2026-02-18
+Grupo Bimbo,grupobimbo.com,seed,Mexico,americas,food processing,http://www.grupobimbo.com/,Q775031,30,0.0,0,21.15,wikidata,2026-02-18
+Asahi Breweries,asahibeer.com,seed,Japan,apac,beverage industry,http://www.asahibeer.com/,Q720479,30,0.0,0,21.15,wikidata,2026-02-18
+Asahi Breweries,asahibeer.co.jp,seed,Japan,apac,beverage industry,https://www.asahibeer.co.jp/,Q720479,30,0.0,0,21.15,wikidata,2026-02-18
+Sido Muncul,sidomuncul.co.id,seed,Indonesia,apac,consumer goods industry,http://www.sidomuncul.co.id,Q12514359,5,0.0,0,21.15,wikidata,2026-02-18
+Parmalat,parmalat.it,seed,Italy,europe,food industry,https://www.parmalat.it/,Q1432285,29,0.0,0,21.07,wikidata,2026-02-18
+Knorr,knorr.com,seed,Germany,europe,food and tobacco industry,http://www.knorr.com/,Q313882,29,0.0,0,21.07,wikidata,2026-02-18
+Barilla Group,barillagroup.com,seed,Italy,europe,food industry,https://www.barillagroup.com/,Q762787,29,0.0,0,21.07,wikidata,2026-02-18
+Siantar Top,siantartop.co.id,seed,Indonesia,apac,consumer goods industry,https://siantartop.co.id/en/home/,Q12514216,4,0.0,0,21.07,wikidata,2026-02-18
+Paulaner Brewery,paulaner-gruppe.de,seed,Germany,europe,food and tobacco industry,https://www.paulaner-gruppe.de,Q127305,28,0.0,0,20.99,wikidata,2026-02-18
+Paulaner Brewery,paulaner.de,seed,Germany,europe,food and tobacco industry,https://www.paulaner.de,Q127305,28,0.0,0,20.99,wikidata,2026-02-18
+Paglieri,paglieri.it,seed,Italy,europe,consumer goods industry,http://paglieri.it,Q3888961,3,0.0,0,20.99,wikidata,2026-02-18
+Mustika Ratu,mustika-ratu.com,seed,Indonesia,apac,consumer goods industry,http://www.mustika-ratu.com/,Q19729543,3,0.0,0,20.99,wikidata,2026-02-18
+Grolsch,grolsch.com,seed,Netherlands,europe,beverage industry,https://www.grolsch.com/,Q153075,27,0.0,0,20.91,wikidata,2026-02-18
+Pyridam Farma,pyridam.com,seed,Indonesia,apac,consumer goods industry,http://www.pyridam.com,Q13096359,2,0.0,0,20.91,wikidata,2026-02-18
+Kino Indonesia,kino.co.id,seed,Indonesia,apac,consumer goods industry,http://www.kino.co.id,Q96472570,2,0.0,0,20.91,wikidata,2026-02-18
+Gunung Madu Plantations,gunungmadu.co.id,seed,Indonesia,apac,consumer goods industry,https://www.gunungmadu.co.id/,Q136293163,2,0.0,0,20.91,wikidata,2026-02-18
+Delta Djakarta,deltajkt.co.id,seed,Indonesia,apac,consumer goods industry,http://www.deltajkt.co.id,Q5254612,2,0.0,0,20.91,wikidata,2026-02-18
+AMARO,amaro.com,seed,Brazil,americas,consumer goods industry,https://amaro.com/,Q62131386,2,0.0,0,20.91,wikidata,2026-02-18
+Kirin Holdings,kirinholdings.com,seed,Japan,apac,beverage industry,https://www.kirinholdings.com/,Q13403399,26,0.0,0,20.83,wikidata,2026-02-18
+Kikkoman,kikkoman.co.jp,seed,Japan,apac,food processing,http://www.kikkoman.co.jp/enjoys/factory/noda.html,Q1321815,26,0.0,0,20.83,wikidata,2026-02-18
+Tunas Baru Lampung,tunasbarulampung.com,seed,Indonesia,apac,consumer goods industry,http://www.tunasbarulampung.com,Q12522712,1,0.0,0,20.83,wikidata,2026-02-18
+Tiga Pilar Sejahtera Food,tpsfood.id,seed,Indonesia,apac,consumer goods industry,http://www.tpsfood.id,Q19744177,1,0.0,0,20.83,wikidata,2026-02-18
+Sekar Laut,sekar.co.id,seed,Indonesia,apac,consumer goods industry,http://www.sekar.co.id,Q12512951,1,0.0,0,20.83,wikidata,2026-02-18
+Prasidha Aneka Niaga,prasidha.co.id,seed,Indonesia,apac,consumer goods industry,http://www.prasidha.co.id,Q12506402,1,0.0,0,20.83,wikidata,2026-02-18
+Phapros,phapros.co.id,seed,Indonesia,apac,consumer goods industry,https://www.phapros.co.id/,Q12505435,1,0.0,0,20.83,wikidata,2026-02-18
+Pantai Indah Kapuk Dua,pratamaabadi.com,seed,Indonesia,apac,consumer goods industry,https://pratamaabadi.com,Q96100535,1,0.0,0,20.83,wikidata,2026-02-18
+Nippon Indosari Corpindo,sariroti.com,seed,Indonesia,apac,consumer goods industry,http://www.sariroti.com,Q19729774,1,0.0,0,20.83,wikidata,2026-02-18
+Martina Berto,martinaberto.co.id,seed,Indonesia,apac,consumer goods industry,http://www.martinaberto.co.id,Q56392707,1,0.0,0,20.83,wikidata,2026-02-18
+Langgeng Makmur Industri,langgengmakmur.com,seed,Indonesia,apac,consumer goods industry,https://www.langgengmakmur.com/corporate/id,Q12493870,1,0.0,0,20.83,wikidata,2026-02-18
+Inti Agri Resources,iikp.com,seed,Indonesia,apac,consumer goods industry,http://www.iikp.com,Q12486708,1,0.0,0,20.83,wikidata,2026-02-18
+Indofood CBP,indofoodcbp.com,seed,Indonesia,apac,consumer goods industry,http://www.indofoodcbp.com,Q105624046,1,0.0,0,20.83,wikidata,2026-02-18
+Garudafood,garudafood.com,seed,Indonesia,apac,consumer goods industry,http://www.garudafood.com,Q12483558,1,0.0,0,20.83,wikidata,2026-02-18
+Apotek K-24,apotek-k24.com,seed,Indonesia,apac,consumer goods industry,https://www.apotek-k24.com,Q56390232,1,0.0,0,20.83,wikidata,2026-02-18
+Apotek K-24,k24klik.com,seed,Indonesia,apac,consumer goods industry,https://www.k24klik.com/,Q56390232,1,0.0,0,20.83,wikidata,2026-02-18
+Douglas,douglas.eu,seed,Germany,europe,cosmetics industry,http://www.douglas.eu,Q570747,13,0.0,0,20.79,wikidata,2026-02-18
+Wismilak Inti Makmur,wismilak.com,seed,Indonesia,apac,consumer goods industry,http://www.wismilak.com,Q96100704,0,0.0,0,20.75,wikidata,2026-02-18
+Wilmar Cahaya Indonesia,wilmarcahayaindonesia.com,seed,Indonesia,apac,consumer goods industry,http://www.wilmarcahayaindonesia.com,Q96100155,0,0.0,0,20.75,wikidata,2026-02-18
+Wahana Interfood Nusantara,wahana-interfood.com,seed,Indonesia,apac,consumer goods industry,http://www.wahana-interfood.com,Q96100165,0,0.0,0,20.75,wikidata,2026-02-18
+Ultra Jaya Milk Industry,ultrajaya.co.id,seed,Indonesia,apac,consumer goods industry,http://www.ultrajaya.co.id,Q96100690,0,0.0,0,20.75,wikidata,2026-02-18
+Tri Banyan Tirta,altospringswater.com,seed,Indonesia,apac,consumer goods industry,http://www.ALTOspringswater.com,Q96099953,0,0.0,0,20.75,wikidata,2026-02-18
+Sentra Food Indonesia,sentrafood.co.id,seed,Indonesia,apac,consumer goods industry,http://www.sentrafood.co.id,Q96100241,0,0.0,0,20.75,wikidata,2026-02-18
+Sariguna Primatirta,tanobel.com,seed,Indonesia,apac,consumer goods industry,http://www.tanobel.com,Q96100159,0,0.0,0,20.75,wikidata,2026-02-18
+Prima Cakrawala Abadi,pcafoods.com,seed,Indonesia,apac,consumer goods industry,http://www.pcafoods.com,Q96100540,0,0.0,0,20.75,wikidata,2026-02-18
+Palma Serasih,palmaserasih.co.id,seed,Indonesia,apac,consumer goods industry,http://www.palmaserasih.co.id,Q96100582,0,0.0,0,20.75,wikidata,2026-02-18
+Mulia Boga Raya,prochiz.com,seed,Indonesia,apac,consumer goods industry,http://www.prochiz.com,Q96100373,0,0.0,0,20.75,wikidata,2026-02-18
+Merck,merck.co.id,seed,Indonesia,apac,consumer goods industry,http://www.merck.co.id,Q96472579,0,0.0,0,20.75,wikidata,2026-02-18
+Mandom Indonesia,mandom.co.id,seed,Indonesia,apac,consumer goods industry,http://www.mandom.co.id,Q96472609,0,0.0,0,20.75,wikidata,2026-02-18
+Magna Investama Mandiri,magnafinance.co.id,seed,Indonesia,apac,consumer goods industry,http://magnafinance.co.id/webmail,Q96100468,0,0.0,0,20.75,wikidata,2026-02-18
+Integra Indocabinet,integrafurniture.co.id,seed,Indonesia,apac,consumer goods industry,http://www.integrafurniture.co.id,Q96472632,0,0.0,0,20.75,wikidata,2026-02-18
+Indonesian Tobacco,indonesiantobacco.com,seed,Indonesia,apac,consumer goods industry,http://www.indonesiantobacco.com,Q96100344,0,0.0,0,20.75,wikidata,2026-02-18
+Hartadinata Abadi,hartadinata.com,seed,Indonesia,apac,consumer goods industry,http://www.hartadinata.com,Q96472541,0,0.0,0,20.75,wikidata,2026-02-18
+Era Mandiri Cemerlang,indonesiaseafood.net,seed,Indonesia,apac,consumer goods industry,http://www.indonesiaseafood.net,Q96100315,0,0.0,0,20.75,wikidata,2026-02-18
+Diamond Food Indonesia,diamondfoodindonesia.com,seed,Indonesia,apac,consumer goods industry,http://www.diamondfoodindonesia.com,Q96100198,0,0.0,0,20.75,wikidata,2026-02-18
+Cottonindo Ariesta,cottonindo.com,seed,Indonesia,apac,consumer goods industry,http://www.cottonindo.com,Q96472573,0,0.0,0,20.75,wikidata,2026-02-18
+Chitose Internasional,chitose-indonesia.com,seed,Indonesia,apac,consumer goods industry,http://www.chitose-indonesia.com,Q96472519,0,0.0,0,20.75,wikidata,2026-02-18
+Campina Ice Cream Industry,campina.co.id,seed,Indonesia,apac,consumer goods industry,http://www.campina.co.id,Q96100149,0,0.0,0,20.75,wikidata,2026-02-18
+Cahaya Bintang Medan,cbm-furniture.com,seed,Indonesia,apac,consumer goods industry,http://www.cbm-furniture.com,Q96472517,0,0.0,0,20.75,wikidata,2026-02-18
+Buyung Poetra Sembada,topikoki.com,seed,Indonesia,apac,consumer goods industry,http://www.topikoki.com,Q96100296,0,0.0,0,20.75,wikidata,2026-02-18
+Budi Starch & Sweetener,budistarchsweetener.com,seed,Indonesia,apac,consumer goods industry,http://www.budistarchsweetener.com,Q96100139,0,0.0,0,20.75,wikidata,2026-02-18
+Bentoel International Investama,bentoelgroup.com,seed,Indonesia,apac,consumer goods industry,http://www.bentoelgroup.com,Q96100610,0,0.0,0,20.75,wikidata,2026-02-18
+Akasha Wira International,akashainternational.com,seed,Indonesia,apac,consumer goods industry,http://www.akashainternational.com,Q96099933,0,0.0,0,20.75,wikidata,2026-02-18
+Innisfree,innisfree.co.kr,seed,South Korea,apac,cosmetics industry,http://www.innisfree.co.kr/,Q16176002,12,0.0,0,20.71,wikidata,2026-02-18
+Innisfree,innisfree.com,seed,South Korea,apac,cosmetics industry,https://www.innisfree.com,Q16176002,12,0.0,0,20.71,wikidata,2026-02-18
+Acqua di Parma,acquadiparma.com,seed,Italy,europe,cosmetics industry,http://www.acquadiparma.com/,Q2056628,12,0.0,0,20.71,wikidata,2026-02-18
+Hengan International,hengan.com,seed,China,apac,hygiene,http://www.hengan.com/,Q5714244,11,0.0,0,20.63,wikidata,2026-02-18
+Natura Cosméticos S.A.,natura.com.br,seed,Brazil,americas,cosmetics industry,https://www.natura.com.br/,Q3131210,10,0.0,0,20.55,wikidata,2026-02-18
+Johann Maria Farina gegenüber dem Jülichs-Platz,farina1709.com,seed,Germany,europe,cosmetics industry,http://www.farina1709.com,Q650195,10,0.0,0,20.55,wikidata,2026-02-18
+Rosenthal,rosenthal.de,seed,Germany,europe,Manufacture of ceramic household and ornamental articles,http://www.rosenthal.de/,Q461222,9,0.0,0,20.47,wikidata,2026-02-18
+KOSÉ Corporation,kose.co.jp,seed,Japan,apac,personal care product,http://www.kose.co.jp/,Q18857532,9,0.0,0,20.47,wikidata,2026-02-18
+Fonterra,fonterra.com,seed,New Zealand,apac,dairying,http://www.fonterra.com,Q946370,21,0.0,0,20.43,wikidata,2026-02-18
+Davidoff,davidoff.com,seed,Switzerland,europe,tobacco industry,http://davidoff.com/age-gate,Q501422,21,0.0,0,20.43,wikidata,2026-02-18
+Natura & Co,naturaeco.com,seed,Brazil,americas,cosmetics industry,https://www.naturaeco.com/,Q130331887,8,0.0,0,20.39,wikidata,2026-02-18
+Etude House,etudehouse.com,seed,South Korea,apac,cosmetics industry,https://www.etudehouse.com/,Q16174973,8,0.0,0,20.39,wikidata,2026-02-18
+Felsenau Brewery,felsenau.ch,seed,Switzerland,europe,beverage industry,https://www.felsenau.ch,Q900178,3,0.0,9,20.39,wikidata,2026-02-18
+Ricola,ricola.com,seed,Switzerland,europe,food industry,https://www.ricola.com/,Q521499,20,0.0,0,20.35,wikidata,2026-02-18
+FrieslandCampina,frieslandcampina.com,seed,Netherlands,europe,dairy industry,http://www.frieslandcampina.com/,Q248711,20,0.0,0,20.35,wikidata,2026-02-18
+Campari Group,camparigroup.com,seed,Italy,europe,beverage industry,https://www.camparigroup.com,Q753685,20,0.0,0,20.35,wikidata,2026-02-18
+Inglot cosmetics,inglot.pl,seed,Poland,europe,cosmetics industry,https://inglot.pl,Q5420712,7,0.0,0,20.31,wikidata,2026-02-18
+Inglot cosmetics,com.ru,seed,Poland,europe,cosmetics industry,https://shop.inglot.com.ru/,Q5420712,7,0.0,0,20.31,wikidata,2026-02-18
+Zott SE & Co. KG,zott-dairy.com,seed,Germany,europe,food industry,http://www.zott-dairy.com,Q226908,19,0.0,0,20.27,wikidata,2026-02-18
+Löwenbräu Brewery,loewenbraeu.de,seed,Germany,europe,food and tobacco industry,http://www.loewenbraeu.de,Q256392,19,0.0,0,20.27,wikidata,2026-02-18
+Coca-Cola HBC,coca-colahellenic.com,seed,Switzerland,europe,food industry,http://www.coca-colahellenic.com/,Q1104910,19,0.0,0,20.27,wikidata,2026-02-18
+Nature Republic,naturerepublic.com,seed,South Korea,apac,cosmetics industry,https://www.naturerepublic.com/,Q16935507,6,0.0,0,20.23,wikidata,2026-02-18
+Nature Republic,naturerepublicusa.com,seed,South Korea,apac,cosmetics industry,https://www.naturerepublicusa.com/,Q16935507,6,0.0,0,20.23,wikidata,2026-02-18
+Mäurer & Wirtz,m-w.de,seed,Germany,europe,cosmetics industry,http://www.m-w.de/,Q879124,6,0.0,0,20.23,wikidata,2026-02-18
+Eisenberg Paris,eisenberg.com,seed,France,europe,cosmetics industry,http://www.eisenberg.com,Q16966916,6,0.0,0,20.23,wikidata,2026-02-18
+Sinalco,sinalco.com,seed,Germany,europe,food and tobacco industry,http://www.sinalco.com,Q707412,18,0.0,0,20.19,wikidata,2026-02-18
+Djarum,djarum.com,seed,Indonesia,apac,tobacco industry,http://www.djarum.com,Q1209119,18,0.0,0,20.19,wikidata,2026-02-18
+Century Pacific Food,centurypacific.com.ph,seed,Philippines,apac,food processing,http://www.centurypacific.com.ph/,Q18345141,18,0.0,0,20.19,wikidata,2026-02-18
+Montserrat,montserrat-chocolate.eu,seed,Belgium,europe,"manufacture of cocoa, chocolate and sugar confectionery",https://www.montserrat-chocolate.eu,Q34120209,1,0.0,8,20.1659,wikidata,2026-02-18
+LR Health & Beauty Systems,lrworld.com,seed,Germany,europe,cosmetics industry,http://www.lrworld.com,Q834977,5,0.0,0,20.15,wikidata,2026-02-18
+Lise Watier,lisewatier.com,seed,Canada,americas,cosmetics industry,http://www.lisewatier.com/,Q3242538,5,0.0,0,20.15,wikidata,2026-02-18
+Lise Watier,watier.com,seed,Canada,americas,cosmetics industry,https://watier.com/,Q3242538,5,0.0,0,20.15,wikidata,2026-02-18
+Kiko Milano,kikocosmetics.com,seed,Italy,europe,cosmetics industry,https://www.kikocosmetics.com/,Q3812045,5,0.0,0,20.15,wikidata,2026-02-18
+ICI Paris XL,iciparisxl.be,seed,Netherlands,europe,cosmetics industry,https://www.iciparisxl.be/,Q769749,5,0.0,0,20.15,wikidata,2026-02-18
+ICI Paris XL,iciparisxl.lu,seed,Netherlands,europe,cosmetics industry,https://www.iciparisxl.lu/,Q769749,5,0.0,0,20.15,wikidata,2026-02-18
+ICI Paris XL,iciparisxl.nl,seed,Netherlands,europe,cosmetics industry,https://www.iciparisxl.nl/,Q769749,5,0.0,0,20.15,wikidata,2026-02-18
+Fancl Corporation,fancl.co.jp,seed,Japan,apac,cosmetics industry,http://www.fancl.co.jp/,Q11332202,5,0.0,0,20.15,wikidata,2026-02-18
+DXN,dxn2u.com,seed,Malaysia,apac,personal care product,http://www.dxn2u.com/,Q5206703,5,0.0,0,20.15,wikidata,2026-02-18
+Martini & Rossi,martini.com,seed,Italy,europe,"distilling, rectifying and blending of spirits",http://www.martini.com/,Q2300932,17,0.0,0,20.11,wikidata,2026-02-18
+Louis Dreyfus Group,louisdreyfus.com,seed,France,europe,agricultural and food trade,http://www.louisdreyfus.com/,Q833111,17,0.0,0,20.11,wikidata,2026-02-18
+Efes Beverage Group,anadoluefes.com,seed,Turkey,europe,brewery,http://www.anadoluefes.com,Q2729871,17,0.0,0,20.11,wikidata,2026-02-18
+Staub,staub.fr,seed,Belgium,europe,manufacture of household metal articles,http://www.staub.fr,Q17144169,4,0.0,0,20.07,wikidata,2026-02-18
+Splash Corporation,splash.com.ph,seed,Philippines,apac,personal care product,http://www.splash.com.ph/,Q17047180,4,0.0,0,20.07,wikidata,2026-02-18
+O Boticário,boticario.com,seed,Brazil,americas,cosmetics industry,https://www.boticario.com/,Q7073219,4,0.0,0,20.07,wikidata,2026-02-18
+Mane SA,mane.com,seed,France,europe,cosmetics industry,https://www.mane.com/,Q3285626,4,0.0,0,20.07,wikidata,2026-02-18
+Lenthéric,lentheric.com,seed,France,europe,cosmetics industry,http://www.lentheric.com,Q6523325,4,0.0,0,20.07,wikidata,2026-02-18
+Kahla/Thüringen Porzellan GmbH,kahlaporzellan.com,seed,Germany,europe,Manufacture of ceramic household and ornamental articles,http://www.kahlaporzellan.com/,Q1718381,4,0.0,0,20.07,wikidata,2026-02-18
+Hutschenreuther,hutschenreuther.com,seed,Germany,europe,Manufacture of ceramic household and ornamental articles,http://www.hutschenreuther.com,Q430822,4,0.0,0,20.07,wikidata,2026-02-18
+Ella Baché,ellabache.com,seed,France,europe,cosmetics industry,http://www.ellabache.com,Q5364466,4,0.0,0,20.07,wikidata,2026-02-18
+Ottogi,ottogi.co.kr,seed,South Korea,apac,food processing,http://www.ottogi.co.kr/,Q625852,16,0.0,0,20.03,wikidata,2026-02-18
+Neuhaus,neuhauschocolates.com,seed,Belgium,europe,food industry,https://www.neuhauschocolates.com,Q1813801,16,0.0,0,20.03,wikidata,2026-02-18
+Companyia cervesera del Montseny,cervesamontseny.cat,seed,Spain,europe,beverage industry,https://cervesamontseny.cat/,Q21086737,1,0.0,6,20.0131,wikidata,2026-02-18
+Ĭsa Knox,isaknox.co.kr,seed,South Korea,apac,cosmetics industry,http://www.isaknox.co.kr/,Q8080013,3,0.0,0,19.99,wikidata,2026-02-18
+Ziaja,ziaja.com,seed,Poland,europe,cosmetics industry,https://ziaja.com,Q9390905,3,0.0,0,19.99,wikidata,2026-02-18
+Ziaja,ziajaonline.co.uk,seed,Poland,europe,cosmetics industry,https://ziajaonline.co.uk/,Q9390905,3,0.0,0,19.99,wikidata,2026-02-18
+SimplySiti,simplysiti.com.my,seed,Malaysia,apac,cosmetics industry,https://www.simplysiti.com.my,Q7520975,3,0.0,0,19.99,wikidata,2026-02-18
+Rituals,rituals.com,seed,Netherlands,europe,cosmetics industry,https://www.rituals.com/,Q62874140,3,0.0,0,19.99,wikidata,2026-02-18
+Klosterfrau Melissengeist,klosterfrau.de,seed,Germany,europe,cosmetics industry,http://klosterfrau.de,Q1776388,3,0.0,0,19.99,wikidata,2026-02-18
+NutriAsia,nutriasia.com,seed,Philippines,apac,food processing,https://nutriasia.com/,Q85790037,15,0.0,0,19.95,wikidata,2026-02-18
+KT&G,ktng.com,seed,South Korea,apac,tobacco industry,http://www.ktng.com/,Q497054,15,0.0,0,19.95,wikidata,2026-02-18
+Krones AG,krones.com,seed,Germany,europe,food industry,https://www.krones.com/,Q705337,15,0.0,0,19.95,wikidata,2026-02-18
+BRF,brf-br.com,seed,Brazil,americas,food industry,http://www.brf-br.com,Q899097,15,0.0,0,19.95,wikidata,2026-02-18
+August Storck KG,storck.com,seed,Germany,europe,food industry,https://www.storck.com/,Q566814,15,0.0,0,19.95,wikidata,2026-02-18
+Pupa Milano,pupa.it,seed,Italy,europe,cosmetics industry,http://www.pupa.it,Q3925875,2,0.0,0,19.91,wikidata,2026-02-18
+proWIN,prowin.net,seed,Germany,europe,personal care product,https://www.prowin.net/,Q24025269,2,0.0,0,19.91,wikidata,2026-02-18
+poterie du Mesnil de Bavent,poterie-bavent.com,seed,France,europe,Manufacture of ceramic household and ornamental articles,https://www.poterie-bavent.com/,Q21427812,2,0.0,0,19.91,wikidata,2026-02-18
+Nocibé,nocibe.fr,seed,France,europe,cosmetics industry,http://www.nocibe.fr/,Q3342592,2,0.0,0,19.91,wikidata,2026-02-18
+Granado,granado.com.br,seed,Brazil,americas,cosmetics industry,https://www.granado.com.br,Q9698089,2,0.0,0,19.91,wikidata,2026-02-18
+Ed. Pinaud,ed-pinaud.com,seed,France,europe,cosmetics industry,http://ed-pinaud.com/,Q50826850,2,0.0,0,19.91,wikidata,2026-02-18
+Bayankala,bayankala.com,seed,China,apac,cosmetics industry,http://www.bayankala.com/,Q4874312,2,0.0,0,19.91,wikidata,2026-02-18
+Albion,albion.co.jp,seed,Japan,apac,cosmetics industry,https://www.albion.co.jp/,Q17192252,2,0.0,0,19.91,wikidata,2026-02-18
+ThaiBev,thaibev.com,seed,Thailand,apac,beverage industry,http://www.thaibev.com/,Q15304350,14,0.0,0,19.87,wikidata,2026-02-18
+Oettinger Brewery,oettinger1731.de,seed,Germany,europe,food and tobacco industry,https://oettinger1731.de/,Q562552,14,0.0,0,19.87,wikidata,2026-02-18
+Mengniu Dairy,mengniu.com.cn,seed,China,apac,dairy industry,https://www.mengniu.com.cn/,Q985475,14,0.0,0,19.87,wikidata,2026-02-18
+McCain Foods,mccain.com,seed,Canada,americas,frozen food,http://www.mccain.com/,Q944414,14,0.0,0,19.87,wikidata,2026-02-18
+Birra Ichnusa,birraichnusa.it,seed,Italy,europe,brewery,http://www.birraichnusa.it,Q2099630,14,0.0,0,19.87,wikidata,2026-02-18
+Beijing Yanjing Brewery,yanjing.com.cn,seed,China,apac,brewery,http://www.yanjing.com.cn,Q2060769,14,0.0,0,19.87,wikidata,2026-02-18
+AmBev,ambev.com.br,seed,Brazil,americas,beverage industry,http://www.ambev.com.br,Q2142669,14,0.0,0,19.87,wikidata,2026-02-18
+Trade Secrets,tradesecrets.ca,seed,Canada,americas,cosmetics industry,https://tradesecrets.ca/,Q7831971,1,0.0,0,19.83,wikidata,2026-02-18
+Skins,skins.nl,seed,Netherlands,europe,cosmetics industry,https://www.skins.nl,Q130745552,1,0.0,0,19.83,wikidata,2026-02-18
+Shobido,shobido-corp.co.jp,seed,Japan,apac,cosmetics industry,https://www.shobido-corp.co.jp/,Q125794919,1,0.0,0,19.83,wikidata,2026-02-18
+Saje Natural Wellness,saje.com,seed,Canada,americas,cosmetics industry,http://saje.com/,Q44631749,1,0.0,0,19.83,wikidata,2026-02-18
+Rachel K,rachelkcosmetics.com,seed,Singapore,apac,cosmetics industry,http://www.rachelkcosmetics.com/,Q17077228,1,0.0,0,19.83,wikidata,2026-02-18
+Laverana GmbH & Co. KG,laverana.com,seed,Germany,europe,cosmetics industry,https://www.laverana.com/,Q132097375,1,0.0,0,19.83,wikidata,2026-02-18
+Klier Hair Group,klierhairgroup.de,seed,Germany,europe,cosmetics industry,https://klierhairgroup.de/,Q1465159,1,0.0,0,19.83,wikidata,2026-02-18
+"Guangzhou Blue Moon Industrial Co., Ltd",bluemoon.com.cn,seed,China,apac,detergent industry,https://www.bluemoon.com.cn/,Q10284305,1,0.0,0,19.83,wikidata,2026-02-18
+Dabao,dabao.com,seed,China,apac,cosmetics industry,https://www.dabao.com/,Q109411893,1,0.0,0,19.83,wikidata,2026-02-18
+Coreana Cosmetics,coreana.com,seed,South Korea,apac,cosmetics industry,https://www.coreana.com/,Q130381170,1,0.0,0,19.83,wikidata,2026-02-18
+Contém1g,contem1g.com.br,seed,Brazil,americas,cosmetics industry,http://www.contem1g.com.br/,Q18481181,1,0.0,0,19.83,wikidata,2026-02-18
+Cativa Natureza,cativanatureza.com.br,seed,Brazil,americas,personal care product,http://www.cativanatureza.com.br/?idioma=en,Q17481020,1,0.0,0,19.83,wikidata,2026-02-18
+Biodermal,biodermal.nl,seed,Netherlands,europe,cosmetics industry,https://www.biodermal.nl/,Q101628028,1,0.0,0,19.83,wikidata,2026-02-18
+Yili Group,yili.com,seed,China,apac,dairy,https://www.yili.com/,Q1231406,13,0.0,0,19.79,wikidata,2026-02-18
+Vinamilk,vinamilk.com.vn,seed,Vietnam,apac,food industry,http://www.vinamilk.com.vn,Q1519175,13,0.0,0,19.79,wikidata,2026-02-18
+Olam Group Limited,olamgroup.com,seed,France,europe,food industry,https://www.olamgroup.com,Q5950695,13,0.0,0,19.79,wikidata,2026-02-18
+Maple Leaf Foods,mapleleaf.ca,seed,Canada,americas,food processing,http://www.mapleleaf.ca/,Q2709101,13,0.0,0,19.79,wikidata,2026-02-18
+Japan Tobacco International,jti.com,seed,Switzerland,europe,tobacco industry,http://www.jti.com,Q397401,13,0.0,0,19.79,wikidata,2026-02-18
+Hacker-Pschorr Brewery,hacker-pschorr.de,seed,Germany,europe,food and tobacco industry,https://www.hacker-pschorr.de/,Q568684,13,0.0,0,19.79,wikidata,2026-02-18
+Group Lala,lala.com.mx,seed,Mexico,americas,food industry,http://www.lala.com.mx/,Q2855873,13,0.0,0,19.79,wikidata,2026-02-18
+Yaqi Brush,yqbrush.cn,seed,China,apac,personal care product,http://www.yqbrush.cn,Q77146064,0,0.0,0,19.75,wikidata,2026-02-18
+Thin Lizzy,thinlizzy.co.nz,seed,New Zealand,apac,cosmetics industry,https://www.thinlizzy.co.nz,Q71916710,0,0.0,0,19.75,wikidata,2026-02-18
+Senjo Color GmbH,senjo-color.de,seed,Germany,europe,cosmetics industry,https://senjo-color.de/,Q136649653,0,0.0,0,19.75,wikidata,2026-02-18
+PRISM+,prismplus.com.au,seed,Singapore,apac,household hardware,https://prismplus.com.au/,Q134122919,0,0.0,0,19.75,wikidata,2026-02-18
+PRISM+,prismplus.my,seed,Singapore,apac,household hardware,https://prismplus.my/,Q134122919,0,0.0,0,19.75,wikidata,2026-02-18
+PRISM+,prismplus.sg,seed,Singapore,apac,household hardware,https://prismplus.sg,Q134122919,0,0.0,0,19.75,wikidata,2026-02-18
+PRISM+,prismplus.ph,seed,Singapore,apac,household hardware,https://www.prismplus.ph/,Q134122919,0,0.0,0,19.75,wikidata,2026-02-18
+Perfumy.pl,perfumy.pl,seed,Poland,europe,cosmetics industry,https://perfumy.pl/,Q137645604,0,0.0,0,19.75,wikidata,2026-02-18
+Organo Gold,organogold.com,seed,Canada,americas,personal care product,http://www.organogold.com,Q33539937,0,0.0,0,19.75,wikidata,2026-02-18
+NWorld,thealphanetworld.com,seed,Philippines,apac,personal care product,https://thealphanetworld.com/,Q38125950,0,0.0,0,19.75,wikidata,2026-02-18
+Nisha Manufacturing,nishamanufacturing.com,seed,Poland,europe,cosmetics industry,https://www.nishamanufacturing.com,Q136563739,0,0.0,0,19.75,wikidata,2026-02-18
+New Era Health Industry Group,5dgz.com,seed,China,apac,personal care product,http://www.5dgz.com/,Q30127393,0,0.0,0,19.75,wikidata,2026-02-18
+Mussofi,mussofi.com,seed,France,europe,cosmetics industry,https://mussofi.com/,Q126876143,0,0.0,0,19.75,wikidata,2026-02-18
+MovLabs,movlabs.co,seed,Canada,americas,personal care product,https://movlabs.co,Q137712361,0,0.0,0,19.75,wikidata,2026-02-18
+Marco Aldany,marcoaldany.com,seed,Spain,europe,cosmetics industry,https://www.marcoaldany.com,Q112095114,0,0.0,0,19.75,wikidata,2026-02-18
+Mahogany,mahogany.com.br,seed,Brazil,americas,cosmetics industry,https://www.mahogany.com.br/,Q127264469,0,0.0,0,19.75,wikidata,2026-02-18
+LAB46 GmbH,lab46.de,seed,Germany,europe,personal care product,https://lab46.de,Q136555801,0,0.0,0,19.75,wikidata,2026-02-18
+Kurves Beauty,kurvesbeauty.com,seed,Canada,americas,beauty salon,https://kurvesbeauty.com/,Q137438694,0,0.0,0,19.75,wikidata,2026-02-18
+Kurves Beauty,kurvesbrowbar.com,seed,Canada,americas,beauty salon,https://kurvesbrowbar.com/,Q137438694,0,0.0,0,19.75,wikidata,2026-02-18
+Juchheim Cosmetics,juchheim-methode.de,seed,Germany,europe,cosmetics industry,https://www.juchheim-methode.de,Q123095803,0,0.0,0,19.75,wikidata,2026-02-18
+IVI Ryo Corporation,ivi.com.ph,seed,Philippines,apac,cosmetics industry,http://www.ivi.com.ph/,Q19604433,0,0.0,0,19.75,wikidata,2026-02-18
+Itens de Casa,melhoresitensdecasa.com.br,seed,Brazil,americas,household,https://melhoresitensdecasa.com.br/,Q115766302,0,0.0,0,19.75,wikidata,2026-02-18
+Immunotec,immunotec.com,seed,Canada,americas,personal care product,http://www.immunotec.com,Q30059378,0,0.0,0,19.75,wikidata,2026-02-18
+Guinot,guinot.com,seed,France,europe,cosmetics industry,https://www.guinot.com,Q123408957,0,0.0,0,19.75,wikidata,2026-02-18
+Fazbulous,fazbulous.com,seed,Malaysia,apac,cosmetics industry,https://www.fazbulous.com/,Q113318736,0,0.0,0,19.75,wikidata,2026-02-18
+Eurocosmesi,eurocosmesi.com,seed,Italy,europe,cosmetics industry,https://www.eurocosmesi.com/,Q121083499,0,0.0,0,19.75,wikidata,2026-02-18
+Esthetic Health,esthetichealth.be,seed,Netherlands,europe,cosmetics industry,https://www.esthetichealth.be/,Q58870843,0,0.0,0,19.75,wikidata,2026-02-18
+Esthetic Health,esthetichealth.nl,seed,Netherlands,europe,cosmetics industry,https://www.esthetichealth.nl/,Q58870843,0,0.0,0,19.75,wikidata,2026-02-18
+Esthetic Center,esthetic-center.com,seed,France,europe,cosmetics industry,https://www.esthetic-center.com/,Q123321775,0,0.0,0,19.75,wikidata,2026-02-18
+Bissú Cosméticos,bissu.com,seed,Mexico,americas,cosmetics industry,https://bissu.com/,Q130466489,0,0.0,0,19.75,wikidata,2026-02-18

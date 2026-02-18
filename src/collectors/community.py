@@ -9,6 +9,7 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src import db
+from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
@@ -18,11 +19,7 @@ DEFAULT_REDDIT_TERMS = "(devops OR platform engineering OR cloud cost OR finops 
 
 @retry(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True)
 def _request_text(url: str, settings: Settings) -> str:
-    response = requests.get(
-        url,
-        timeout=settings.http_timeout_seconds,
-        headers={"User-Agent": settings.http_user_agent},
-    )
+    response = http_get(url, settings)
     response.raise_for_status()
     return response.text
 

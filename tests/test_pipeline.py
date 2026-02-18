@@ -138,3 +138,29 @@ def test_tune_profile_command_emits_profile_suggestion(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "suggested_high=" in result.stdout
     assert "scenario_pass_rate=" in result.stdout
+
+
+def test_icp_signal_gaps_command_writes_report(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(
+        root / "config" / "icp_reference_accounts.csv",
+        "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
+    )
+    _write(
+        root / "config" / "icp_signal_playbook.csv",
+        "relationship_stage,product,signal_code,priority,recommended_source,action_hint\n"
+        "customer,shared,cloud_connected,p0,first_party_csv,track product usage\n"
+        "customer,zopnight,cost_reduction_mandate,p1,first_party_csv,track budget pressure\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
+
+    runner = CliRunner()
+    daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert daily_result.exit_code == 0
+
+    result = runner.invoke(app, ["icp-signal-gaps", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+    assert "coverage_rate=" in result.stdout
+    assert (root / "data" / "out" / "icp_signal_gaps_20260216.csv").exists()

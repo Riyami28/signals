@@ -1,0 +1,20 @@
+relationship_stage,product,signal_code,priority,recommended_source,action_hint
+all,shared,poc_stage_progression,p0,first_party_csv,capture procurement legal and security milestones
+all,shared,repo_added_deploy_attempted,p1,first_party_csv,capture product usage progression inside evaluations
+customer,zopdev,compliance_initiative,p0,news_csv,track SOC2 ISO or audit driven initiatives
+customer,zopdev,enterprise_modernization_program,p1,news_csv,track modernization announcements tied to platform upgrades
+customer,zopdev,kubernetes_detected,p2,website_scan,confirm infrastructure complexity and platform fit
+customer,zopday,supply_chain_platform_rollout,p0,first_party_csv,track control tower and platform rollout milestones
+customer,zopday,idp_golden_path_initiative,p1,jobs_csv,track internal platform engineering maturity workstreams
+customer,zopday,data_platform_initiative,p1,news_csv,track data platform transformation and integration programs
+customer,zopnight,cost_reduction_mandate,p0,first_party_csv,track board level efficiency and cost pressure
+customer,zopnight,vendor_consolidation_program,p1,first_party_csv,track tooling consolidation directives
+customer,zopnight,finops_role_open,p2,jobs_csv,track FinOps hiring signals before budget reset
+poc,shared,audit_viewed,p1,first_party_csv,track compliance evaluation behavior during proof of concept
+poc,shared,teammate_invited,p1,first_party_csv,track buying committee expansion behavior
+poc,zopdev,devops_role_open,p2,jobs_csv,track build versus buy pressure via hiring demand
+poc,zopdev,tooling_sprawl_detected,p2,website_scan,track integration complexity and migration urgency
+poc,zopday,devops_bottleneck_language,p1,community_csv,track friction language from platform teams
+poc,zopday,platform_role_open,p2,jobs_csv,track platform enablement investment signals
+poc,zopnight,cost_reduction_mandate,p1,news_csv,track commercial pressure in evaluation accounts
+poc,zopnight,vendor_consolidation_program,p1,first_party_csv,track active consolidation efforts during POC

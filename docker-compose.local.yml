@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: signals-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SIGNALS_PG_USER:-signals}
+      POSTGRES_PASSWORD: ${SIGNALS_PG_PASSWORD:-signals_dev_password}
+      POSTGRES_DB: ${SIGNALS_PG_DB:-signals}
+    ports:
+      - "${SIGNALS_PG_PORT:-55432}:5432"
+    volumes:
+      - ./data/local/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: signals-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${SIGNALS_REDIS_PORT:-56379}:6379"
+    volumes:
+      - ./data/local/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  huginn:
+    image: huginn/huginn:latest
+    container_name: signals-huginn
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_SECRET_TOKEN: ${HUGINN_APP_SECRET_TOKEN:-change-me-please}
+      INVITATION_CODE: ${HUGINN_INVITATION_CODE:-signals-local}
+      DOMAIN: ${HUGINN_DOMAIN:-localhost:3000}
+      PORT: 3000
+      FORCE_SSL: "false"
+      DATABASE_ADAPTER: postgresql
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${HUGINN_PG_DB:-signals}
+      DATABASE_USERNAME: ${HUGINN_PG_USER:-signals}
+      DATABASE_PASSWORD: ${HUGINN_PG_PASSWORD:-signals_dev_password}
+      DATABASE_POOL: 20
+      TIMEZONE: ${TZ:-UTC}
+    ports:
+      - "${HUGINN_PORT:-3000}:3000"

@@ -1,1 +1,4 @@
 company_name,domain,text,url,observed_at,signal_code,confidence
+Coca-Cola India,coca-colaindia.com,Engineering platform standards include Kubernetes clusters for production workloads,internal://architecture/cocacola/platform-standards,2026-02-17T00:00:00Z,kubernetes_detected,0.86
+Conde Nast,condenast.com,Current platform stack shows overlapping CI observability and release tools across teams,internal://architecture/condenast/tooling-inventory,2026-02-17T00:00:00Z,tooling_sprawl_detected,0.83
+Tata Digital,tatadigital.com,Multiple deployment and monitoring products are active creating tooling sprawl risk,internal://architecture/tatadigital/toolchain-review,2026-02-17T00:00:00Z,tooling_sprawl_detected,0.84

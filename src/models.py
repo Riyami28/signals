@@ -27,6 +27,16 @@ class SignalObservation(BaseModel):
     observed_at: str
     evidence_url: str = ""
     evidence_text: str = ""
+    document_id: str = ""
+    mention_id: str = ""
+    evidence_sentence: str = ""
+    evidence_sentence_en: str = ""
+    matched_phrase: str = ""
+    language: str = ""
+    speaker_name: str = ""
+    speaker_role: str = ""
+    evidence_quality: float = 0.0
+    relevance_score: float = 0.0
     confidence: float
     source_reliability: float
     raw_payload_hash: str

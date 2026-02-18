@@ -10,6 +10,7 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src import db
+from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
@@ -26,11 +27,7 @@ FALLBACK_ROLE_SIGNALS = {
 
 @retry(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True)
 def _request(url: str, settings: Settings) -> requests.Response:
-    return requests.get(
-        url,
-        timeout=settings.http_timeout_seconds,
-        headers={"User-Agent": settings.http_user_agent},
-    )
+    return http_get(url, settings)
 
 
 def _today_start_iso() -> str:

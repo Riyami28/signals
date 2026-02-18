@@ -1,0 +1,14 @@
+source,max_parallel_workers,requests_per_second,timeout_seconds,retry_attempts,backoff_seconds,batch_size,enabled
+news_rss,24,3.0,20,3,2,200,true
+google_news_rss,24,3.0,20,3,2,200,true
+rss_feed,16,2.0,25,3,2,150,true
+website_scan,16,2.0,25,3,2,120,true
+jobs_pages,12,1.0,20,2,2,100,true
+greenhouse_api,10,1.0,20,2,2,100,true
+lever_api,10,1.0,20,2,2,100,true
+technographics,12,1.5,20,2,2,120,true
+reddit_api,8,1.0,15,2,2,150,true
+social_provider,4,0.5,20,2,3,80,true
+earnings_transcripts_provider,4,0.5,25,2,3,60,true
+first_party_csv,4,5.0,10,1,1,500,true
+huginn_webhook,8,8.0,10,1,1,500,true
