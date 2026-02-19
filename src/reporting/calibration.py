@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from pathlib import Path
-import sqlite3
+from typing import Any
 
 from src.scoring.rules import Thresholds
 from src.utils import load_csv_rows, normalize_domain, write_csv_rows
@@ -89,7 +89,7 @@ def _classify_tier(score: float, high: float, medium: float) -> str:
     return "low"
 
 
-def _load_score_segments(conn: sqlite3.Connection, run_id: str, reference_csv_path: Path) -> ScoreSegments:
+def _load_score_segments(conn: Any, run_id: str, reference_csv_path: Path) -> ScoreSegments:
     reference_rows = load_csv_rows(reference_csv_path)
     icp_domains = {
         normalize_domain(str(row.get("domain", "")))
@@ -165,7 +165,7 @@ def _scenario_pass_rate(scenarios: list[ScenarioRule], high: float, medium: floa
 
 
 def suggest_thresholds_for_run(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_id: str,
     reference_csv_path: Path,
     medium_target_coverage: float,
@@ -209,7 +209,7 @@ def suggest_thresholds_for_run(
 
 
 def suggest_profile_for_run(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_id: str,
     reference_csv_path: Path,
     scenarios: list[ScenarioRule],

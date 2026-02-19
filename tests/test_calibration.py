@@ -15,7 +15,7 @@ def _write(path: Path, content: str) -> None:
 
 
 def test_suggest_thresholds_for_run_targets_requested_icp_coverage(tmp_path: Path):
-    conn = db.get_connection(tmp_path / "signals.db")
+    conn = db.get_connection()
     db.init_db(conn)
 
     scores_by_domain = {
@@ -98,7 +98,7 @@ def test_load_scenarios_uses_defaults_when_missing(tmp_path: Path):
 
 
 def test_suggest_profile_for_run_balances_icp_and_non_icp(tmp_path: Path):
-    conn = db.get_connection(tmp_path / "signals.db")
+    conn = db.get_connection()
     db.init_db(conn)
 
     scores_by_domain = {

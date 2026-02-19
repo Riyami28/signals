@@ -11,7 +11,7 @@ from src.utils import stable_hash
 
 
 def test_source_metrics_use_scored_sources_not_all_account_sources(tmp_path: Path):
-    conn = db.get_connection(tmp_path / "signals.db")
+    conn = db.get_connection()
     db.init_db(conn)
 
     account_id = db.upsert_account(conn, company_name="Acme", domain="acme.example", source_type="seed")

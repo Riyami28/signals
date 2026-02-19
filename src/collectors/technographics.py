@@ -132,7 +132,13 @@ def collect(
             if not domain:
                 continue
             company_name = row.get("company_name", "") or domain
-            account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+            account_id = db.upsert_account(
+                conn,
+                company_name=company_name,
+                domain=domain,
+                source_type="discovered",
+                commit=False,
+            )
 
             text = row.get("text", "")
             explicit_signal = row.get("signal_code", "")
@@ -159,13 +165,14 @@ def collect(
                     evidence_text=text,
                     payload={"row": row, "matched_keyword": matched_keyword},
                 )
-                if db.insert_signal_observation(conn, observation):
+                if db.insert_signal_observation(conn, observation, commit=False):
                     inserted += 1
 
     if settings.enable_live_crawl:
         scan_source = "website_scan"
         scan_reliability = source_reliability.get(scan_source, 0.6)
         if scan_reliability <= 0:
+            conn.commit()
             return {"inserted": inserted, "seen": seen}
         accounts = conn.execute(
             "SELECT account_id, domain FROM accounts ORDER BY created_at LIMIT ?",
@@ -196,6 +203,7 @@ def collect(
                         endpoint=url,
                         status="skipped",
                         error_summary="checkpoint_recent",
+                        commit=False,
                     )
                     continue
 
@@ -210,8 +218,9 @@ def collect(
                         endpoint=url,
                         status="http_error",
                         error_summary=f"status_code={status_code}",
+                        commit=False,
                     )
-                    db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url)
+                    db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url, commit=False)
                     continue
                 except Exception as exc:
                     db.record_crawl_attempt(
@@ -221,8 +230,9 @@ def collect(
                         endpoint=url,
                         status="exception",
                         error_summary=str(exc),
+                        commit=False,
                     )
-                    db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url)
+                    db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url, commit=False)
                     continue
                 db.record_crawl_attempt(
                     conn,
@@ -231,8 +241,9 @@ def collect(
                     endpoint=url,
                     status="success",
                     error_summary="",
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url)
+                db.mark_crawled(conn, source=scan_source, account_id=account_id, endpoint=url, commit=False)
 
                 matches = classify_text(page_text, lexicon_rows)
                 observed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -249,7 +260,7 @@ def collect(
                         evidence_text=page_text,
                         payload={"url": url, "matched_keyword": matched_keyword},
                     )
-                    if db.insert_signal_observation(conn, observation):
+                    if db.insert_signal_observation(conn, observation, commit=False):
                         inserted += 1
 
                 if url == homepage_url:
@@ -257,4 +268,5 @@ def collect(
                         if link not in scanned:
                             urls_to_scan.append(link)
 
+    conn.commit()
     return {"inserted": inserted, "seen": seen}

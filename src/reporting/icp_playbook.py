@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-import sqlite3
 from typing import Any
 
 from src.utils import load_csv_rows, normalize_domain, write_csv_rows
@@ -148,7 +147,7 @@ def _best_score_for_domain(
 
 
 def compute_icp_signal_gaps(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_id: str,
     reference_csv_path: Path,
     playbook_path: Path | None = None,

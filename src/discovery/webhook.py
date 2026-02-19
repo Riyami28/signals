@@ -54,7 +54,7 @@ def _resolve_domain_hint(payload: DiscoveryEventPayload) -> str:
 
 def _insert_event(payload: DiscoveryEventPayload) -> bool:
     settings = load_settings()
-    conn = db.get_connection(settings.db_path)
+    conn = db.get_connection(settings.pg_dsn)
     db.init_db(conn)
     try:
         raw_payload = payload.raw_payload

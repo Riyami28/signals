@@ -123,7 +123,7 @@ def _ingest_feed_entries(
                     **extra_payload,
                 },
             )
-            if db.insert_signal_observation(conn, observation):
+            if db.insert_signal_observation(conn, observation, commit=False):
                 inserted += 1
 
     return inserted, seen
@@ -148,7 +148,13 @@ def collect(
             if not domain:
                 continue
             company_name = row.get("company_name", "") or domain
-            account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+            account_id = db.upsert_account(
+                conn,
+                company_name=company_name,
+                domain=domain,
+                source_type="discovered",
+                commit=False,
+            )
 
             title = row.get("title", "")
             content = row.get("content", "")
@@ -178,7 +184,7 @@ def collect(
                     evidence_text=text,
                     payload={"row": row, "matched_keyword": matched_keyword},
                 )
-                if db.insert_signal_observation(conn, observation):
+                if db.insert_signal_observation(conn, observation, commit=False):
                     inserted += 1
 
     feed_source = "rss_feed"
@@ -193,7 +199,13 @@ def collect(
             if not domain or not feed_url:
                 continue
             company_name = feed_row.get("company_name", "") or domain
-            account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+            account_id = db.upsert_account(
+                conn,
+                company_name=company_name,
+                domain=domain,
+                source_type="discovered",
+                commit=False,
+            )
 
             try:
                 parsed = feedparser.parse(feed_url)
@@ -258,6 +270,7 @@ def collect(
                         endpoint=feed_url,
                         status="skipped",
                         error_summary="checkpoint_recent",
+                        commit=False,
                     )
                     continue
                 xml_text = _request_text(feed_url, settings)
@@ -271,8 +284,9 @@ def collect(
                     endpoint=feed_url,
                     status="http_error",
                     error_summary=f"status_code={status_code}",
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url)
+                db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url, commit=False)
                 continue
             except Exception as exc:
                 db.record_crawl_attempt(
@@ -282,8 +296,9 @@ def collect(
                     endpoint=feed_url,
                     status="exception",
                     error_summary=str(exc),
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url)
+                db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url, commit=False)
                 continue
             db.record_crawl_attempt(
                 conn,
@@ -292,8 +307,9 @@ def collect(
                 endpoint=feed_url,
                 status="success",
                 error_summary="",
+                commit=False,
             )
-            db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url)
+            db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=feed_url, commit=False)
 
             local_inserted, local_seen = _ingest_feed_entries(
                 conn=conn,
@@ -307,4 +323,5 @@ def collect(
             inserted += local_inserted
             seen += local_seen
 
+    conn.commit()
     return {"inserted": inserted, "seen": seen}

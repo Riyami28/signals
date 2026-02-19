@@ -13,7 +13,7 @@ def _write(path: Path, content: str) -> None:
 
 
 def test_compute_icp_signal_gaps_surfaces_missing_priority_signals(tmp_path: Path):
-    conn = db.get_connection(tmp_path / "signals.db")
+    conn = db.get_connection()
     db.init_db(conn)
 
     customer_id = db.upsert_account(conn, company_name="Customer One", domain="customer.example", source_type="seed")

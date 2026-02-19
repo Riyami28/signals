@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import csv
+from functools import lru_cache
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -97,21 +99,38 @@ def write_csv_rows(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]
             writer.writerow({key: row.get(key, "") for key in fieldnames})
 
 
+@lru_cache(maxsize=4096)
+def _keyword_pattern(keyword: str) -> re.Pattern[str] | None:
+    normalized = (keyword or "").strip().lower()
+    if not normalized:
+        return None
+    tokens = [token for token in normalized.split() if token]
+    if not tokens:
+        return None
+    escaped = [re.escape(token) for token in tokens]
+    body = r"\s+".join(escaped)
+    return re.compile(rf"(?<![a-z0-9]){body}(?![a-z0-9])")
+
+
 def classify_text(
     text: str,
     lexicon_rows: list[dict[str, str]],
 ) -> list[tuple[str, float, str]]:
-    normalized = (text or "").lower()
+    normalized = re.sub(r"\s+", " ", (text or "").lower()).strip()
     matches: list[tuple[str, float, str]] = []
     for row in lexicon_rows:
         keyword = row.get("keyword", "").lower().strip()
         signal_code = row.get("signal_code", "").strip()
         if not keyword or not signal_code:
             continue
-        if keyword in normalized:
-            try:
-                confidence = float(row.get("confidence", "0.6") or 0.6)
-            except ValueError:
-                confidence = 0.6
-            matches.append((signal_code, confidence, keyword))
+        pattern = _keyword_pattern(keyword)
+        if pattern is None:
+            continue
+        if not pattern.search(normalized):
+            continue
+        try:
+            confidence = float(row.get("confidence", "0.6") or 0.6)
+        except ValueError:
+            confidence = 0.6
+        matches.append((signal_code, confidence, keyword))
     return matches

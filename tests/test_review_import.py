@@ -22,7 +22,7 @@ def test_import_reviews_is_idempotent_when_created_at_missing(tmp_path: Path):
     )
 
     settings = load_settings(project_root=root)
-    conn = db.get_connection(settings.db_path)
+    conn = db.get_connection(settings.pg_dsn)
     db.init_db(conn)
     db.seed_accounts(conn, settings.seed_accounts_path)
 

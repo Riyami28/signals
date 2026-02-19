@@ -7,6 +7,7 @@ from urllib.parse import urlparse, urlunparse
 from src import db
 from src.discovery.config import is_placeholder_domain
 from src.settings import Settings
+from src.source_policy import load_source_execution_policy
 from src.utils import normalize_domain
 
 VALID_URL_TYPES = {"article", "listing", "profile", "other"}
@@ -78,7 +79,13 @@ def _build_priority(url_type: str, source: str, text: str) -> float:
 
 def build_frontier(conn, settings: Settings, run_date: date, budget: int) -> dict[str, int | str]:
     run_date_str = run_date.isoformat()
-    events = db.fetch_pending_external_discovery_events(conn, run_date=run_date_str, limit=max(1, int(budget)))
+    execution_policy = load_source_execution_policy(settings.source_execution_policy_path)
+    webhook_policy = execution_policy.get("huginn_webhook")
+    effective_budget = max(1, int(budget))
+    if webhook_policy is not None and webhook_policy.batch_size > 0:
+        effective_budget = min(effective_budget, int(webhook_policy.batch_size))
+
+    events = db.fetch_pending_external_discovery_events(conn, run_date=run_date_str, limit=effective_budget)
     marker = f"discover_frontier_{run_date_str}"
 
     queued = 0
@@ -100,6 +107,7 @@ def build_frontier(conn, settings: Settings, run_date: date, budget: int) -> dic
                 event_id=event_id,
                 processed_run_id=marker,
                 error_summary="invalid_url",
+                commit=False,
             )
             failed += 1
             continue
@@ -111,12 +119,19 @@ def build_frontier(conn, settings: Settings, run_date: date, budget: int) -> dic
                 event_id=event_id,
                 processed_run_id=marker,
                 error_summary="invalid_domain",
+                commit=False,
             )
             failed += 1
             continue
 
         company_name = str(row["company_name_hint"] or "").strip() or domain
-        account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+        account_id = db.upsert_account(
+            conn,
+            company_name=company_name,
+            domain=domain,
+            source_type="discovered",
+            commit=False,
+        )
         url_type = _infer_url_type(canonical, str(row["url_type"] or ""), title, text)
         priority = _build_priority(url_type, source, text)
 
@@ -142,14 +157,21 @@ def build_frontier(conn, settings: Settings, run_date: date, budget: int) -> dic
             priority=priority,
             max_retries=2,
             payload_json=json.dumps(payload, ensure_ascii=True, separators=(",", ":")),
+            commit=False,
         )
         if inserted:
             queued += 1
         else:
             duplicates += 1
 
-        db.mark_external_discovery_event_processed(conn, event_id=event_id, processed_run_id=marker)
+        db.mark_external_discovery_event_processed(
+            conn,
+            event_id=event_id,
+            processed_run_id=marker,
+            commit=False,
+        )
 
+    conn.commit()
     return {
         "run_date": run_date_str,
         "events_seen": len(events),

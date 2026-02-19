@@ -100,6 +100,7 @@ def fetch_documents(conn, settings: Settings, run_date: date, profile: HuntProfi
                 status="failed",
                 error_summary=result.error,
                 bump_retry=True,
+                commit=False,
             )
             failed += 1
             continue
@@ -131,6 +132,7 @@ def fetch_documents(conn, settings: Settings, run_date: date, profile: HuntProfi
             relevance_score=0.0,
             fetched_with=result.fetched_with,
             outbound_links_json="[]",
+            commit=False,
         )
         db.mark_crawl_frontier_status(
             conn,
@@ -138,11 +140,13 @@ def fetch_documents(conn, settings: Settings, run_date: date, profile: HuntProfi
             status="fetched",
             error_summary="",
             bump_retry=False,
+            commit=False,
         )
         fetched += 1
         if result.fetched_with == "js_render":
             js_used += 1
 
+    conn.commit()
     return {
         "run_date": run_date_str,
         "frontier_rows_seen": len(rows),
@@ -223,6 +227,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
             relevance_score=parsed.relevance_score,
             fetched_with=str(row["fetched_with"] or "static_http"),
             outbound_links_json=json.dumps(parsed.outbound_links, ensure_ascii=True),
+            commit=False,
         )
         parsed_docs += 1
 
@@ -246,6 +251,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                     priority=max(0.0, float(row["priority"]) - 0.1),
                     max_retries=2,
                     payload_json=str(row["payload_json"] or "{}"),
+                    commit=False,
                 )
                 if inserted:
                     links_enqueued += 1
@@ -254,6 +260,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                 frontier_id=str(row["frontier_id"]),
                 status="parsed",
                 error_summary="listing_expanded",
+                commit=False,
             )
             continue
 
@@ -277,6 +284,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                 confidence=mention.confidence,
                 evidence_quality=parsed.evidence_quality,
                 relevance_score=parsed.relevance_score,
+                commit=False,
             )
             if mention_inserted:
                 mentions_inserted += 1
@@ -322,7 +330,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                 source_reliability=source_reliability,
                 raw_payload_hash=raw_hash,
             )
-            inserted_observation = db.insert_signal_observation(conn, observation)
+            inserted_observation = db.insert_signal_observation(conn, observation, commit=False)
             if inserted_observation:
                 observations_inserted += 1
                 db.insert_observation_lineage(
@@ -333,6 +341,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                     mention_id=mention_id,
                     source_event_id=str(row["source_event_id"]),
                     run_date=run_date_str,
+                    commit=False,
                 )
 
             if mention.speaker_name:
@@ -344,6 +353,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                     role_weight=max(0.1, float(mention.speaker_weight)),
                     source_url=str(row["canonical_url"]),
                     is_active=True,
+                    commit=False,
                 )
                 if db.insert_people_activity(
                     conn=conn,
@@ -355,6 +365,7 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
                     summary=mention.evidence_sentence_en,
                     published_at=observed_at,
                     url=str(row["canonical_url"]),
+                    commit=False,
                 ):
                     people_activity_inserted += 1
 
@@ -363,8 +374,10 @@ def extract_documents(conn, settings: Settings, run_date: date, profile: HuntPro
             frontier_id=str(row["frontier_id"]),
             status="parsed",
             error_summary="",
+            commit=False,
         )
 
+    conn.commit()
     return {
         "run_date": run_date_str,
         "documents_seen": len(docs),

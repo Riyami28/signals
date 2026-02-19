@@ -112,7 +112,7 @@ def _ingest_entries(
                     **extra_payload,
                 },
             )
-            if db.insert_signal_observation(conn, observation):
+            if db.insert_signal_observation(conn, observation, commit=False):
                 inserted += 1
     return inserted, seen
 
@@ -136,7 +136,13 @@ def collect(
             if not domain:
                 continue
             company_name = row.get("company_name", "") or domain
-            account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+            account_id = db.upsert_account(
+                conn,
+                company_name=company_name,
+                domain=domain,
+                source_type="discovered",
+                commit=False,
+            )
 
             text = row.get("text", "")
             explicit_signal = row.get("signal_code", "")
@@ -163,7 +169,7 @@ def collect(
                     evidence_text=text,
                     payload={"row": row, "matched_keyword": matched_keyword},
                 )
-                if db.insert_signal_observation(conn, observation):
+                if db.insert_signal_observation(conn, observation, commit=False):
                     inserted += 1
 
     if settings.enable_live_crawl:
@@ -176,6 +182,7 @@ def collect(
         rss_source = "reddit_rss"
         rss_reliability = source_reliability.get(rss_source, 0.62)
         if rss_reliability <= 0:
+            conn.commit()
             return {"inserted": inserted, "seen": seen}
 
         for account in accounts:
@@ -199,6 +206,7 @@ def collect(
                     endpoint=rss_url,
                     status="skipped",
                     error_summary="checkpoint_recent",
+                    commit=False,
                 )
                 continue
             try:
@@ -213,8 +221,9 @@ def collect(
                     endpoint=rss_url,
                     status="http_error",
                     error_summary=f"status_code={status_code}",
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url)
+                db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
                 continue
             except Exception as exc:
                 db.record_crawl_attempt(
@@ -224,8 +233,9 @@ def collect(
                     endpoint=rss_url,
                     status="exception",
                     error_summary=str(exc),
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url)
+                db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
                 continue
             db.record_crawl_attempt(
                 conn,
@@ -234,8 +244,9 @@ def collect(
                 endpoint=rss_url,
                 status="success",
                 error_summary="",
+                commit=False,
             )
-            db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url)
+            db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
 
             local_inserted, local_seen = _ingest_entries(
                 conn=conn,
@@ -249,4 +260,5 @@ def collect(
             inserted += local_inserted
             seen += local_seen
 
+    conn.commit()
     return {"inserted": inserted, "seen": seen}

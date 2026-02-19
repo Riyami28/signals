@@ -28,7 +28,7 @@ def collect(
             continue
 
         company_name = row.get("company_name", "") or domain
-        account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+        account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered", commit=False)
 
         product = (row.get("product", "shared") or "shared").strip().lower()
         if product not in VALID_PRODUCTS:
@@ -72,7 +72,8 @@ def collect(
             raw_payload_hash=raw_hash,
         )
         seen += 1
-        if db.insert_signal_observation(conn, observation):
+        if db.insert_signal_observation(conn, observation, commit=False):
             inserted += 1
 
+    conn.commit()
     return {"inserted": inserted, "seen": seen}

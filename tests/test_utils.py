@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from src.utils import load_csv_rows, normalize_domain, parse_date, stable_hash
+from src.utils import classify_text, load_csv_rows, normalize_domain, parse_date, stable_hash
 
 
 def test_normalize_domain_strips_protocol_and_path():
@@ -24,3 +24,16 @@ def test_load_csv_rows_tolerates_extra_columns(tmp_path: Path):
     path.write_text("a,b\n1,2,3\n", encoding="utf-8")
     rows = load_csv_rows(path)
     assert rows == [{"a": "1", "b": "2"}]
+
+
+def test_classify_text_matches_keyword_on_word_boundaries():
+    rows = [{"signal_code": "cost_reduction_mandate", "keyword": "cost transformation office", "confidence": "0.9"}]
+    matches = classify_text("Board approved the cost transformation office plan.", rows)
+    assert matches
+    assert matches[0][0] == "cost_reduction_mandate"
+
+
+def test_classify_text_does_not_match_partial_inside_larger_word():
+    rows = [{"signal_code": "cost_reduction_mandate", "keyword": "erp", "confidence": "0.9"}]
+    matches = classify_text("This describes a sharperpops migration.", rows)
+    assert matches == []

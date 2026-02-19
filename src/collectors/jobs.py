@@ -171,7 +171,7 @@ def _insert_matches(
             evidence_text=evidence_text,
             payload={"payload": payload, "matched_keyword": matched_keyword},
         )
-        if db.insert_signal_observation(conn, observation):
+        if db.insert_signal_observation(conn, observation, commit=False):
             inserted += 1
     return inserted, seen
 
@@ -228,6 +228,7 @@ def _collect_greenhouse(
                 endpoint=url,
                 status="skipped",
                 error_summary="checkpoint_recent",
+                commit=False,
             )
             continue
         try:
@@ -240,8 +241,9 @@ def _collect_greenhouse(
                     endpoint=url,
                     status="http_error",
                     error_summary=f"status_code={response.status_code}",
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
+                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
                 continue
             payload = response.json()
         except Exception as exc:
@@ -252,8 +254,9 @@ def _collect_greenhouse(
                 endpoint=url,
                 status="exception",
                 error_summary=str(exc),
+                commit=False,
             )
-            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
+            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
             continue
         db.record_crawl_attempt(
             conn,
@@ -262,8 +265,9 @@ def _collect_greenhouse(
             endpoint=url,
             status="success",
             error_summary="",
+            commit=False,
         )
-        db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
+        db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
 
         jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
         if not isinstance(jobs, list):
@@ -341,6 +345,7 @@ def _collect_lever(
                 endpoint=url,
                 status="skipped",
                 error_summary="checkpoint_recent",
+                commit=False,
             )
             continue
         try:
@@ -353,8 +358,9 @@ def _collect_lever(
                     endpoint=url,
                     status="http_error",
                     error_summary=f"status_code={response.status_code}",
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
+                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
                 continue
             postings = response.json()
         except Exception as exc:
@@ -365,8 +371,9 @@ def _collect_lever(
                 endpoint=url,
                 status="exception",
                 error_summary=str(exc),
+                commit=False,
             )
-            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
+            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
             continue
         db.record_crawl_attempt(
             conn,
@@ -375,8 +382,9 @@ def _collect_lever(
             endpoint=url,
             status="success",
             error_summary="",
+            commit=False,
         )
-        db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url)
+        db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
 
         if not isinstance(postings, list):
             continue
@@ -452,6 +460,7 @@ def _collect_careers_pages(
                 endpoint=homepage_url,
                 status="http_error",
                 error_summary=f"status_code={homepage_response.status_code}",
+                commit=False,
             )
         if homepage_response.status_code < 400:
             db.record_crawl_attempt(
@@ -461,6 +470,7 @@ def _collect_careers_pages(
                 endpoint=homepage_url,
                 status="success",
                 error_summary="",
+                commit=False,
             )
             soup = BeautifulSoup(homepage_response.text, "html.parser")
             for anchor in soup.find_all("a", href=True):
@@ -477,6 +487,7 @@ def _collect_careers_pages(
             endpoint=homepage_url,
             status="exception",
             error_summary=str(exc),
+            commit=False,
         )
 
     if website_url:
@@ -504,6 +515,7 @@ def _collect_careers_pages(
                 endpoint=normalized_url,
                 status="skipped",
                 error_summary="checkpoint_recent",
+                commit=False,
             )
             continue
 
@@ -517,8 +529,9 @@ def _collect_careers_pages(
                     endpoint=normalized_url,
                     status="http_error",
                     error_summary=f"status_code={response.status_code}",
+                    commit=False,
                 )
-                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url)
+                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url, commit=False)
                 continue
             html = response.text
         except Exception as exc:
@@ -529,8 +542,9 @@ def _collect_careers_pages(
                 endpoint=normalized_url,
                 status="exception",
                 error_summary=str(exc),
+                commit=False,
             )
-            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url)
+            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url, commit=False)
             continue
         db.record_crawl_attempt(
             conn,
@@ -539,8 +553,9 @@ def _collect_careers_pages(
             endpoint=normalized_url,
             status="success",
             error_summary="",
+            commit=False,
         )
-        db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url)
+        db.mark_crawled(conn, source=source, account_id=account_id, endpoint=normalized_url, commit=False)
 
         soup = BeautifulSoup(html, "html.parser")
         text = soup.get_text(" ", strip=True)
@@ -590,7 +605,13 @@ def collect(
             if not domain:
                 continue
             company_name = row.get("company_name", "") or domain
-            account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+            account_id = db.upsert_account(
+                conn,
+                company_name=company_name,
+                domain=domain,
+                source_type="discovered",
+                commit=False,
+            )
 
             title = row.get("title", "")
             description = row.get("description", "")
@@ -671,4 +692,5 @@ def collect(
             inserted += careers_inserted
             seen += careers_seen
 
+    conn.commit()
     return {"inserted": inserted, "seen": seen}

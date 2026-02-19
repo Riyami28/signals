@@ -130,9 +130,39 @@ CSV
 
 source .venv/bin/activate
 export SIGNALS_PROJECT_ROOT="$TEST_ROOT"
-export SIGNALS_DB_PATH="$TEST_ROOT/data/signals.db"
+export SIGNALS_PG_DSN="${SIGNALS_TEST_PG_DSN:-postgresql://signals:signals_dev_password@127.0.0.1:55432/signals}"
 export SIGNALS_DISCOVERY_WEBHOOK_TOKEN="$WEBHOOK_TOKEN"
 export SIGNALS_ENABLE_LIVE_CRAWL=0
+
+python - <<'PY'
+from src import db
+
+conn = db.get_connection()
+db.init_db(conn)
+for table in (
+    "people_activity",
+    "people_watchlist",
+    "observation_lineage",
+    "document_mentions",
+    "documents",
+    "crawl_frontier",
+    "discovery_evidence",
+    "discovery_candidates",
+    "discovery_runs",
+    "external_discovery_events",
+    "crawl_attempts",
+    "crawl_checkpoints",
+    "source_metrics",
+    "review_labels",
+    "account_scores",
+    "score_components",
+    "score_runs",
+    "accounts",
+):
+    conn.execute(f"DELETE FROM {table}")
+conn.commit()
+conn.close()
+PY
 
 python -m src.main serve-discovery-webhook --host "$WEBHOOK_HOST" --port "$WEBHOOK_PORT" --log-level warning > "$TEST_ROOT/webhook.log" 2>&1 &
 WEBHOOK_PID=$!
@@ -272,10 +302,11 @@ python -m src.main run-autonomous-loop --once --ingest-interval-minutes 15 --sco
 TEST_ROOT="$TEST_ROOT" RUN_DATE="$RUN_DATE" python - <<'PY'
 import csv
 import os
-import sqlite3
 import json
 from collections import Counter
 from pathlib import Path
+
+from src import db
 
 root = Path(os.environ["TEST_ROOT"])
 run_date = os.environ["RUN_DATE"].replace("-", "")
@@ -283,7 +314,6 @@ queue = root / "data" / "out" / f"discovery_queue_{run_date}.csv"
 crm = root / "data" / "out" / f"crm_candidates_{run_date}.csv"
 metrics = root / "data" / "out" / f"discovery_metrics_{run_date}.csv"
 daily = root / "data" / "out" / f"daily_scores_{run_date}.csv"
-db_path = root / "data" / "signals.db"
 webhook_results_path = root / "webhook_results.json"
 
 queue_rows = list(csv.DictReader(queue.open())) if queue.exists() else []
@@ -339,8 +369,7 @@ for domain, (score, tier, product) in sorted(best.items(), key=lambda x: x[1][0]
     print(domain, round(score, 2), tier, product)
 
 print("=== discovery events persisted ===")
-conn = sqlite3.connect(db_path)
-conn.row_factory = sqlite3.Row
+conn = db.get_connection()
 event_rows = conn.execute(
     """
     SELECT source_event_id, domain_hint, processing_status, error_summary
