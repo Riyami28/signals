@@ -23,8 +23,10 @@ from src.discovery.config import (
     resolve_account_profile,
 )
 from src.models import SignalObservation
+from src.promotion_policy import PromotionPolicy, load_promotion_policy
 from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry
 from src.settings import Settings
+from src.source_policy import load_source_execution_policy
 from src.utils import classify_text, normalize_domain, stable_hash, utc_now_iso, write_csv_rows
 
 
@@ -106,10 +108,15 @@ def _resolve_domain_and_company(
 
 def ingest_external_events(conn, settings: Settings, run_date: date) -> dict[str, int | str]:
     run_date_str = run_date.isoformat()
+    execution_policy = load_source_execution_policy(settings.source_execution_policy_path)
+    webhook_policy = execution_policy.get("huginn_webhook")
+    batch_limit = settings.discovery_event_batch_size
+    if webhook_policy is not None and webhook_policy.batch_size > 0:
+        batch_limit = min(batch_limit, webhook_policy.batch_size)
     pending_rows = db.fetch_pending_external_discovery_events(
         conn,
         run_date=run_date_str,
-        limit=settings.discovery_event_batch_size,
+        limit=batch_limit,
     )
 
     lexicon = load_keyword_lexicon(settings.keyword_lexicon_path)
@@ -135,7 +142,13 @@ def ingest_external_events(conn, settings: Settings, run_date: date) -> dict[str
 
         text = "\n".join([title, body]).strip()
         if not text:
-            db.mark_external_discovery_event_failed(conn, event_id=event_id, processed_run_id=marker, error_summary="empty_text")
+            db.mark_external_discovery_event_failed(
+                conn,
+                event_id=event_id,
+                processed_run_id=marker,
+                error_summary="empty_text",
+                commit=False,
+            )
             failed += 1
             continue
 
@@ -151,6 +164,7 @@ def ingest_external_events(conn, settings: Settings, run_date: date) -> dict[str
                 event_id=event_id,
                 processed_run_id=marker,
                 error_summary="unresolved_domain",
+                commit=False,
             )
             failed += 1
             continue
@@ -160,20 +174,37 @@ def ingest_external_events(conn, settings: Settings, run_date: date) -> dict[str
                 event_id=event_id,
                 processed_run_id=marker,
                 error_summary="placeholder_domain",
+                commit=False,
             )
             failed += 1
             continue
 
-        account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered")
+        account_id = db.upsert_account(
+            conn,
+            company_name=company_name,
+            domain=domain,
+            source_type="discovered",
+            commit=False,
+        )
         matches = classify_text(text, flattened_lexicon)
         if not matches:
-            db.mark_external_discovery_event_processed(conn, event_id=event_id, processed_run_id=marker)
+            db.mark_external_discovery_event_processed(
+                conn,
+                event_id=event_id,
+                processed_run_id=marker,
+                commit=False,
+            )
             processed += 1
             continue
 
         source_reliability = source_registry.get(source, source_registry.get("huginn_webhook", 0.65))
         if source_reliability <= 0:
-            db.mark_external_discovery_event_processed(conn, event_id=event_id, processed_run_id=marker)
+            db.mark_external_discovery_event_processed(
+                conn,
+                event_id=event_id,
+                processed_run_id=marker,
+                commit=False,
+            )
             processed += 1
             continue
 
@@ -214,12 +245,18 @@ def ingest_external_events(conn, settings: Settings, run_date: date) -> dict[str
                 source_reliability=max(0.0, min(1.0, float(source_reliability))),
                 raw_payload_hash=raw_hash,
             )
-            if db.insert_signal_observation(conn, observation):
+            if db.insert_signal_observation(conn, observation, commit=False):
                 inserted += 1
 
-        db.mark_external_discovery_event_processed(conn, event_id=event_id, processed_run_id=marker)
+        db.mark_external_discovery_event_processed(
+            conn,
+            event_id=event_id,
+            processed_run_id=marker,
+            commit=False,
+        )
         processed += 1
 
+    conn.commit()
     return {
         "run_date": run_date_str,
         "events_seen": len(pending_rows),
@@ -241,6 +278,52 @@ def _parse_reasons(raw: str) -> list[dict[str, Any]]:
     if not isinstance(parsed, list):
         return []
     return [row for row in parsed if isinstance(row, dict)]
+
+
+def _max_reason_quality_scores(reasons: list[dict[str, Any]]) -> tuple[float, float]:
+    max_evidence_quality = 0.0
+    max_relevance_score = 0.0
+    for reason in reasons:
+        source_name = str(reason.get("source", ""))
+        eq_raw = reason.get("evidence_quality", 0.0)
+        rel_raw = reason.get("relevance_score", 0.0)
+        try:
+            eq = float(eq_raw or 0.0)
+        except (TypeError, ValueError):
+            eq = 0.0
+        try:
+            rel = float(rel_raw or 0.0)
+        except (TypeError, ValueError):
+            rel = 0.0
+        if source_name == "first_party_csv" and eq <= 0:
+            eq = 1.0
+        if source_name == "first_party_csv" and rel <= 0:
+            rel = 1.0
+        max_evidence_quality = max(max_evidence_quality, eq)
+        max_relevance_score = max(max_relevance_score, rel)
+    return max_evidence_quality, max_relevance_score
+
+
+def _evaluate_policy(
+    row: dict[str, Any],
+    policy: PromotionPolicy,
+    max_evidence_quality: float,
+    max_relevance_score: float,
+) -> tuple[str, str]:
+    if int(row.get("eligible_for_crm", 0) or 0) != 1:
+        return "blocked", "not_eligible_for_crm"
+
+    band = str(row.get("confidence_band", "")).strip().lower()
+    if band in policy.auto_push_bands:
+        if policy.require_strict_evidence_for_auto_push and (
+            max_evidence_quality < float(policy.min_auto_push_evidence_quality)
+            or max_relevance_score < float(policy.min_auto_push_relevance_score)
+        ):
+            return "blocked", "strict_evidence_gate_failed"
+        return "auto_push", "meets_auto_push_policy"
+    if band in policy.manual_review_bands:
+        return "manual_review", "manual_review_band"
+    return "blocked", "band_not_routable"
 
 
 def _query_poc_progression_accounts(conn, run_date: str, lookback_days: int) -> set[str]:
@@ -573,14 +656,24 @@ def write_discovery_reports(
     discovery_run_id: str,
 ) -> dict[str, int | str]:
     rows = db.fetch_discovery_candidates_for_run(conn, discovery_run_id)
+    policy = load_promotion_policy(settings.promotion_policy_path)
     run_date_str = run_date.strftime("%Y%m%d")
 
     queue_rows: list[dict[str, Any]] = []
     crm_rows: list[dict[str, Any]] = []
+    manual_rows: list[dict[str, Any]] = []
     metrics_by_band: dict[str, int] = {"high": 0, "medium": 0, "explore": 0}
+    metrics_by_decision: dict[str, int] = {"auto_push": 0, "manual_review": 0, "blocked": 0}
 
     for row in rows:
         reasons = _parse_reasons(str(row["reasons_json"] or ""))
+        max_evidence_quality, max_relevance_score = _max_reason_quality_scores(reasons)
+        policy_decision, policy_reason = _evaluate_policy(
+            row=dict(row),
+            policy=policy,
+            max_evidence_quality=max_evidence_quality,
+            max_relevance_score=max_relevance_score,
+        )
         reason_codes = [str(reason.get("signal_code", "")) for reason in reasons if str(reason.get("signal_code", ""))]
         evidence_links = [
             str(reason.get("evidence_url", "")) for reason in reasons if str(reason.get("evidence_url", ""))
@@ -601,17 +694,24 @@ def write_discovery_reports(
             "primary_signal_count": row["primary_signal_count"],
             "source_count": row["source_count"],
             "eligible_for_crm": row["eligible_for_crm"],
+            "max_evidence_quality": round(max_evidence_quality, 4),
+            "max_relevance_score": round(max_relevance_score, 4),
+            "policy_decision": policy_decision,
+            "policy_reason": policy_reason,
             "top_signals": " | ".join(reason_codes[:3]),
             "evidence_links": " | ".join(evidence_links[:3]),
         }
         queue_rows.append(queue_row)
+        metrics_by_decision[policy_decision] = metrics_by_decision.get(policy_decision, 0) + 1
 
         band = str(row["confidence_band"])
         if band in metrics_by_band:
             metrics_by_band[band] += 1
 
-        if int(row["eligible_for_crm"]) == 1 and band in {"high", "medium"}:
+        if policy_decision == "auto_push":
             crm_rows.append(queue_row)
+        elif policy_decision == "manual_review":
+            manual_rows.append(queue_row)
 
     metrics_rows = [
         {
@@ -644,11 +744,30 @@ def write_discovery_reports(
             "metric": "explore_candidates",
             "value": metrics_by_band["explore"],
         },
+        {
+            "run_date": run_date.isoformat(),
+            "discovery_run_id": discovery_run_id,
+            "metric": "auto_push_candidates",
+            "value": metrics_by_decision["auto_push"],
+        },
+        {
+            "run_date": run_date.isoformat(),
+            "discovery_run_id": discovery_run_id,
+            "metric": "manual_review_candidates",
+            "value": metrics_by_decision["manual_review"],
+        },
+        {
+            "run_date": run_date.isoformat(),
+            "discovery_run_id": discovery_run_id,
+            "metric": "blocked_candidates",
+            "value": metrics_by_decision["blocked"],
+        },
     ]
 
     queue_path = settings.out_dir / f"discovery_queue_{run_date_str}.csv"
     metrics_path = settings.out_dir / f"discovery_metrics_{run_date_str}.csv"
     crm_path = settings.out_dir / f"crm_candidates_{run_date_str}.csv"
+    manual_path = settings.out_dir / f"manual_review_queue_{run_date_str}.csv"
 
     write_csv_rows(
         queue_path,
@@ -669,6 +788,10 @@ def write_discovery_reports(
             "primary_signal_count",
             "source_count",
             "eligible_for_crm",
+            "max_evidence_quality",
+            "max_relevance_score",
+            "policy_decision",
+            "policy_reason",
             "top_signals",
             "evidence_links",
         ],
@@ -697,6 +820,37 @@ def write_discovery_reports(
             "primary_signal_count",
             "source_count",
             "eligible_for_crm",
+            "max_evidence_quality",
+            "max_relevance_score",
+            "policy_decision",
+            "policy_reason",
+            "top_signals",
+            "evidence_links",
+        ],
+    )
+    write_csv_rows(
+        manual_path,
+        manual_rows,
+        fieldnames=[
+            "run_date",
+            "discovery_run_id",
+            "account_id",
+            "company_name",
+            "domain",
+            "best_product",
+            "score",
+            "tier",
+            "confidence_band",
+            "relationship_stage",
+            "vertical_tag",
+            "cpg_like_group_count",
+            "primary_signal_count",
+            "source_count",
+            "eligible_for_crm",
+            "max_evidence_quality",
+            "max_relevance_score",
+            "policy_decision",
+            "policy_reason",
             "top_signals",
             "evidence_links",
         ],
@@ -704,8 +858,10 @@ def write_discovery_reports(
     return {
         "discovery_queue_rows": len(queue_rows),
         "crm_candidates_rows": len(crm_rows),
+        "manual_review_rows": len(manual_rows),
         "metrics_rows": len(metrics_rows),
         "discovery_queue_path": str(queue_path),
         "crm_candidates_path": str(crm_path),
+        "manual_review_path": str(manual_path),
         "discovery_metrics_path": str(metrics_path),
     }

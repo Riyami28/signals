@@ -27,7 +27,7 @@ def _load_dotenv(dotenv_path: Path) -> None:
 @dataclass(frozen=True)
 class Settings:
     project_root: Path
-    db_path: Path
+    pg_dsn: str
     data_dir: Path
     raw_dir: Path
     out_dir: Path
@@ -38,11 +38,13 @@ class Settings:
     source_registry_path: Path
     thresholds_path: Path
     keyword_lexicon_path: Path
+    source_execution_policy_path: Path
     account_source_handles_path: Path
     signal_classes_path: Path
     account_profiles_path: Path
     discovery_thresholds_path: Path
     discovery_blocklist_path: Path
+    promotion_policy_path: Path
     google_sheet_id: str | None
     google_service_account_file: Path | None
     run_timezone: str
@@ -58,8 +60,21 @@ class Settings:
     discovery_webhook_token: str
     discovery_event_batch_size: int
     discovery_lookback_days: int
+    stage_timeout_seconds: int
+    retry_attempt_limit: int
     watchlist_query_workers: int
     watchlist_country_query_timeout_seconds: int
+    gchat_webhook_url: str
+    alert_email_to: str
+    alert_email_from: str
+    alert_smtp_host: str
+    alert_smtp_port: int
+    alert_smtp_user: str
+    alert_smtp_password: str
+    alert_retry_depth_threshold: int
+    alert_min_high_precision: float
+    alert_min_medium_precision: float
+    ops_metrics_lookback_days: int
 
 
 def load_settings(project_root: Path | None = None) -> Settings:
@@ -69,7 +84,14 @@ def load_settings(project_root: Path | None = None) -> Settings:
 
     _load_dotenv(root / ".env")
 
-    db_path = Path(os.getenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db")))
+    pg_dsn = os.getenv("SIGNALS_PG_DSN", "").strip()
+    if not pg_dsn:
+        pg_host = os.getenv("SIGNALS_PG_HOST", "127.0.0.1").strip()
+        pg_port = os.getenv("SIGNALS_PG_PORT", "55432").strip()
+        pg_user = os.getenv("SIGNALS_PG_USER", "signals").strip()
+        pg_password = os.getenv("SIGNALS_PG_PASSWORD", "signals_dev_password").strip()
+        pg_database = os.getenv("SIGNALS_PG_DB", "signals").strip()
+        pg_dsn = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_database}"
     config_dir = root / "config"
     data_dir = root / "data"
 
@@ -112,6 +134,18 @@ def load_settings(project_root: Path | None = None) -> Settings:
     except ValueError:
         discovery_lookback_days = 120
 
+    stage_timeout_raw = os.getenv("SIGNALS_STAGE_TIMEOUT_SECONDS", "1800")
+    try:
+        stage_timeout_seconds = max(10, int(stage_timeout_raw))
+    except ValueError:
+        stage_timeout_seconds = 1800
+
+    retry_attempt_limit_raw = os.getenv("SIGNALS_RETRY_ATTEMPT_LIMIT", "3")
+    try:
+        retry_attempt_limit = max(1, int(retry_attempt_limit_raw))
+    except ValueError:
+        retry_attempt_limit = 3
+
     watchlist_workers_raw = os.getenv("SIGNALS_WATCHLIST_QUERY_WORKERS", "8")
     try:
         watchlist_query_workers = max(1, int(watchlist_workers_raw))
@@ -124,9 +158,39 @@ def load_settings(project_root: Path | None = None) -> Settings:
     except ValueError:
         watchlist_country_query_timeout_seconds = 120
 
+    smtp_port_raw = os.getenv("SIGNALS_ALERT_SMTP_PORT", "587")
+    try:
+        smtp_port = max(1, int(smtp_port_raw))
+    except ValueError:
+        smtp_port = 587
+
+    retry_depth_threshold_raw = os.getenv("SIGNALS_ALERT_RETRY_DEPTH_THRESHOLD", "2")
+    try:
+        alert_retry_depth_threshold = max(1, int(retry_depth_threshold_raw))
+    except ValueError:
+        alert_retry_depth_threshold = 2
+
+    high_precision_raw = os.getenv("SIGNALS_ALERT_MIN_HIGH_PRECISION", "0.65")
+    try:
+        alert_min_high_precision = max(0.0, min(1.0, float(high_precision_raw)))
+    except ValueError:
+        alert_min_high_precision = 0.65
+
+    medium_precision_raw = os.getenv("SIGNALS_ALERT_MIN_MEDIUM_PRECISION", "0.55")
+    try:
+        alert_min_medium_precision = max(0.0, min(1.0, float(medium_precision_raw)))
+    except ValueError:
+        alert_min_medium_precision = 0.55
+
+    ops_lookback_raw = os.getenv("SIGNALS_OPS_METRICS_LOOKBACK_DAYS", "14")
+    try:
+        ops_metrics_lookback_days = max(1, int(ops_lookback_raw))
+    except ValueError:
+        ops_metrics_lookback_days = 14
+
     return Settings(
         project_root=root,
-        db_path=db_path,
+        pg_dsn=pg_dsn,
         data_dir=data_dir,
         raw_dir=data_dir / "raw",
         out_dir=data_dir / "out",
@@ -137,11 +201,13 @@ def load_settings(project_root: Path | None = None) -> Settings:
         source_registry_path=config_dir / "source_registry.csv",
         thresholds_path=config_dir / "thresholds.csv",
         keyword_lexicon_path=config_dir / "keyword_lexicon.csv",
+        source_execution_policy_path=config_dir / "source_execution_policy.csv",
         account_source_handles_path=config_dir / "account_source_handles.csv",
         signal_classes_path=config_dir / "signal_classes.csv",
         account_profiles_path=config_dir / "account_profiles.csv",
         discovery_thresholds_path=config_dir / "discovery_thresholds.csv",
         discovery_blocklist_path=config_dir / "discovery_blocklist.csv",
+        promotion_policy_path=config_dir / "promotion_policy.csv",
         google_sheet_id=os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip() or None,
         google_service_account_file=google_service_account_file,
         run_timezone=os.getenv("SIGNALS_RUN_TIMEZONE", "America/Los_Angeles"),
@@ -157,6 +223,19 @@ def load_settings(project_root: Path | None = None) -> Settings:
         discovery_webhook_token=os.getenv("SIGNALS_DISCOVERY_WEBHOOK_TOKEN", "").strip(),
         discovery_event_batch_size=discovery_event_batch_size,
         discovery_lookback_days=discovery_lookback_days,
+        stage_timeout_seconds=stage_timeout_seconds,
+        retry_attempt_limit=retry_attempt_limit,
         watchlist_query_workers=watchlist_query_workers,
         watchlist_country_query_timeout_seconds=watchlist_country_query_timeout_seconds,
+        gchat_webhook_url=os.getenv("SIGNALS_GCHAT_WEBHOOK_URL", "").strip(),
+        alert_email_to=os.getenv("SIGNALS_ALERT_EMAIL_TO", "").strip(),
+        alert_email_from=os.getenv("SIGNALS_ALERT_EMAIL_FROM", "").strip(),
+        alert_smtp_host=os.getenv("SIGNALS_ALERT_SMTP_HOST", "").strip(),
+        alert_smtp_port=smtp_port,
+        alert_smtp_user=os.getenv("SIGNALS_ALERT_SMTP_USER", "").strip(),
+        alert_smtp_password=os.getenv("SIGNALS_ALERT_SMTP_PASSWORD", "").strip(),
+        alert_retry_depth_threshold=alert_retry_depth_threshold,
+        alert_min_high_precision=alert_min_high_precision,
+        alert_min_medium_precision=alert_min_medium_precision,
+        ops_metrics_lookback_days=ops_metrics_lookback_days,
     )

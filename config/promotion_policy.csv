@@ -1,0 +1,6 @@
+key,value
+auto_push_bands,high
+manual_review_bands,medium
+require_strict_evidence_for_auto_push,true
+min_auto_push_evidence_quality,0.80
+min_auto_push_relevance_score,0.65

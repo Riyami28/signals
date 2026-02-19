@@ -1,8 +1,11 @@
 from pathlib import Path
+import json
 
 from typer.testing import CliRunner
 
+from src import db
 from src.main import app
+from src.utils import load_csv_rows
 
 
 def _write(path: Path, content: str) -> None:
@@ -43,7 +46,6 @@ def test_run_daily_creates_outputs(tmp_path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     runner = CliRunner()
     result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
@@ -61,7 +63,6 @@ def test_ingest_no_all_rejected(tmp_path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     runner = CliRunner()
     result = runner.invoke(app, ["ingest", "--no-all"])
@@ -91,7 +92,6 @@ def test_crawl_diagnostics_command_handles_empty_day(tmp_path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     runner = CliRunner()
     result = runner.invoke(app, ["crawl-diagnostics", "--date", "2026-02-16"])
@@ -108,7 +108,6 @@ def test_calibrate_thresholds_command_emits_suggestion(tmp_path, monkeypatch):
         "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
     )
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     runner = CliRunner()
     daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
@@ -128,7 +127,6 @@ def test_tune_profile_command_emits_profile_suggestion(tmp_path, monkeypatch):
         "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
     )
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     runner = CliRunner()
     daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
@@ -154,7 +152,6 @@ def test_icp_signal_gaps_command_writes_report(tmp_path, monkeypatch):
         "customer,zopnight,cost_reduction_mandate,p1,first_party_csv,track budget pressure\n",
     )
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     runner = CliRunner()
     daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
@@ -164,3 +161,171 @@ def test_icp_signal_gaps_command_writes_report(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "coverage_rate=" in result.stdout
     assert (root / "data" / "out" / "icp_signal_gaps_20260216.csv").exists()
+
+
+def test_review_queue_is_account_level_and_excludes_internal_domain(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(
+        root / "config" / "seed_accounts.csv",
+        "company_name,domain,source_type\n"
+        "Acme,acme.example,seed\n"
+        "Zopdev,zop.dev,seed\n",
+    )
+    _write(
+        root / "config" / "signal_classes.csv",
+        "signal_code,class,vertical_scope,promotion_critical\n"
+        "cloud_connected,primary,all,false\n",
+    )
+    _write(
+        root / "config" / "account_profiles.csv",
+        "domain,relationship_stage,vertical_tag,is_self,exclude_from_crm\n"
+        "zop.dev,customer,internal,1,1\n",
+    )
+    _write(root / "config" / "discovery_blocklist.csv", "domain,reason\nzop.dev,self\n")
+    _write(
+        root / "data" / "raw" / "first_party_events.csv",
+        "domain,company_name,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at\n"
+        "acme.example,Acme,shared,cloud_connected,first_party_csv,https://acme.example/connect,connected cloud,0.95,2026-02-16T00:00:00Z\n"
+        "zop.dev,Zopdev,shared,cloud_connected,first_party_csv,https://zop.dev/connect,connected cloud,0.95,2026-02-16T00:00:00Z\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+
+    queue_rows = load_csv_rows(root / "data" / "out" / "review_queue_20260216.csv")
+    assert len(queue_rows) == 1
+    assert queue_rows[0]["domain"] == "acme.example"
+
+
+def test_daily_scores_include_zero_rows_for_unobserved_accounts(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(
+        root / "config" / "seed_accounts.csv",
+        "company_name,domain,source_type\n"
+        "Acme,acme.example,seed\n"
+        "Beta,beta.example,seed\n",
+    )
+    _write(
+        root / "data" / "raw" / "first_party_events.csv",
+        "domain,company_name,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at\n"
+        "acme.example,Acme,zopdev,cloud_connected,first_party_csv,https://app.example/connect,connected cloud,0.95,2026-02-16T00:00:00Z\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+
+    score_rows = load_csv_rows(root / "data" / "out" / "daily_scores_20260216.csv")
+    beta_rows = [row for row in score_rows if row.get("domain") == "beta.example"]
+    assert len(beta_rows) == 3
+    assert all(float(row["score"]) == 0.0 for row in beta_rows)
+    assert all(row["tier"] == "low" for row in beta_rows)
+
+
+def test_source_execution_policy_can_disable_collector(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(
+        root / "config" / "source_execution_policy.csv",
+        "source,max_parallel_workers,requests_per_second,timeout_seconds,retry_attempts,backoff_seconds,batch_size,enabled\n"
+        "first_party_csv,4,5.0,10,1,1,500,false\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["ingest", "--all"])
+
+    assert result.exit_code == 0
+    assert "collector=first_party seen=0 inserted=0" in result.stdout
+
+
+def test_run_daily_skips_when_lock_is_held(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    conn = db.get_connection()
+    db.init_db(conn)
+    assert db.try_advisory_lock(conn, lock_name="signals:run-daily", owner_id="test-owner") is True
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+    assert "status=skipped reason=lock_busy" in result.stdout
+
+    assert db.release_advisory_lock(conn, lock_name="signals:run-daily", owner_id="test-owner") is True
+    conn.close()
+
+
+def test_retry_failures_processes_due_task(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    conn = db.get_connection()
+    db.init_db(conn)
+    _ = db.enqueue_retry_task(
+        conn,
+        task_type="ingest_cycle",
+        payload_json=json.dumps({"run_date": "2026-02-16"}, ensure_ascii=True),
+        due_at="2026-02-16T00:00:00+00:00",
+        max_attempts=3,
+    )
+    conn.close()
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["retry-failures", "--limit", "10"])
+    assert result.exit_code == 0
+    assert "completed=1" in result.stdout
+
+
+def test_ops_metrics_command_writes_output(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert daily_result.exit_code == 0
+
+    metrics_result = runner.invoke(app, ["ops-metrics", "--date", "2026-02-16"])
+    assert metrics_result.exit_code == 0
+    assert "ops_metrics_rows=" in metrics_result.stdout
+    assert (root / "data" / "out" / "ops_metrics_20260216.csv").exists()
+
+
+def test_alert_test_command_writes_local_log(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["alert-test", "--title", "test-alert", "--body", "hello"])
+    assert result.exit_code == 0
+    assert "local_log" in result.stdout
+    assert (root / "data" / "out" / "alerts.log").exists()
+
+
+def test_backfill_run_daily_command_single_day(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "backfill-run-daily",
+            "--start-date",
+            "2026-02-16",
+            "--end-date",
+            "2026-02-16",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "succeeded=1" in result.stdout

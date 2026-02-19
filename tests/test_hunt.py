@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import sqlite3
 
 from typer.testing import CliRunner
 
@@ -83,9 +82,8 @@ def test_listing_expansion_enqueues_story_urls(tmp_path: Path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_hunt_fixture(root)
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
-    conn = db.get_connection(root / "data" / "signals.db")
+    conn = db.get_connection()
     db.init_db(conn)
     listing_html = """
     <html><head><title>Unilever Newsroom</title></head>
@@ -120,8 +118,7 @@ def test_listing_expansion_enqueues_story_urls(tmp_path: Path, monkeypatch):
     extract_result = runner.invoke(app, ["discover-extract", "--date", "2026-02-17"])
     assert extract_result.exit_code == 0
 
-    conn2 = sqlite3.connect(root / "data" / "signals.db")
-    conn2.row_factory = sqlite3.Row
+    conn2 = db.get_connection()
     queued_links = conn2.execute(
         """
         SELECT COUNT(*) AS c
@@ -139,7 +136,6 @@ def test_run_hunt_writes_lineage_and_applies_quality_gate(tmp_path: Path, monkey
     root = tmp_path / "signals"
     _bootstrap_hunt_fixture(root)
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
-    monkeypatch.setenv("SIGNALS_DB_PATH", str(root / "data" / "signals.db"))
 
     long_body = (
         "control tower program, margin improvement program, policy enforcement, audit readiness, "
@@ -161,7 +157,7 @@ def test_run_hunt_writes_lineage_and_applies_quality_gate(tmp_path: Path, monkey
         "</body></html>"
     )
 
-    conn = db.get_connection(root / "data" / "signals.db")
+    conn = db.get_connection()
     db.init_db(conn)
     ok1 = db.insert_external_discovery_event(
         conn=conn,
@@ -221,3 +217,62 @@ def test_run_hunt_writes_lineage_and_applies_quality_gate(tmp_path: Path, monkey
     lineage_rows = load_csv_rows(lineage_path)
     assert len(lineage_rows) >= 1
     assert any(row.get("domain") == "unilever.com" for row in lineage_rows)
+
+
+def test_hunt_respects_promotion_policy_config(tmp_path: Path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_hunt_fixture(root)
+    _write(
+        root / "config" / "promotion_policy.csv",
+        "key,value\n"
+        "auto_push_bands,explore\n"
+        "manual_review_bands,high|medium\n"
+        "require_strict_evidence_for_auto_push,false\n"
+        "min_auto_push_evidence_quality,0.0\n"
+        "min_auto_push_relevance_score,0.0\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    long_body = (
+        "control tower program, margin improvement program, policy enforcement, audit readiness, "
+        "go-live date set, procurement workflow modernization, cloud platform resilience, "
+        "ERP modernization phase-2, vendor consolidation and risk controls."
+    )
+    long_body = " ".join([long_body for _ in range(30)])
+    high_quality_html = (
+        "<html><head><title>Unilever supply chain rollout</title>"
+        "<meta name='author' content='Anita Rao'/>"
+        "<meta property='article:published_time' content='2026-02-17T09:00:00Z'/>"
+        "</head><body><p>"
+        + long_body
+        + "</p></body></html>"
+    )
+
+    conn = db.get_connection()
+    db.init_db(conn)
+    inserted = db.insert_external_discovery_event(
+        conn=conn,
+        source="huginn_webhook",
+        source_event_id="evt-unilever-policy",
+        observed_at="2026-02-17T00:00:00Z",
+        title="Unilever transformation",
+        text="story article",
+        url="https://unilever.com/news/transform",
+        entry_url="https://unilever.com/news/transform",
+        url_type="article",
+        company_name_hint="Unilever",
+        domain_hint="unilever.com",
+        raw_payload_json=json.dumps({"html_content": high_quality_html}, ensure_ascii=True),
+    )
+    conn.close()
+    assert inserted is True
+
+    runner = CliRunner()
+    run_result = runner.invoke(app, ["run-hunt", "--date", "2026-02-17", "--profile", "light"])
+    assert run_result.exit_code == 0
+
+    crm_rows = load_csv_rows(root / "data" / "out" / "crm_candidates_20260217.csv")
+    manual_rows = load_csv_rows(root / "data" / "out" / "manual_review_queue_20260217.csv")
+    assert "unilever.com" not in {row.get("domain") for row in crm_rows}
+    assert "unilever.com" in {row.get("domain") for row in manual_rows}
+    assert any(row.get("policy_decision") == "manual_review" for row in manual_rows)

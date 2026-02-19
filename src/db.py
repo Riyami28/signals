@@ -2,12 +2,120 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import os
 from pathlib import Path
-import sqlite3
+import re
+from typing import Any
 import uuid
 
 from src.models import Account, AccountScore, ComponentScore, ReviewLabel, SignalObservation
 from src.utils import load_csv_rows, normalize_domain, stable_hash, utc_now_iso
+
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except Exception:  # pragma: no cover - psycopg may be absent in lightweight envs.
+    psycopg = None  # type: ignore[assignment]
+    dict_row = None  # type: ignore[assignment]
+
+
+_RE_INSERT_OR_IGNORE = re.compile(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", flags=re.IGNORECASE)
+_RE_DATE_TWO_ARG = re.compile(r"date\(\s*([^,()]+?)\s*,\s*([^)]+?)\s*\)", flags=re.IGNORECASE)
+_RE_DATE_ONE_ARG = re.compile(r"date\(\s*([^)]+?)\s*\)", flags=re.IGNORECASE)
+_RE_DATETIME_NOW_OFFSET = re.compile(r"datetime\(\s*'now'\s*,\s*'([^']+)'\s*\)", flags=re.IGNORECASE)
+_RE_DATETIME_NOW = re.compile(r"datetime\(\s*'now'\s*\)", flags=re.IGNORECASE)
+_RE_DATETIME_ONE_ARG = re.compile(r"datetime\(\s*([^)]+?)\s*\)", flags=re.IGNORECASE)
+
+
+class PostgresCompatCursor:
+    def __init__(self, cursor: Any):
+        self._cursor = cursor
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return list(self._cursor.fetchall())
+
+
+class PostgresCompatConnection:
+    backend = "postgres"
+
+    def __init__(self, raw_conn: Any):
+        self._raw_conn = raw_conn
+
+    def execute(self, sql: str, params: tuple[Any, ...] | list[Any] | None = None) -> PostgresCompatCursor:
+        cursor = self._raw_conn.execute(_rewrite_sql_for_postgres(sql), tuple(params or ()))
+        return PostgresCompatCursor(cursor)
+
+    def executemany(self, sql: str, params_seq: list[tuple[Any, ...]] | tuple[tuple[Any, ...], ...]) -> Any:
+        with self._raw_conn.cursor() as cursor:
+            return cursor.executemany(_rewrite_sql_for_postgres(sql), params_seq)
+
+    def executescript(self, sql_script: str) -> None:
+        for statement in _split_sql_statements(sql_script):
+            self._raw_conn.execute(_rewrite_sql_for_postgres(statement))
+
+    def commit(self) -> None:
+        self._raw_conn.commit()
+
+    def rollback(self) -> None:
+        self._raw_conn.rollback()
+
+    def close(self) -> None:
+        self._raw_conn.close()
+
+
+def _split_sql_statements(script: str) -> list[str]:
+    statements: list[str] = []
+    current: list[str] = []
+    in_single_quote = False
+    for char in script:
+        if char == "'":
+            in_single_quote = not in_single_quote
+        if char == ";" and not in_single_quote:
+            statement = "".join(current).strip()
+            if statement:
+                statements.append(statement)
+            current = []
+            continue
+        current.append(char)
+    tail = "".join(current).strip()
+    if tail:
+        statements.append(tail)
+    return statements
+
+
+def _rewrite_sql_for_postgres(sql: str) -> str:
+    rewritten = sql.replace("?", "%s")
+    rewritten = rewritten.replace("COLLATE NOCASE", "")
+    rewritten = rewritten.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+
+    replaced_insert_ignore = bool(_RE_INSERT_OR_IGNORE.search(rewritten))
+    rewritten = _RE_INSERT_OR_IGNORE.sub("INSERT INTO", rewritten)
+
+    rewritten = _RE_DATETIME_NOW_OFFSET.sub(
+        lambda match: f"(CURRENT_TIMESTAMP + INTERVAL '{match.group(1)}')",
+        rewritten,
+    )
+    rewritten = _RE_DATETIME_NOW.sub("CURRENT_TIMESTAMP", rewritten)
+    rewritten = _RE_DATETIME_ONE_ARG.sub(lambda match: f"CAST({match.group(1)} AS TIMESTAMP)", rewritten)
+    rewritten = _RE_DATE_TWO_ARG.sub(
+        lambda match: f"CAST((CAST({match.group(1)} AS DATE) + CAST({match.group(2)} AS INTERVAL)) AS DATE)",
+        rewritten,
+    )
+    rewritten = _RE_DATE_ONE_ARG.sub(lambda match: f"CAST({match.group(1)} AS DATE)", rewritten)
+
+    if replaced_insert_ignore and "ON CONFLICT" not in rewritten.upper():
+        trimmed = rewritten.rstrip()
+        if trimmed.endswith(";"):
+            trimmed = trimmed[:-1].rstrip()
+        rewritten = f"{trimmed} ON CONFLICT DO NOTHING"
+    return rewritten
+
+
+def _is_integrity_error(exc: Exception) -> bool:
+    return bool(psycopg is not None and isinstance(exc, psycopg.IntegrityError))
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -324,37 +432,129 @@ CREATE TABLE IF NOT EXISTS people_activity (
   created_at TEXT NOT NULL,
   UNIQUE(account_id, person_name, document_id, activity_type)
 );
+
+CREATE TABLE IF NOT EXISTS run_lock_events (
+  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lock_name TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('acquired', 'released', 'busy', 'release_missed')),
+  details TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_lock_events_lock_name_created
+ON run_lock_events(lock_name, created_at);
+
+CREATE TABLE IF NOT EXISTS stage_failures (
+  failure_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_type TEXT NOT NULL,
+  run_date TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  duration_seconds REAL NOT NULL DEFAULT 0,
+  timed_out INTEGER NOT NULL DEFAULT 0,
+  error_summary TEXT NOT NULL DEFAULT '',
+  retry_task_id TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_stage_failures_run_date_created
+ON stage_failures(run_date, created_at);
+
+CREATE TABLE IF NOT EXISTS retry_queue (
+  task_id TEXT PRIMARY KEY,
+  task_type TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  max_attempts INTEGER NOT NULL DEFAULT 3,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'quarantined', 'failed')),
+  due_at TEXT NOT NULL,
+  last_error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_retry_queue_status_due
+ON retry_queue(status, due_at);
+
+CREATE TABLE IF NOT EXISTS quarantine_failures (
+  quarantine_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id TEXT NOT NULL,
+  task_type TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  error_summary TEXT NOT NULL DEFAULT '',
+  quarantined_at TEXT NOT NULL,
+  resolved INTEGER NOT NULL DEFAULT 0,
+  resolved_at TEXT NOT NULL DEFAULT '',
+  resolution_note TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_quarantine_failures_resolved
+ON quarantine_failures(resolved, quarantined_at);
+
+CREATE TABLE IF NOT EXISTS ops_metrics (
+  metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_date TEXT NOT NULL,
+  recorded_at TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  value REAL NOT NULL,
+  meta_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_metrics_run_date_metric
+ON ops_metrics(run_date, metric, recorded_at);
 """
 
 
-def get_connection(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=30000;")
-    return conn
+def get_connection(pg_dsn: str | Path | None = None):
+    if psycopg is None:
+        raise RuntimeError("psycopg is required. Install dependencies and ensure postgres driver is available.")
+    dsn = str(pg_dsn or "").strip()
+    # Allow legacy callsites that still pass a local file path; postgres is mandatory now.
+    if "://" not in dsn:
+        dsn = os.getenv("SIGNALS_PG_DSN", "").strip()
+    if not dsn:
+        host = os.getenv("SIGNALS_PG_HOST", "127.0.0.1").strip()
+        port = os.getenv("SIGNALS_PG_PORT", "55432").strip()
+        user = os.getenv("SIGNALS_PG_USER", "signals").strip()
+        password = os.getenv("SIGNALS_PG_PASSWORD", "signals_dev_password").strip()
+        database = os.getenv("SIGNALS_PG_DB", "signals").strip()
+        dsn = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    if not dsn:
+        raise ValueError("Postgres DSN is required. Set SIGNALS_PG_DSN or SIGNALS_PG_* environment variables.")
+    raw_conn = psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+    return PostgresCompatConnection(raw_conn)
 
 
-def init_db(conn: sqlite3.Connection) -> None:
+def init_db(conn) -> None:
     conn.executescript(SCHEMA_SQL)
     _run_schema_migrations(conn)
     conn.commit()
 
 
-def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    return any(str(row["name"]) == column for row in rows)
+def _column_exists(conn, table: str, column: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ?
+          AND column_name = ?
+        LIMIT 1
+        """,
+        (table, column),
+    ).fetchone()
+    return row is not None
 
 
-def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl_fragment: str) -> None:
+def _ensure_column(conn, table: str, column: str, ddl_fragment: str) -> None:
     if _column_exists(conn, table, column):
         return
     conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_fragment}")
 
 
-def _run_schema_migrations(conn: sqlite3.Connection) -> None:
-    # Backfill newly introduced lineage columns in legacy SQLite databases.
+def _run_schema_migrations(conn) -> None:
+    # Backfill newly introduced lineage columns in legacy PostgreSQL databases.
     _ensure_column(conn, "signal_observations", "document_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "mention_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "evidence_sentence", "TEXT NOT NULL DEFAULT ''")
@@ -377,7 +577,7 @@ def _build_account_id(domain: str) -> str:
     return stable_hash({"domain": normalize_domain(domain)}, prefix="acc", length=12)
 
 
-def get_account_by_domain(conn: sqlite3.Connection, domain: str) -> sqlite3.Row | None:
+def get_account_by_domain(conn: Any, domain: str) -> dict[str, Any] | None:
     normalized = normalize_domain(domain)
     if not normalized:
         return None
@@ -385,7 +585,13 @@ def get_account_by_domain(conn: sqlite3.Connection, domain: str) -> sqlite3.Row 
     return cur.fetchone()
 
 
-def upsert_account(conn: sqlite3.Connection, company_name: str, domain: str, source_type: str = "discovered") -> str:
+def upsert_account(
+    conn: Any,
+    company_name: str,
+    domain: str,
+    source_type: str = "discovered",
+    commit: bool = True,
+) -> str:
     normalized_domain = normalize_domain(domain)
     if not normalized_domain:
         raise ValueError("domain is required")
@@ -413,11 +619,12 @@ def upsert_account(conn: sqlite3.Connection, company_name: str, domain: str, sou
             account.created_at,
         ),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return account.account_id
 
 
-def seed_accounts(conn: sqlite3.Connection, seed_accounts_csv: Path) -> int:
+def seed_accounts(conn: Any, seed_accounts_csv: Path) -> int:
     rows = load_csv_rows(seed_accounts_csv)
     inserted = 0
     for row in rows:
@@ -437,66 +644,67 @@ def seed_accounts(conn: sqlite3.Connection, seed_accounts_csv: Path) -> int:
     return inserted
 
 
-def insert_signal_observation(conn: sqlite3.Connection, observation: SignalObservation) -> bool:
-    try:
-        conn.execute(
-            """
-            INSERT INTO signal_observations (
-                obs_id,
-                account_id,
-                signal_code,
-                product,
-                source,
-                observed_at,
-                evidence_url,
-                evidence_text,
-                document_id,
-                mention_id,
-                evidence_sentence,
-                evidence_sentence_en,
-                matched_phrase,
-                language,
-                speaker_name,
-                speaker_role,
-                evidence_quality,
-                relevance_score,
-                confidence,
-                source_reliability,
-                raw_payload_hash
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                observation.obs_id,
-                observation.account_id,
-                observation.signal_code,
-                observation.product,
-                observation.source,
-                observation.observed_at,
-                observation.evidence_url,
-                observation.evidence_text,
-                observation.document_id,
-                observation.mention_id,
-                observation.evidence_sentence,
-                observation.evidence_sentence_en,
-                observation.matched_phrase,
-                observation.language,
-                observation.speaker_name,
-                observation.speaker_role,
-                float(observation.evidence_quality),
-                float(observation.relevance_score),
-                float(observation.confidence),
-                float(observation.source_reliability),
-                observation.raw_payload_hash,
-            ),
+def insert_signal_observation(conn: Any, observation: SignalObservation, commit: bool = True) -> bool:
+    cur = conn.execute(
+        """
+        INSERT INTO signal_observations (
+            obs_id,
+            account_id,
+            signal_code,
+            product,
+            source,
+            observed_at,
+            evidence_url,
+            evidence_text,
+            document_id,
+            mention_id,
+            evidence_sentence,
+            evidence_sentence_en,
+            matched_phrase,
+            language,
+            speaker_name,
+            speaker_role,
+            evidence_quality,
+            relevance_score,
+            confidence,
+            source_reliability,
+            raw_payload_hash
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT DO NOTHING
+        RETURNING obs_id
+        """,
+        (
+            observation.obs_id,
+            observation.account_id,
+            observation.signal_code,
+            observation.product,
+            observation.source,
+            observation.observed_at,
+            observation.evidence_url,
+            observation.evidence_text,
+            observation.document_id,
+            observation.mention_id,
+            observation.evidence_sentence,
+            observation.evidence_sentence_en,
+            observation.matched_phrase,
+            observation.language,
+            observation.speaker_name,
+            observation.speaker_role,
+            float(observation.evidence_quality),
+            float(observation.relevance_score),
+            float(observation.confidence),
+            float(observation.source_reliability),
+            observation.raw_payload_hash,
+        ),
+    )
+    inserted = cur.fetchone() is not None
+    if commit:
         conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    return inserted
 
 
-def create_score_run(conn: sqlite3.Connection, run_date: str) -> str:
+def create_score_run(conn: Any, run_date: str) -> str:
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     conn.execute(
         """
@@ -510,7 +718,7 @@ def create_score_run(conn: sqlite3.Connection, run_date: str) -> str:
 
 
 def finish_score_run(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_id: str,
     status: str,
     error_summary: str | None = None,
@@ -527,10 +735,10 @@ def finish_score_run(
 
 
 def fetch_observations_for_scoring(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_date: str,
     lookback_days: int = 120,
-) -> list[sqlite3.Row]:
+) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT *
@@ -544,7 +752,7 @@ def fetch_observations_for_scoring(
 
 
 def replace_run_scores(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_id: str,
     component_scores: list[ComponentScore],
     account_scores: list[AccountScore],
@@ -594,7 +802,7 @@ def replace_run_scores(
     conn.commit()
 
 
-def get_score_delta_7d(conn: sqlite3.Connection, account_id: str, product: str, run_date: str) -> float:
+def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) -> float:
     cur = conn.execute(
         """
         SELECT s.score
@@ -631,7 +839,7 @@ def get_score_delta_7d(conn: sqlite3.Connection, account_id: str, product: str, 
     return round(float(current_row["score"]) - float(row["score"]), 2)
 
 
-def get_latest_run_id_for_date(conn: sqlite3.Connection, run_date: str) -> str | None:
+def get_latest_run_id_for_date(conn: Any, run_date: str) -> str | None:
     cur = conn.execute(
         """
         SELECT run_id
@@ -646,12 +854,12 @@ def get_latest_run_id_for_date(conn: sqlite3.Connection, run_date: str) -> str |
     return None if not row else str(row["run_id"])
 
 
-def list_runs(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def list_runs(conn: Any) -> list[dict[str, Any]]:
     cur = conn.execute("SELECT * FROM score_runs ORDER BY started_at DESC")
     return list(cur.fetchall())
 
 
-def fetch_scores_for_run(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
+def fetch_scores_for_run(conn: Any, run_id: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT
@@ -675,30 +883,29 @@ def fetch_scores_for_run(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.
     return list(cur.fetchall())
 
 
-def insert_review_label(conn: sqlite3.Connection, label: ReviewLabel) -> bool:
-    try:
-        conn.execute(
-            """
-            INSERT INTO review_labels (review_id, run_id, account_id, decision, reviewer, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                label.review_id,
-                label.run_id,
-                label.account_id,
-                label.decision,
-                label.reviewer,
-                label.notes,
-                label.created_at,
-            ),
-        )
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+def insert_review_label(conn: Any, label: ReviewLabel) -> bool:
+    cur = conn.execute(
+        """
+        INSERT INTO review_labels (review_id, run_id, account_id, decision, reviewer, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT DO NOTHING
+        RETURNING review_id
+        """,
+        (
+            label.review_id,
+            label.run_id,
+            label.account_id,
+            label.decision,
+            label.reviewer,
+            label.notes,
+            label.created_at,
+        ),
+    )
+    conn.commit()
+    return cur.fetchone() is not None
 
 
-def fetch_review_rows_for_date(conn: sqlite3.Connection, run_date: str) -> list[sqlite3.Row]:
+def fetch_review_rows_for_date(conn: Any, run_date: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT rl.*, r.run_date
@@ -712,7 +919,7 @@ def fetch_review_rows_for_date(conn: sqlite3.Connection, run_date: str) -> list[
 
 
 def fetch_sources_for_account_window(
-    conn: sqlite3.Connection,
+    conn: Any,
     account_id: str,
     run_date: str,
     lookback_days: int = 30,
@@ -732,7 +939,7 @@ def fetch_sources_for_account_window(
 
 
 def fetch_scored_sources_for_run_account(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_id: str,
     account_id: str,
 ) -> list[str]:
@@ -769,7 +976,7 @@ def fetch_scored_sources_for_run_account(
 
 
 def upsert_source_metrics(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_date: str,
     rows: list[dict[str, float | int | str]],
 ) -> None:
@@ -792,7 +999,7 @@ def upsert_source_metrics(
     conn.commit()
 
 
-def fetch_source_metrics(conn: sqlite3.Connection, run_date: str) -> list[sqlite3.Row]:
+def fetch_source_metrics(conn: Any, run_date: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT run_date, source, approved_rate, sample_size
@@ -805,7 +1012,7 @@ def fetch_source_metrics(conn: sqlite3.Connection, run_date: str) -> list[sqlite
     return list(cur.fetchall())
 
 
-def fetch_recent_reviews(conn: sqlite3.Connection, run_date: str, days: int) -> list[sqlite3.Row]:
+def fetch_recent_reviews(conn: Any, run_date: str, days: int) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT rl.*, r.run_date
@@ -820,12 +1027,12 @@ def fetch_recent_reviews(conn: sqlite3.Connection, run_date: str, days: int) -> 
     return list(cur.fetchall())
 
 
-def account_exists(conn: sqlite3.Connection, account_id: str) -> bool:
+def account_exists(conn: Any, account_id: str) -> bool:
     cur = conn.execute("SELECT 1 FROM accounts WHERE account_id = ? LIMIT 1", (account_id,))
     return cur.fetchone() is not None
 
 
-def dump_run_summary(conn: sqlite3.Connection, run_id: str) -> dict[str, object]:
+def dump_run_summary(conn: Any, run_id: str) -> dict[str, object]:
     cur = conn.execute(
         """
         SELECT
@@ -845,7 +1052,7 @@ def dump_run_summary(conn: sqlite3.Connection, run_id: str) -> dict[str, object]
 
 
 def was_crawled_today(
-    conn: sqlite3.Connection,
+    conn: Any,
     source: str,
     account_id: str,
     endpoint: str,
@@ -866,10 +1073,11 @@ def was_crawled_today(
 
 
 def mark_crawled(
-    conn: sqlite3.Connection,
+    conn: Any,
     source: str,
     account_id: str,
     endpoint: str,
+    commit: bool = True,
 ) -> None:
     conn.execute(
         """
@@ -880,16 +1088,18 @@ def mark_crawled(
         """,
         (source, account_id, endpoint, utc_now_iso()),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def record_crawl_attempt(
-    conn: sqlite3.Connection,
+    conn: Any,
     source: str,
     account_id: str,
     endpoint: str,
     status: str,
     error_summary: str = "",
+    commit: bool = True,
 ) -> None:
     conn.execute(
         """
@@ -898,10 +1108,11 @@ def record_crawl_attempt(
         """,
         (source, account_id, endpoint, utc_now_iso(), status, (error_summary or "")[:500]),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
-def fetch_crawl_attempt_summary(conn: sqlite3.Connection, run_date: str) -> list[sqlite3.Row]:
+def fetch_crawl_attempt_summary(conn: Any, run_date: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT source, status, COUNT(*) AS attempt_count
@@ -915,7 +1126,7 @@ def fetch_crawl_attempt_summary(conn: sqlite3.Connection, run_date: str) -> list
     return list(cur.fetchall())
 
 
-def fetch_latest_crawl_failures(conn: sqlite3.Connection, run_date: str, limit: int = 10) -> list[sqlite3.Row]:
+def fetch_latest_crawl_failures(conn: Any, run_date: str, limit: int = 10) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT source, account_id, endpoint, status, error_summary, attempted_at
@@ -931,7 +1142,7 @@ def fetch_latest_crawl_failures(conn: sqlite3.Connection, run_date: str, limit: 
 
 
 def insert_external_discovery_event(
-    conn: sqlite3.Connection,
+    conn: Any,
     source: str,
     source_event_id: str,
     observed_at: str,
@@ -965,63 +1176,62 @@ def insert_external_discovery_event(
             length=24,
         )
     )
-    try:
-        conn.execute(
-            """
-            INSERT INTO external_discovery_events (
-                source,
-                source_event_id,
-                dedupe_key,
-                observed_at,
-                title,
-                text,
-                url,
-                entry_url,
-                url_type,
-                language_hint,
-                author_hint,
-                published_at_hint,
-                company_name_hint,
-                domain_hint,
-                raw_payload_json,
-                ingested_at,
-                processing_status,
-                processed_run_id,
-                processed_at,
-                error_summary
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', '')
-            """,
-            (
-                normalized_source,
-                normalized_event_id,
-                dedupe_key,
-                observed_at,
-                title,
-                text,
-                (url or "").strip(),
-                (entry_url or "").strip(),
-                (url_type or "").strip().lower(),
-                (language_hint or "").strip().lower(),
-                (author_hint or "").strip(),
-                (published_at_hint or "").strip(),
-                (company_name_hint or "").strip(),
-                normalize_domain(domain_hint or ""),
-                (raw_payload_json or "{}")[:8000],
-                utc_now_iso(),
-            ),
+    cur = conn.execute(
+        """
+        INSERT INTO external_discovery_events (
+            source,
+            source_event_id,
+            dedupe_key,
+            observed_at,
+            title,
+            text,
+            url,
+            entry_url,
+            url_type,
+            language_hint,
+            author_hint,
+            published_at_hint,
+            company_name_hint,
+            domain_hint,
+            raw_payload_json,
+            ingested_at,
+            processing_status,
+            processed_run_id,
+            processed_at,
+            error_summary
         )
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', '')
+        ON CONFLICT DO NOTHING
+        RETURNING event_id
+        """,
+        (
+            normalized_source,
+            normalized_event_id,
+            dedupe_key,
+            observed_at,
+            title,
+            text,
+            (url or "").strip(),
+            (entry_url or "").strip(),
+            (url_type or "").strip().lower(),
+            (language_hint or "").strip().lower(),
+            (author_hint or "").strip(),
+            (published_at_hint or "").strip(),
+            (company_name_hint or "").strip(),
+            normalize_domain(domain_hint or ""),
+            (raw_payload_json or "{}")[:8000],
+            utc_now_iso(),
+        ),
+    )
+    conn.commit()
+    return cur.fetchone() is not None
 
 
 def fetch_pending_external_discovery_events(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_date: str,
     limit: int = 500,
-) -> list[sqlite3.Row]:
+) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT *
@@ -1037,9 +1247,10 @@ def fetch_pending_external_discovery_events(
 
 
 def mark_external_discovery_event_processed(
-    conn: sqlite3.Connection,
+    conn: Any,
     event_id: int,
     processed_run_id: str,
+    commit: bool = True,
 ) -> None:
     conn.execute(
         """
@@ -1052,14 +1263,16 @@ def mark_external_discovery_event_processed(
         """,
         ((processed_run_id or "").strip(), utc_now_iso(), int(event_id)),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def mark_external_discovery_event_failed(
-    conn: sqlite3.Connection,
+    conn: Any,
     event_id: int,
     processed_run_id: str,
     error_summary: str,
+    commit: bool = True,
 ) -> None:
     conn.execute(
         """
@@ -1077,11 +1290,12 @@ def mark_external_discovery_event_failed(
             int(event_id),
         ),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def insert_crawl_frontier(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_date: str,
     source: str,
     source_event_id: str,
@@ -1094,6 +1308,7 @@ def insert_crawl_frontier(
     priority: float = 0.5,
     max_retries: int = 2,
     payload_json: str = "{}",
+    commit: bool = True,
 ) -> bool:
     frontier_id = stable_hash(
         {
@@ -1104,60 +1319,61 @@ def insert_crawl_frontier(
         prefix="frn",
         length=16,
     )
-    try:
-        conn.execute(
-            """
-            INSERT INTO crawl_frontier (
-                frontier_id,
-                run_date,
-                source,
-                source_event_id,
-                account_id,
-                domain,
-                url,
-                canonical_url,
-                url_type,
-                depth,
-                priority,
-                status,
-                retry_count,
-                max_retries,
-                first_seen_at,
-                last_attempt_at,
-                last_error,
-                payload_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, '', '', ?)
-            """,
-            (
-                frontier_id,
-                run_date,
-                (source or "").strip().lower(),
-                (source_event_id or "").strip(),
-                account_id,
-                normalize_domain(domain or ""),
-                (url or "").strip(),
-                (canonical_url or "").strip(),
-                (url_type or "article").strip().lower(),
-                max(0, int(depth)),
-                max(0.0, float(priority)),
-                max(0, int(max_retries)),
-                utc_now_iso(),
-                (payload_json or "{}")[:12000],
-            ),
+    cur = conn.execute(
+        """
+        INSERT INTO crawl_frontier (
+            frontier_id,
+            run_date,
+            source,
+            source_event_id,
+            account_id,
+            domain,
+            url,
+            canonical_url,
+            url_type,
+            depth,
+            priority,
+            status,
+            retry_count,
+            max_retries,
+            first_seen_at,
+            last_attempt_at,
+            last_error,
+            payload_json
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, '', '', ?)
+        ON CONFLICT DO NOTHING
+        RETURNING frontier_id
+        """,
+        (
+            frontier_id,
+            run_date,
+            (source or "").strip().lower(),
+            (source_event_id or "").strip(),
+            account_id,
+            normalize_domain(domain or ""),
+            (url or "").strip(),
+            (canonical_url or "").strip(),
+            (url_type or "article").strip().lower(),
+            max(0, int(depth)),
+            max(0.0, float(priority)),
+            max(0, int(max_retries)),
+            utc_now_iso(),
+            (payload_json or "{}")[:12000],
+        ),
+    )
+    inserted = cur.fetchone() is not None
+    if commit:
         conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    return inserted
 
 
 def fetch_crawl_frontier_by_status(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_date: str,
     status: str,
     limit: int = 500,
-) -> list[sqlite3.Row]:
+) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT *
@@ -1173,11 +1389,12 @@ def fetch_crawl_frontier_by_status(
 
 
 def mark_crawl_frontier_status(
-    conn: sqlite3.Connection,
+    conn: Any,
     frontier_id: str,
     status: str,
     error_summary: str = "",
     bump_retry: bool = False,
+    commit: bool = True,
 ) -> None:
     if bump_retry:
         conn.execute(
@@ -1202,10 +1419,11 @@ def mark_crawl_frontier_status(
             """,
             (status, utc_now_iso(), (error_summary or "")[:500], frontier_id),
         )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
-def get_document_by_frontier_id(conn: sqlite3.Connection, frontier_id: str) -> sqlite3.Row | None:
+def get_document_by_frontier_id(conn: Any, frontier_id: str) -> dict[str, Any] | None:
     cur = conn.execute(
         """
         SELECT *
@@ -1219,7 +1437,7 @@ def get_document_by_frontier_id(conn: sqlite3.Connection, frontier_id: str) -> s
 
 
 def upsert_document(
-    conn: sqlite3.Connection,
+    conn: Any,
     frontier_id: str,
     account_id: str,
     domain: str,
@@ -1241,9 +1459,12 @@ def upsert_document(
     relevance_score: float,
     fetched_with: str,
     outbound_links_json: str = "[]",
+    commit: bool = True,
 ) -> str:
     document_id = stable_hash({"canonical_url": canonical_url}, prefix="doc", length=16)
     now = utc_now_iso()
+    savepoint_name = f"sp_doc_{uuid.uuid4().hex[:8]}"
+    conn.execute(f"SAVEPOINT {savepoint_name}")
     try:
         conn.execute(
             """
@@ -1324,8 +1545,15 @@ def upsert_document(
                 now,
             ),
         )
-        conn.commit()
-    except sqlite3.IntegrityError:
+        if commit:
+            conn.commit()
+        else:
+            conn.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+    except Exception as exc:
+        if not _is_integrity_error(exc):
+            raise
+        conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+        conn.execute(f"RELEASE SAVEPOINT {savepoint_name}")
         # Content hash collisions can happen when multiple URLs resolve to the same article.
         row = conn.execute(
             """
@@ -1339,16 +1567,16 @@ def upsert_document(
         ).fetchone()
         if row is not None:
             return str(row["document_id"])
-        raise
+        raise exc
     return document_id
 
 
 def fetch_documents_for_run_by_frontier_status(
-    conn: sqlite3.Connection,
+    conn: Any,
     run_date: str,
     frontier_status: str,
     limit: int = 500,
-) -> list[sqlite3.Row]:
+) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT d.*, f.url_type, f.depth, f.priority, f.payload_json, f.frontier_id, f.source_event_id, f.source
@@ -1365,7 +1593,7 @@ def fetch_documents_for_run_by_frontier_status(
 
 
 def insert_document_mention(
-    conn: sqlite3.Connection,
+    conn: Any,
     document_id: str,
     account_id: str,
     signal_code: str,
@@ -1378,6 +1606,7 @@ def insert_document_mention(
     confidence: float,
     evidence_quality: float,
     relevance_score: float,
+    commit: bool = True,
 ) -> tuple[str, bool]:
     normalized_phrase = (matched_phrase or "").strip().lower()
     mention_id = stable_hash(
@@ -1389,97 +1618,99 @@ def insert_document_mention(
         prefix="mnt",
         length=16,
     )
-    try:
-        conn.execute(
-            """
-            INSERT INTO document_mentions (
-                mention_id,
-                document_id,
-                account_id,
-                signal_code,
-                matched_phrase,
-                evidence_sentence,
-                evidence_sentence_en,
-                language,
-                speaker_name,
-                speaker_role,
-                confidence,
-                evidence_quality,
-                relevance_score,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                mention_id,
-                document_id,
-                account_id,
-                signal_code,
-                normalized_phrase,
-                (evidence_sentence or "")[:1500],
-                (evidence_sentence_en or "")[:1500],
-                (language or "").strip().lower(),
-                (speaker_name or "")[:200],
-                (speaker_role or "")[:120],
-                max(0.0, min(1.0, float(confidence))),
-                max(0.0, min(1.0, float(evidence_quality))),
-                max(0.0, min(1.0, float(relevance_score))),
-                utc_now_iso(),
-            ),
+    cur = conn.execute(
+        """
+        INSERT INTO document_mentions (
+            mention_id,
+            document_id,
+            account_id,
+            signal_code,
+            matched_phrase,
+            evidence_sentence,
+            evidence_sentence_en,
+            language,
+            speaker_name,
+            speaker_role,
+            confidence,
+            evidence_quality,
+            relevance_score,
+            created_at
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT DO NOTHING
+        RETURNING mention_id
+        """,
+        (
+            mention_id,
+            document_id,
+            account_id,
+            signal_code,
+            normalized_phrase,
+            (evidence_sentence or "")[:1500],
+            (evidence_sentence_en or "")[:1500],
+            (language or "").strip().lower(),
+            (speaker_name or "")[:200],
+            (speaker_role or "")[:120],
+            max(0.0, min(1.0, float(confidence))),
+            max(0.0, min(1.0, float(evidence_quality))),
+            max(0.0, min(1.0, float(relevance_score))),
+            utc_now_iso(),
+        ),
+    )
+    if commit:
         conn.commit()
-        return mention_id, True
-    except sqlite3.IntegrityError:
-        return mention_id, False
+    return mention_id, (cur.fetchone() is not None)
 
 
 def insert_observation_lineage(
-    conn: sqlite3.Connection,
+    conn: Any,
     obs_id: str,
     account_id: str,
     document_id: str,
     mention_id: str,
     source_event_id: str,
     run_date: str,
+    commit: bool = True,
 ) -> bool:
-    try:
-        conn.execute(
-            """
-            INSERT INTO observation_lineage (
-                obs_id,
-                account_id,
-                document_id,
-                mention_id,
-                source_event_id,
-                run_date,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                obs_id,
-                account_id,
-                document_id,
-                mention_id,
-                (source_event_id or "")[:250],
-                run_date,
-                utc_now_iso(),
-            ),
+    cur = conn.execute(
+        """
+        INSERT INTO observation_lineage (
+            obs_id,
+            account_id,
+            document_id,
+            mention_id,
+            source_event_id,
+            run_date,
+            created_at
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT DO NOTHING
+        RETURNING obs_id
+        """,
+        (
+            obs_id,
+            account_id,
+            document_id,
+            mention_id,
+            (source_event_id or "")[:250],
+            run_date,
+            utc_now_iso(),
+        ),
+    )
+    if commit:
         conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    return cur.fetchone() is not None
 
 
 def upsert_people_watchlist_entry(
-    conn: sqlite3.Connection,
+    conn: Any,
     account_id: str,
     person_name: str,
     role_title: str,
     role_weight: float,
     source_url: str,
     is_active: bool = True,
+    commit: bool = True,
 ) -> str:
     watch_id = stable_hash(
         {"account_id": account_id, "person_name": person_name, "role_title": role_title},
@@ -1519,12 +1750,13 @@ def upsert_people_watchlist_entry(
             now,
         ),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return watch_id
 
 
 def insert_people_activity(
-    conn: sqlite3.Connection,
+    conn: Any,
     account_id: str,
     person_name: str,
     role_title: str,
@@ -1533,6 +1765,7 @@ def insert_people_activity(
     summary: str,
     published_at: str,
     url: str,
+    commit: bool = True,
 ) -> bool:
     activity_id = stable_hash(
         {
@@ -1544,43 +1777,43 @@ def insert_people_activity(
         prefix="pac",
         length=16,
     )
-    try:
-        conn.execute(
-            """
-            INSERT INTO people_activity (
-                activity_id,
-                account_id,
-                person_name,
-                role_title,
-                document_id,
-                activity_type,
-                summary,
-                published_at,
-                url,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                activity_id,
-                account_id,
-                (person_name or "")[:200],
-                (role_title or "")[:120],
-                document_id,
-                (activity_type or "")[:120],
-                (summary or "")[:1500],
-                (published_at or "")[:80],
-                (url or "")[:500],
-                utc_now_iso(),
-            ),
+    cur = conn.execute(
+        """
+        INSERT INTO people_activity (
+            activity_id,
+            account_id,
+            person_name,
+            role_title,
+            document_id,
+            activity_type,
+            summary,
+            published_at,
+            url,
+            created_at
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT DO NOTHING
+        RETURNING activity_id
+        """,
+        (
+            activity_id,
+            account_id,
+            (person_name or "")[:200],
+            (role_title or "")[:120],
+            document_id,
+            (activity_type or "")[:120],
+            (summary or "")[:1500],
+            (published_at or "")[:80],
+            (url or "")[:500],
+            utc_now_iso(),
+        ),
+    )
+    if commit:
         conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    return cur.fetchone() is not None
 
 
-def fetch_story_evidence_rows(conn: sqlite3.Connection, run_date: str) -> list[sqlite3.Row]:
+def fetch_story_evidence_rows(conn: Any, run_date: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT
@@ -1608,7 +1841,7 @@ def fetch_story_evidence_rows(conn: sqlite3.Connection, run_date: str) -> list[s
     return list(cur.fetchall())
 
 
-def fetch_signal_lineage_rows(conn: sqlite3.Connection, run_date: str) -> list[sqlite3.Row]:
+def fetch_signal_lineage_rows(conn: Any, run_date: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT
@@ -1642,7 +1875,7 @@ def fetch_signal_lineage_rows(conn: sqlite3.Connection, run_date: str) -> list[s
     return list(cur.fetchall())
 
 
-def create_discovery_run(conn: sqlite3.Connection, run_date: str, score_run_id: str) -> str:
+def create_discovery_run(conn: Any, run_date: str, score_run_id: str) -> str:
     discovery_run_id = f"disc_{uuid.uuid4().hex[:12]}"
     conn.execute(
         """
@@ -1667,7 +1900,7 @@ def create_discovery_run(conn: sqlite3.Connection, run_date: str, score_run_id: 
 
 
 def finish_discovery_run(
-    conn: sqlite3.Connection,
+    conn: Any,
     discovery_run_id: str,
     status: str,
     source_events_processed: int,
@@ -1701,7 +1934,7 @@ def finish_discovery_run(
 
 
 def replace_discovery_candidates(
-    conn: sqlite3.Connection,
+    conn: Any,
     discovery_run_id: str,
     candidates: list[dict[str, object]],
     evidence_rows: list[dict[str, object]],
@@ -1767,7 +2000,7 @@ def replace_discovery_candidates(
     for row in evidence_rows:
         conn.execute(
             """
-            INSERT OR REPLACE INTO discovery_evidence (
+            INSERT INTO discovery_evidence (
                 discovery_run_id,
                 account_id,
                 signal_code,
@@ -1777,6 +2010,9 @@ def replace_discovery_candidates(
                 component_score
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(discovery_run_id, account_id, signal_code, source, evidence_url) DO UPDATE
+            SET evidence_text = excluded.evidence_text,
+                component_score = excluded.component_score
             """,
             (
                 discovery_run_id,
@@ -1792,7 +2028,7 @@ def replace_discovery_candidates(
     conn.commit()
 
 
-def get_latest_discovery_run_id_for_date(conn: sqlite3.Connection, run_date: str) -> str | None:
+def get_latest_discovery_run_id_for_date(conn: Any, run_date: str) -> str | None:
     cur = conn.execute(
         """
         SELECT discovery_run_id
@@ -1808,7 +2044,7 @@ def get_latest_discovery_run_id_for_date(conn: sqlite3.Connection, run_date: str
     return None if row is None else str(row["discovery_run_id"])
 
 
-def fetch_discovery_candidates_for_run(conn: sqlite3.Connection, discovery_run_id: str) -> list[sqlite3.Row]:
+def fetch_discovery_candidates_for_run(conn: Any, discovery_run_id: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
         SELECT *
@@ -1821,7 +2057,7 @@ def fetch_discovery_candidates_for_run(conn: sqlite3.Connection, discovery_run_i
     return list(cur.fetchall())
 
 
-def fetch_discovery_run(conn: sqlite3.Connection, discovery_run_id: str) -> sqlite3.Row | None:
+def fetch_discovery_run(conn: Any, discovery_run_id: str) -> dict[str, Any] | None:
     cur = conn.execute(
         """
         SELECT *
@@ -1832,3 +2068,420 @@ def fetch_discovery_run(conn: sqlite3.Connection, discovery_run_id: str) -> sqli
         (discovery_run_id,),
     )
     return cur.fetchone()
+
+
+def try_advisory_lock(conn: Any, lock_name: str, owner_id: str, details: str = "") -> bool:
+    row = conn.execute("SELECT pg_try_advisory_lock(hashtext(?)) AS locked", (lock_name,)).fetchone()
+    locked = bool(row and bool(row["locked"]))
+    conn.execute(
+        """
+        INSERT INTO run_lock_events (lock_name, owner_id, action, details, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            (lock_name or "")[:120],
+            (owner_id or "")[:120],
+            "acquired" if locked else "busy",
+            (details or "")[:300],
+            utc_now_iso(),
+        ),
+    )
+    conn.commit()
+    return locked
+
+
+def release_advisory_lock(conn: Any, lock_name: str, owner_id: str, details: str = "") -> bool:
+    row = conn.execute("SELECT pg_advisory_unlock(hashtext(?)) AS unlocked", (lock_name,)).fetchone()
+    unlocked = bool(row and bool(row["unlocked"]))
+    conn.execute(
+        """
+        INSERT INTO run_lock_events (lock_name, owner_id, action, details, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            (lock_name or "")[:120],
+            (owner_id or "")[:120],
+            "released" if unlocked else "release_missed",
+            (details or "")[:300],
+            utc_now_iso(),
+        ),
+    )
+    conn.commit()
+    return unlocked
+
+
+def record_stage_failure(
+    conn: Any,
+    run_type: str,
+    run_date: str,
+    stage: str,
+    error_summary: str,
+    duration_seconds: float,
+    timed_out: bool,
+    retry_task_id: str = "",
+    commit: bool = True,
+) -> int:
+    cur = conn.execute(
+        """
+        INSERT INTO stage_failures (
+            run_type,
+            run_date,
+            stage,
+            duration_seconds,
+            timed_out,
+            error_summary,
+            retry_task_id,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING failure_id
+        """,
+        (
+            (run_type or "")[:80],
+            (run_date or "")[:30],
+            (stage or "")[:120],
+            max(0.0, float(duration_seconds)),
+            1 if timed_out else 0,
+            (error_summary or "")[:1000],
+            (retry_task_id or "")[:80],
+            utc_now_iso(),
+        ),
+    )
+    row = cur.fetchone()
+    failure_id = int(row["failure_id"]) if row is not None else 0
+    if commit:
+        conn.commit()
+    return failure_id
+
+
+def enqueue_retry_task(
+    conn: Any,
+    task_type: str,
+    payload_json: str,
+    due_at: str,
+    max_attempts: int = 3,
+    commit: bool = True,
+) -> str:
+    task_id = f"retry_{uuid.uuid4().hex[:12]}"
+    now_iso = utc_now_iso()
+    conn.execute(
+        """
+        INSERT INTO retry_queue (
+            task_id,
+            task_type,
+            payload_json,
+            attempt_count,
+            max_attempts,
+            status,
+            due_at,
+            last_error,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, 0, ?, 'pending', ?, '', ?, ?)
+        """,
+        (
+            task_id,
+            (task_type or "")[:80],
+            (payload_json or "{}")[:12000],
+            max(1, int(max_attempts)),
+            (due_at or now_iso)[:80],
+            now_iso,
+            now_iso,
+        ),
+    )
+    if commit:
+        conn.commit()
+    return task_id
+
+
+def fetch_due_retry_tasks(conn: Any, limit: int = 20, now_iso: str | None = None) -> list[dict[str, Any]]:
+    cur = conn.execute(
+        """
+        SELECT *
+        FROM retry_queue
+        WHERE status = 'pending'
+          AND CAST(due_at AS TIMESTAMP) <= CAST(? AS TIMESTAMP)
+        ORDER BY due_at ASC, created_at ASC
+        LIMIT ?
+        """,
+        ((now_iso or utc_now_iso()), max(1, int(limit))),
+    )
+    return list(cur.fetchall())
+
+
+def mark_retry_task_running(conn: Any, task_id: str, commit: bool = True) -> None:
+    conn.execute(
+        """
+        UPDATE retry_queue
+        SET status = 'running', updated_at = ?
+        WHERE task_id = ?
+        """,
+        (utc_now_iso(), task_id),
+    )
+    if commit:
+        conn.commit()
+
+
+def mark_retry_task_completed(conn: Any, task_id: str, commit: bool = True) -> None:
+    conn.execute(
+        """
+        UPDATE retry_queue
+        SET status = 'completed', updated_at = ?, last_error = ''
+        WHERE task_id = ?
+        """,
+        (utc_now_iso(), task_id),
+    )
+    if commit:
+        conn.commit()
+
+
+def reschedule_retry_task(
+    conn: Any,
+    task_id: str,
+    attempt_count: int,
+    due_at: str,
+    error_summary: str,
+    commit: bool = True,
+) -> None:
+    conn.execute(
+        """
+        UPDATE retry_queue
+        SET status = 'pending',
+            attempt_count = ?,
+            due_at = ?,
+            last_error = ?,
+            updated_at = ?
+        WHERE task_id = ?
+        """,
+        (
+            max(0, int(attempt_count)),
+            (due_at or utc_now_iso())[:80],
+            (error_summary or "")[:1000],
+            utc_now_iso(),
+            task_id,
+        ),
+    )
+    if commit:
+        conn.commit()
+
+
+def quarantine_retry_task(
+    conn: Any,
+    task_id: str,
+    task_type: str,
+    payload_json: str,
+    attempt_count: int,
+    error_summary: str,
+    commit: bool = True,
+) -> None:
+    now_iso = utc_now_iso()
+    conn.execute(
+        """
+        UPDATE retry_queue
+        SET status = 'quarantined',
+            attempt_count = ?,
+            last_error = ?,
+            updated_at = ?
+        WHERE task_id = ?
+        """,
+        (max(0, int(attempt_count)), (error_summary or "")[:1000], now_iso, task_id),
+    )
+    conn.execute(
+        """
+        INSERT INTO quarantine_failures (
+            task_id,
+            task_type,
+            payload_json,
+            attempt_count,
+            error_summary,
+            quarantined_at,
+            resolved,
+            resolved_at,
+            resolution_note
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 0, '', '')
+        """,
+        (
+            task_id,
+            (task_type or "")[:80],
+            (payload_json or "{}")[:12000],
+            max(0, int(attempt_count)),
+            (error_summary or "")[:1000],
+            now_iso,
+        ),
+    )
+    if commit:
+        conn.commit()
+
+
+def fetch_retry_queue_size(conn: Any) -> int:
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM retry_queue
+        WHERE status IN ('pending', 'running')
+        """
+    ).fetchone()
+    return int(row["c"] if row is not None else 0)
+
+
+def fetch_retry_depth(conn: Any) -> int:
+    row = conn.execute(
+        """
+        SELECT COALESCE(MAX(attempt_count), 0) AS depth
+        FROM retry_queue
+        WHERE status IN ('pending', 'running')
+        """
+    ).fetchone()
+    return int(row["depth"] if row is not None else 0)
+
+
+def fetch_quarantine_size(conn: Any) -> int:
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM quarantine_failures
+        WHERE resolved = 0
+        """
+    ).fetchone()
+    return int(row["c"] if row is not None else 0)
+
+
+def fetch_pending_retry_tasks(conn: Any, limit: int = 100) -> list[dict[str, Any]]:
+    cur = conn.execute(
+        """
+        SELECT *
+        FROM retry_queue
+        WHERE status IN ('pending', 'running')
+        ORDER BY due_at ASC
+        LIMIT ?
+        """,
+        (max(1, int(limit)),),
+    )
+    return list(cur.fetchall())
+
+
+def requeue_external_discovery_events(conn: Any, run_date: str, include_processed: bool = False) -> int:
+    if include_processed:
+        where_clause = "processing_status IN ('processed', 'failed')"
+    else:
+        where_clause = "processing_status = 'failed'"
+
+    cur = conn.execute(
+        f"""
+        UPDATE external_discovery_events
+        SET processing_status = 'pending',
+            processed_run_id = '',
+            processed_at = '',
+            error_summary = ''
+        WHERE date(observed_at) = date(?)
+          AND {where_clause}
+        RETURNING event_id
+        """,
+        (run_date,),
+    )
+    rows = cur.fetchall()
+    conn.commit()
+    return len(rows)
+
+
+def replace_ops_metrics(conn: Any, run_date: str, rows: list[dict[str, Any]]) -> None:
+    conn.execute("DELETE FROM ops_metrics WHERE date(run_date) = date(?)", (run_date,))
+    now_iso = utc_now_iso()
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO ops_metrics (run_date, recorded_at, metric, value, meta_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                run_date,
+                now_iso,
+                str(row.get("metric", "unknown"))[:120],
+                float(row.get("value", 0.0)),
+                str(row.get("meta_json", "{}"))[:4000],
+            ),
+        )
+    conn.commit()
+
+
+def fetch_ops_metrics(conn: Any, run_date: str) -> list[dict[str, Any]]:
+    cur = conn.execute(
+        """
+        SELECT run_date, recorded_at, metric, value, meta_json
+        FROM ops_metrics
+        WHERE date(run_date) = date(?)
+        ORDER BY metric ASC, recorded_at ASC
+        """,
+        (run_date,),
+    )
+    return list(cur.fetchall())
+
+
+def fetch_latest_event_ingest_lag_seconds(conn: Any, run_date: str) -> float | None:
+    row = conn.execute(
+        """
+        SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MAX(CAST(ingested_at AS TIMESTAMP)))) AS lag_seconds
+        FROM external_discovery_events
+        WHERE date(observed_at) <= date(?)
+        """,
+        (run_date,),
+    ).fetchone()
+    if row is None or row["lag_seconds"] is None:
+        return None
+    return max(0.0, float(row["lag_seconds"]))
+
+
+def fetch_precision_by_band(conn: Any, run_date: str, lookback_days: int = 14) -> list[dict[str, Any]]:
+    cur = conn.execute(
+        """
+        WITH decisions AS (
+            SELECT rl.run_id, rl.account_id, rl.decision
+            FROM review_labels rl
+            JOIN score_runs sr ON sr.run_id = rl.run_id
+            WHERE date(sr.run_date) <= date(?)
+              AND date(sr.run_date) >= date(?, ?)
+              AND rl.decision IN ('approved', 'rejected')
+        ),
+        best_band AS (
+            SELECT
+                s.run_id,
+                s.account_id,
+                CASE MAX(CASE s.tier WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END)
+                    WHEN 3 THEN 'high'
+                    WHEN 2 THEN 'medium'
+                    ELSE 'low'
+                END AS band
+            FROM account_scores s
+            JOIN decisions d ON d.run_id = s.run_id AND d.account_id = s.account_id
+            GROUP BY s.run_id, s.account_id
+        )
+        SELECT
+            b.band,
+            COUNT(*) AS sample_size,
+            AVG(CASE d.decision WHEN 'approved' THEN 1.0 ELSE 0.0 END) AS approved_rate
+        FROM decisions d
+        JOIN best_band b ON b.run_id = d.run_id AND b.account_id = d.account_id
+        GROUP BY b.band
+        ORDER BY b.band
+        """,
+        (run_date, run_date, f"-{max(1, int(lookback_days))} day"),
+    )
+    return list(cur.fetchall())
+
+
+def fetch_lock_event_counts(conn: Any, lookback_hours: int = 24) -> dict[str, int]:
+    cur = conn.execute(
+        """
+        SELECT action, COUNT(*) AS c
+        FROM run_lock_events
+        WHERE CAST(created_at AS TIMESTAMP) >= (CURRENT_TIMESTAMP - CAST(? AS INTERVAL))
+        GROUP BY action
+        """,
+        (f"{max(1, int(lookback_hours))} hours",),
+    )
+    counts: dict[str, int] = {}
+    for row in cur.fetchall():
+        counts[str(row["action"])] = int(row["c"])
+    return counts

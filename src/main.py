@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import json
+import os
 from pathlib import Path
-import sqlite3
 import time
+import uuid
 
 import typer
 
@@ -13,17 +15,182 @@ from src.collectors import community, first_party, jobs, news, technographics
 from src.discovery import hunt as hunt_pipeline
 from src.discovery import pipeline as discovery_pipeline
 from src.discovery import watchlist_builder
-from src.discovery.config import classify_signal, load_signal_classes
+from src.discovery.config import (
+    classify_signal,
+    load_account_profiles,
+    load_discovery_blocklist,
+    load_signal_classes,
+)
 from src.export import csv_exporter
+from src.models import AccountScore
+from src.notifier import send_alert
 from src.reporting import calibration, icp_playbook, quality
 from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
 from src.scoring.engine import run_scoring
 from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry, load_thresholds
 from src.settings import Settings, load_settings
+from src.source_policy import load_source_execution_policy
 from src.sync.google_sheets import sync_outputs
 from src.utils import ensure_project_directories, load_csv_rows, normalize_domain, parse_date, write_csv_rows
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+_RUN_DAILY_LOCK_NAME = "signals:run-daily"
+_AUTONOMOUS_LOCK_NAME = "signals:run-autonomous-loop"
+_RETRY_BACKOFF_SECONDS = [60, 300, 900]
+
+
+class StageExecutionError(RuntimeError):
+    def __init__(self, stage: str, duration_seconds: float, timed_out: bool, message: str):
+        super().__init__(message)
+        self.stage = stage
+        self.duration_seconds = float(duration_seconds)
+        self.timed_out = bool(timed_out)
+
+
+def _run_with_watchdog(stage: str, timeout_seconds: int, fn):
+    started = time.monotonic()
+    try:
+        result = fn()
+    except Exception as exc:
+        elapsed = time.monotonic() - started
+        raise StageExecutionError(
+            stage=stage,
+            duration_seconds=elapsed,
+            timed_out=False,
+            message=f"{stage} failed: {str(exc)[:240]}",
+        ) from exc
+    elapsed = time.monotonic() - started
+    if elapsed > float(timeout_seconds):
+        raise StageExecutionError(
+            stage=stage,
+            duration_seconds=elapsed,
+            timed_out=True,
+            message=f"{stage} exceeded timeout_seconds={timeout_seconds}",
+        )
+    return result, elapsed
+
+
+def _retry_due_iso(backoff_seconds: int) -> str:
+    return (datetime.now(timezone.utc) + timedelta(seconds=max(1, int(backoff_seconds)))).replace(microsecond=0).isoformat()
+
+
+def _enqueue_retry_task(
+    conn,
+    settings: Settings,
+    task_type: str,
+    payload: dict[str, object],
+    reason: str,
+) -> str:
+    task_id = db.enqueue_retry_task(
+        conn=conn,
+        task_type=task_type,
+        payload_json=json.dumps(payload, ensure_ascii=True, sort_keys=True),
+        due_at=_retry_due_iso(_RETRY_BACKOFF_SECONDS[0]),
+        max_attempts=settings.retry_attempt_limit,
+        commit=True,
+    )
+    retry_depth = db.fetch_retry_depth(conn)
+    if retry_depth >= settings.alert_retry_depth_threshold:
+        send_alert(
+            settings,
+            title="Retry depth threshold exceeded",
+            body=f"retry_depth={retry_depth} threshold={settings.alert_retry_depth_threshold} task_id={task_id}",
+            severity="warn",
+        )
+    if reason:
+        send_alert(
+            settings,
+            title="Retry task enqueued",
+            body=f"task_id={task_id} task_type={task_type} reason={reason[:300]}",
+            severity="warn",
+        )
+    return task_id
+
+
+def _persist_ops_metrics(conn, settings: Settings, run_date: date) -> dict[str, int | float | str]:
+    run_date_str = run_date.isoformat()
+    queue_path = settings.out_dir / f"discovery_queue_{run_date.strftime('%Y%m%d')}.csv"
+    crm_path = settings.out_dir / f"crm_candidates_{run_date.strftime('%Y%m%d')}.csv"
+    queue_rows = load_csv_rows(queue_path)
+    crm_rows = load_csv_rows(crm_path)
+
+    ingest_lag = db.fetch_latest_event_ingest_lag_seconds(conn, run_date_str)
+    retry_depth = db.fetch_retry_depth(conn)
+    retry_queue_size = db.fetch_retry_queue_size(conn)
+    quarantine_size = db.fetch_quarantine_size(conn)
+    handoff_success_rate = round((len(crm_rows) / len(queue_rows)) if queue_rows else 0.0, 4)
+
+    precision_rows = db.fetch_precision_by_band(conn, run_date_str, lookback_days=settings.ops_metrics_lookback_days)
+    lock_events = db.fetch_lock_event_counts(conn, lookback_hours=24)
+    lock_busy_24h = int(lock_events.get("busy", 0))
+    lock_release_missed_24h = int(lock_events.get("release_missed", 0))
+    precision_by_band: dict[str, tuple[float, int]] = {}
+    for row in precision_rows:
+        band = str(row.get("band", "") or "").strip().lower()
+        if not band:
+            continue
+        precision_by_band[band] = (
+            round(float(row.get("approved_rate", 0.0) or 0.0), 4),
+            int(row.get("sample_size", 0) or 0),
+        )
+
+    high_precision, high_sample = precision_by_band.get("high", (0.0, 0))
+    medium_precision, medium_sample = precision_by_band.get("medium", (0.0, 0))
+
+    metric_rows = [
+        {"metric": "ingest_lag_seconds", "value": round(float(ingest_lag or 0.0), 2), "meta_json": "{}"},
+        {"metric": "handoff_success_rate", "value": handoff_success_rate, "meta_json": "{}"},
+        {"metric": "retry_depth", "value": float(retry_depth), "meta_json": "{}"},
+        {"metric": "retry_queue_size", "value": float(retry_queue_size), "meta_json": "{}"},
+        {"metric": "quarantine_size", "value": float(quarantine_size), "meta_json": "{}"},
+        {"metric": "lock_busy_24h", "value": float(lock_busy_24h), "meta_json": "{}"},
+        {"metric": "lock_release_missed_24h", "value": float(lock_release_missed_24h), "meta_json": "{}"},
+        {
+            "metric": "precision_high_band",
+            "value": high_precision,
+            "meta_json": json.dumps({"sample_size": high_sample}, ensure_ascii=True),
+        },
+        {
+            "metric": "precision_medium_band",
+            "value": medium_precision,
+            "meta_json": json.dumps({"sample_size": medium_sample}, ensure_ascii=True),
+        },
+    ]
+
+    db.replace_ops_metrics(conn, run_date_str, metric_rows)
+    ops_count = csv_exporter.export_ops_metrics(conn, run_date_str, settings.out_dir / f"ops_metrics_{run_date.strftime('%Y%m%d')}.csv")
+
+    if high_sample > 0 and high_precision < settings.alert_min_high_precision:
+        send_alert(
+            settings,
+            title="High-band precision degraded",
+            body=(
+                f"run_date={run_date_str} high_precision={high_precision} "
+                f"threshold={settings.alert_min_high_precision} sample_size={high_sample}"
+            ),
+            severity="warn",
+        )
+    if medium_sample > 0 and medium_precision < settings.alert_min_medium_precision:
+        send_alert(
+            settings,
+            title="Medium-band precision degraded",
+            body=(
+                f"run_date={run_date_str} medium_precision={medium_precision} "
+                f"threshold={settings.alert_min_medium_precision} sample_size={medium_sample}"
+            ),
+            severity="warn",
+        )
+
+    return {
+        "ops_metrics_rows": int(ops_count),
+        "retry_depth": int(retry_depth),
+        "retry_queue_size": int(retry_queue_size),
+        "quarantine_size": int(quarantine_size),
+        "lock_busy_24h": int(lock_busy_24h),
+        "lock_release_missed_24h": int(lock_release_missed_24h),
+        "handoff_success_rate": float(handoff_success_rate),
+    }
 
 
 def _bootstrap(settings: Settings | None = None):
@@ -37,7 +204,7 @@ def _bootstrap(settings: Settings | None = None):
             local_settings.out_dir,
         ]
     )
-    conn = db.get_connection(local_settings.db_path)
+    conn = db.get_connection(local_settings.pg_dsn)
     db.init_db(conn)
     seeded_base = db.seed_accounts(conn, local_settings.seed_accounts_path)
     seeded_watchlist = db.seed_accounts(conn, local_settings.watchlist_accounts_path)
@@ -48,14 +215,38 @@ def _bootstrap(settings: Settings | None = None):
 def _collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
     lexicon = load_keyword_lexicon(settings.keyword_lexicon_path)
     source_reliability = load_source_registry(settings.source_registry_path)
+    execution_policy = load_source_execution_policy(settings.source_execution_policy_path)
 
-    results = {
-        "jobs": jobs.collect(conn, settings, lexicon, source_reliability),
-        "news": news.collect(conn, settings, lexicon, source_reliability),
-        "technographics": technographics.collect(conn, settings, lexicon, source_reliability),
-        "community": community.collect(conn, settings, lexicon, source_reliability),
-        "first_party": first_party.collect(conn, settings, lexicon, source_reliability),
-    }
+    def _collector_enabled(policy_key: str) -> bool:
+        policy = execution_policy.get(policy_key.strip().lower())
+        return bool(policy.enabled) if policy is not None else True
+
+    results: dict[str, dict[str, int]] = {}
+    results["jobs"] = (
+        jobs.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("jobs_pages")
+        else {"inserted": 0, "seen": 0}
+    )
+    results["news"] = (
+        news.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("news_rss")
+        else {"inserted": 0, "seen": 0}
+    )
+    results["technographics"] = (
+        technographics.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("technographics")
+        else {"inserted": 0, "seen": 0}
+    )
+    results["community"] = (
+        community.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("reddit_api")
+        else {"inserted": 0, "seen": 0}
+    )
+    results["first_party"] = (
+        first_party.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("first_party_csv")
+        else {"inserted": 0, "seen": 0}
+    )
     return results
 
 
@@ -98,6 +289,26 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
             delta_lookup=None,
         )
 
+        # Keep account_scores exhaustive so downstream exports/metrics include silent accounts too.
+        existing_scores = {(score.account_id, score.product) for score in result.account_scores}
+        account_rows = conn.execute("SELECT account_id FROM accounts").fetchall()
+        for row in account_rows:
+            account_id = str(row["account_id"])
+            for product in ("zopdev", "zopday", "zopnight"):
+                if (account_id, product) in existing_scores:
+                    continue
+                result.account_scores.append(
+                    AccountScore(
+                        run_id=run_id,
+                        account_id=account_id,
+                        product=product,
+                        score=0.0,
+                        tier="low",
+                        top_reasons_json="[]",
+                        delta_7d=0.0,
+                    )
+                )
+
         signals_by_account_product: dict[tuple[str, str], set[str]] = {}
         for component in result.component_scores:
             key = (component.account_id, component.product)
@@ -121,10 +332,41 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
         raise
 
 
+def _review_queue_excluded_domains(settings: Settings) -> set[str]:
+    # Always suppress internal domain even if config is incomplete.
+    excluded = {"zop.dev"}
+
+    try:
+        blocked_domains = load_discovery_blocklist(settings.discovery_blocklist_path)
+        excluded.update(blocked_domains)
+    except Exception:
+        pass
+
+    try:
+        profiles = load_account_profiles(settings.account_profiles_path)
+        for domain, profile in profiles.items():
+            if profile.is_self or profile.exclude_from_crm:
+                excluded.add(domain)
+    except Exception:
+        pass
+
+    normalized: set[str] = set()
+    for domain in excluded:
+        value = normalize_domain(domain)
+        if value:
+            normalized.add(value)
+    return normalized
+
+
 def _run_exports(conn, settings: Settings, run_date: date, run_id: str) -> dict[str, int | str]:
     paths = csv_exporter.output_paths(settings.out_dir, run_date)
 
-    queue_count = csv_exporter.export_review_queue(conn, run_id, paths["review_queue"])
+    queue_count = csv_exporter.export_review_queue(
+        conn,
+        run_id,
+        paths["review_queue"],
+        excluded_domains=_review_queue_excluded_domains(settings),
+    )
     score_count = csv_exporter.export_daily_scores(conn, run_id, paths["daily_scores"])
 
     quality.compute_and_persist_source_metrics(conn, run_date)
@@ -232,6 +474,7 @@ def _run_discovery_cycle(run_date: date) -> dict[str, int | str]:
             "events_processed": int(ingest_result["events_processed"]),
             "candidates": int(scoring_result["total_candidates"]),
             "crm_candidates_rows": int(report_result["crm_candidates_rows"]),
+            "manual_review_rows": int(report_result["manual_review_rows"]),
         }
     finally:
         conn.close()
@@ -279,6 +522,7 @@ def _run_hunt_cycle(run_date: date, profile_name: str = "light") -> dict[str, in
             "discovery_run_id": str(scoring_result["discovery_run_id"]),
             "total_candidates": int(scoring_result["total_candidates"]),
             "crm_candidates_rows": int(report_result["crm_candidates_rows"]),
+            "manual_review_rows": int(report_result["manual_review_rows"]),
             "story_evidence_rows": int(hunt_reports["story_evidence_rows"]),
             "signal_lineage_rows": int(hunt_reports["signal_lineage_rows"]),
         }
@@ -746,28 +990,74 @@ def tune_profile(
 def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD")) -> None:
     settings, conn, seeded = _bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
+    lock_owner = f"pid{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    lock_acquired = False
     try:
-        collect_results = _collect_all(conn, settings)
+        lock_acquired = db.try_advisory_lock(
+            conn,
+            lock_name=_RUN_DAILY_LOCK_NAME,
+            owner_id=lock_owner,
+            details=f"run_date={run_date.isoformat()}",
+        )
+        if not lock_acquired:
+            typer.echo(f"status=skipped reason=lock_busy lock_name={_RUN_DAILY_LOCK_NAME}")
+            return
+
+        collect_results, _ = _run_with_watchdog("ingest", settings.stage_timeout_seconds, lambda: _collect_all(conn, settings))
         collect_inserted = sum(result["inserted"] for result in collect_results.values())
 
-        run_id = _run_scoring(conn, settings, run_date)
-        export_result = _run_exports(conn, settings, run_date, run_id)
-        prepared_reviews = prepare_review_input_for_date(settings, run_date)
+        run_id, _ = _run_with_watchdog("score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date))
+        export_result, _ = _run_with_watchdog(
+            "export",
+            settings.stage_timeout_seconds,
+            lambda: _run_exports(conn, settings, run_date, run_id),
+        )
+        prepared_reviews, _ = _run_with_watchdog(
+            "prepare-review-input",
+            settings.stage_timeout_seconds,
+            lambda: prepare_review_input_for_date(settings, run_date),
+        )
 
         sync_error = ""
+        sync_result = {"review_queue_rows": 0, "daily_scores_rows": 0, "source_quality_rows": 0}
         try:
-            sync_result = sync_outputs(settings, run_date)
+            sync_result, _ = _run_with_watchdog(
+                "sync-sheet",
+                settings.stage_timeout_seconds,
+                lambda: sync_outputs(settings, run_date),
+            )
         except Exception as exc:
-            sync_result = {"review_queue_rows": 0, "daily_scores_rows": 0, "source_quality_rows": 0}
             sync_error = str(exc)
 
-        imported = import_reviews_for_date(conn, settings, run_date)
-        quality.compute_and_persist_source_metrics(conn, run_date)
-        readiness_rows = quality.compute_promotion_readiness(conn, run_date)
-        paths = csv_exporter.output_paths(settings.out_dir, run_date)
-        csv_exporter.export_source_quality(conn, run_date.isoformat(), paths["source_quality"])
-        csv_exporter.export_promotion_readiness(readiness_rows, paths["promotion_readiness"])
-        icp_report = _write_icp_coverage_report(conn, settings, run_id, run_date)
+        imported, _ = _run_with_watchdog(
+            "import-reviews",
+            settings.stage_timeout_seconds,
+            lambda: import_reviews_for_date(conn, settings, run_date),
+        )
+
+        def _refresh_quality_outputs() -> dict[str, int]:
+            quality.compute_and_persist_source_metrics(conn, run_date)
+            readiness_rows = quality.compute_promotion_readiness(conn, run_date)
+            paths = csv_exporter.output_paths(settings.out_dir, run_date)
+            quality_rows = csv_exporter.export_source_quality(conn, run_date.isoformat(), paths["source_quality"])
+            readiness_count = csv_exporter.export_promotion_readiness(readiness_rows, paths["promotion_readiness"])
+            return {"source_quality_rows": quality_rows, "promotion_readiness_rows": readiness_count}
+
+        quality_result, _ = _run_with_watchdog(
+            "quality-refresh",
+            settings.stage_timeout_seconds,
+            _refresh_quality_outputs,
+        )
+        icp_report, _ = _run_with_watchdog(
+            "icp-coverage-report",
+            settings.stage_timeout_seconds,
+            lambda: _write_icp_coverage_report(conn, settings, run_id, run_date),
+        )
+        ops_result, _ = _run_with_watchdog(
+            "ops-metrics",
+            settings.stage_timeout_seconds,
+            lambda: _persist_ops_metrics(conn, settings, run_date),
+        )
 
         typer.echo(
             " ".join(
@@ -777,18 +1067,89 @@ def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-M
                     f"run_id={run_id}",
                     f"review_queue_rows={export_result['review_queue']}",
                     f"daily_scores_rows={export_result['daily_scores']}",
-                    f"source_quality_rows={export_result['source_quality']}",
+                    f"source_quality_rows={quality_result['source_quality_rows']}",
+                    f"promotion_readiness_rows={quality_result['promotion_readiness_rows']}",
                     f"prepared_review_rows={prepared_reviews}",
                     f"imported_reviews={imported}",
                     f"synced_review_queue_rows={sync_result['review_queue_rows']}",
                     f"icp_accounts={icp_report['total_accounts']}",
                     f"icp_high_or_medium={icp_report['high_or_medium_accounts']}",
                     f"icp_coverage={icp_report['coverage_rate']}",
+                    f"ops_metrics_rows={ops_result['ops_metrics_rows']}",
+                    f"retry_depth={ops_result['retry_depth']}",
+                    f"retry_queue_size={ops_result['retry_queue_size']}",
+                    f"quarantine_size={ops_result['quarantine_size']}",
+                    f"lock_busy_24h={ops_result['lock_busy_24h']}",
+                    f"lock_release_missed_24h={ops_result['lock_release_missed_24h']}",
                     f"sync_error={sync_error}",
                 ]
             )
         )
+    except StageExecutionError as exc:
+        enqueue_retries = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", "").strip().lower() not in {"1", "true", "yes"}
+        retry_task_id = ""
+        if enqueue_retries:
+            retry_task_id = _enqueue_retry_task(
+                conn,
+                settings,
+                task_type="run_daily",
+                payload={"run_date": run_date.isoformat()},
+                reason=str(exc),
+            )
+        db.record_stage_failure(
+            conn,
+            run_type="run_daily",
+            run_date=run_date.isoformat(),
+            stage=exc.stage,
+            error_summary=str(exc),
+            duration_seconds=exc.duration_seconds,
+            timed_out=exc.timed_out,
+            retry_task_id=retry_task_id,
+            commit=True,
+        )
+        send_alert(
+            settings,
+            title="run-daily failed",
+            body=(
+                f"run_date={run_date.isoformat()} stage={exc.stage} "
+                f"timed_out={int(exc.timed_out)} duration_seconds={round(exc.duration_seconds, 2)} "
+                f"retry_task_id={retry_task_id}"
+            ),
+            severity="error",
+        )
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        enqueue_retries = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", "").strip().lower() not in {"1", "true", "yes"}
+        retry_task_id = ""
+        if enqueue_retries:
+            retry_task_id = _enqueue_retry_task(
+                conn,
+                settings,
+                task_type="run_daily",
+                payload={"run_date": run_date.isoformat()},
+                reason=str(exc),
+            )
+        db.record_stage_failure(
+            conn,
+            run_type="run_daily",
+            run_date=run_date.isoformat(),
+            stage="run_daily",
+            error_summary=str(exc),
+            duration_seconds=0.0,
+            timed_out=False,
+            retry_task_id=retry_task_id,
+            commit=True,
+        )
+        send_alert(
+            settings,
+            title="run-daily failed",
+            body=f"run_date={run_date.isoformat()} error={str(exc)[:400]} retry_task_id={retry_task_id}",
+            severity="error",
+        )
+        raise typer.Exit(code=1)
     finally:
+        if lock_acquired:
+            db.release_advisory_lock(conn, lock_name=_RUN_DAILY_LOCK_NAME, owner_id=lock_owner)
         conn.close()
 
 
@@ -1036,9 +1397,11 @@ def discover_report(date_str: str = typer.Option(None, "--date", help="Discovery
                     f"discovery_run_id={discovery_run_id}",
                     f"discovery_queue_rows={result['discovery_queue_rows']}",
                     f"crm_candidates_rows={result['crm_candidates_rows']}",
+                    f"manual_review_rows={result['manual_review_rows']}",
                     f"metrics_rows={result['metrics_rows']}",
                     f"discovery_queue_path={result['discovery_queue_path']}",
                     f"crm_candidates_path={result['crm_candidates_path']}",
+                    f"manual_review_path={result['manual_review_path']}",
                     f"discovery_metrics_path={result['discovery_metrics_path']}",
                 ]
             )
@@ -1070,6 +1433,7 @@ def run_discovery(
                 f"discovery_run_id={result['discovery_run_id']}",
                 f"total_candidates={result['total_candidates']}",
                 f"crm_candidates_rows={result['crm_candidates_rows']}",
+                f"manual_review_rows={result['manual_review_rows']}",
                 f"story_evidence_rows={result['story_evidence_rows']}",
                 f"signal_lineage_rows={result['signal_lineage_rows']}",
             ]
@@ -1099,6 +1463,7 @@ def run_hunt(
                 f"discovery_run_id={result['discovery_run_id']}",
                 f"total_candidates={result['total_candidates']}",
                 f"crm_candidates_rows={result['crm_candidates_rows']}",
+                f"manual_review_rows={result['manual_review_rows']}",
                 f"story_evidence_rows={result['story_evidence_rows']}",
                 f"signal_lineage_rows={result['signal_lineage_rows']}",
             ]
@@ -1115,6 +1480,21 @@ def run_autonomous_loop(
     sleep_seconds: int = typer.Option(5, "--sleep-seconds", min=1),
     once: bool = typer.Option(False, "--once", help="Run one cycle for each due job and exit"),
 ) -> None:
+    settings = load_settings()
+    lock_conn = db.get_connection(settings.pg_dsn)
+    db.init_db(lock_conn)
+    lock_owner = f"pid{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    lock_acquired = db.try_advisory_lock(
+        lock_conn,
+        lock_name=_AUTONOMOUS_LOCK_NAME,
+        owner_id=lock_owner,
+        details=f"hunt_profile={hunt_profile}",
+    )
+    if not lock_acquired:
+        typer.echo(f"status=skipped reason=lock_busy lock_name={_AUTONOMOUS_LOCK_NAME}")
+        lock_conn.close()
+        return
+
     next_ingest_at = 0.0
     next_score_at = 0.0
     next_discovery_at = 0.0
@@ -1123,81 +1503,414 @@ def run_autonomous_loop(
     score_every = float(score_interval_minutes * 60)
     discovery_every = float(discovery_interval_minutes * 60)
 
-    while True:
-        now_mono = time.monotonic()
-        run_date = parse_date(None, load_settings().run_timezone)
-        now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-        did_work = False
+    try:
+        while True:
+            now_mono = time.monotonic()
+            run_date = parse_date(None, settings.run_timezone)
+            now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+            did_work = False
 
-        due_ingest = now_mono >= next_ingest_at
-        due_discovery = now_mono >= next_discovery_at
-        due_score = now_mono >= next_score_at
+            due_ingest = now_mono >= next_ingest_at
+            due_discovery = now_mono >= next_discovery_at
+            due_score = now_mono >= next_score_at
 
-        # Ordering matters: discovery runs before score so exports reflect same-cycle webhook events.
-        if due_ingest:
-            did_work = True
-            try:
-                ingest_result = _run_ingest_cycle(run_date)
-                typer.echo(
-                    " ".join(
-                        [
-                            f"ts={now_iso}",
-                            "job=ingest",
-                            f"run_date={ingest_result['run_date']}",
-                            f"observations_seen={ingest_result['observations_seen']}",
-                            f"observations_inserted={ingest_result['observations_inserted']}",
-                        ]
+            # Ordering matters: discovery runs before score so exports reflect same-cycle webhook events.
+            if due_ingest:
+                did_work = True
+                try:
+                    ingest_result, _ = _run_with_watchdog(
+                        "ingest_cycle",
+                        settings.stage_timeout_seconds,
+                        lambda: _run_ingest_cycle(run_date),
                     )
-                )
-            except Exception as exc:
-                typer.echo(f"ts={now_iso} job=ingest status=failed error={str(exc)[:240]}")
-            next_ingest_at = now_mono + ingest_every
-
-        if due_discovery:
-            did_work = True
-            try:
-                discovery_result = _run_hunt_cycle(run_date, profile_name=hunt_profile)
-                typer.echo(
-                    " ".join(
-                        [
-                            f"ts={now_iso}",
-                            "job=discovery",
-                            f"discovery_run_id={discovery_result['discovery_run_id']}",
-                            f"profile={discovery_result.get('profile', hunt_profile)}",
-                            f"events_processed={discovery_result.get('events_seen', 0)}",
-                            f"candidates={discovery_result.get('total_candidates', 0)}",
-                            f"crm_candidates_rows={discovery_result['crm_candidates_rows']}",
-                        ]
+                    typer.echo(
+                        " ".join(
+                            [
+                                f"ts={now_iso}",
+                                "job=ingest",
+                                f"run_date={ingest_result['run_date']}",
+                                f"observations_seen={ingest_result['observations_seen']}",
+                                f"observations_inserted={ingest_result['observations_inserted']}",
+                            ]
+                        )
                     )
-                )
-            except Exception as exc:
-                typer.echo(f"ts={now_iso} job=discovery status=failed error={str(exc)[:240]}")
-            next_discovery_at = now_mono + discovery_every
-
-        if due_score:
-            did_work = True
-            try:
-                score_result = _run_score_cycle(run_date)
-                typer.echo(
-                    " ".join(
-                        [
-                            f"ts={now_iso}",
-                            "job=score",
-                            f"run_id={score_result['run_id']}",
-                            f"daily_scores_rows={score_result['daily_scores_rows']}",
-                            f"review_queue_rows={score_result['review_queue_rows']}",
-                            f"icp_coverage_rate={score_result['icp_coverage_rate']}",
-                        ]
+                except StageExecutionError as exc:
+                    retry_task_id = _enqueue_retry_task(
+                        lock_conn,
+                        settings,
+                        task_type="ingest_cycle",
+                        payload={"run_date": run_date.isoformat()},
+                        reason=str(exc),
                     )
-                )
+                    db.record_stage_failure(
+                        lock_conn,
+                        run_type="autonomous_loop",
+                        run_date=run_date.isoformat(),
+                        stage=exc.stage,
+                        error_summary=str(exc),
+                        duration_seconds=exc.duration_seconds,
+                        timed_out=exc.timed_out,
+                        retry_task_id=retry_task_id,
+                        commit=True,
+                    )
+                    send_alert(
+                        settings,
+                        title="Autonomous ingest job failed",
+                        body=(
+                            f"run_date={run_date.isoformat()} stage={exc.stage} timed_out={int(exc.timed_out)} "
+                            f"duration_seconds={round(exc.duration_seconds, 2)} retry_task_id={retry_task_id}"
+                        ),
+                        severity="error",
+                    )
+                    typer.echo(
+                        f"ts={now_iso} job=ingest status=failed error={str(exc)[:200]} retry_task_id={retry_task_id}"
+                    )
+                except Exception as exc:
+                    typer.echo(f"ts={now_iso} job=ingest status=failed error={str(exc)[:240]}")
+                next_ingest_at = now_mono + ingest_every
+
+            if due_discovery:
+                did_work = True
+                try:
+                    discovery_result, _ = _run_with_watchdog(
+                        "discovery_cycle",
+                        settings.stage_timeout_seconds,
+                        lambda: _run_hunt_cycle(run_date, profile_name=hunt_profile),
+                    )
+                    typer.echo(
+                        " ".join(
+                            [
+                                f"ts={now_iso}",
+                                "job=discovery",
+                                f"discovery_run_id={discovery_result['discovery_run_id']}",
+                                f"profile={discovery_result.get('profile', hunt_profile)}",
+                                f"events_processed={discovery_result.get('events_seen', 0)}",
+                                f"candidates={discovery_result.get('total_candidates', 0)}",
+                                f"crm_candidates_rows={discovery_result['crm_candidates_rows']}",
+                                f"manual_review_rows={discovery_result.get('manual_review_rows', 0)}",
+                            ]
+                        )
+                    )
+                except StageExecutionError as exc:
+                    retry_task_id = _enqueue_retry_task(
+                        lock_conn,
+                        settings,
+                        task_type="discovery_cycle",
+                        payload={"run_date": run_date.isoformat(), "hunt_profile": hunt_profile},
+                        reason=str(exc),
+                    )
+                    db.record_stage_failure(
+                        lock_conn,
+                        run_type="autonomous_loop",
+                        run_date=run_date.isoformat(),
+                        stage=exc.stage,
+                        error_summary=str(exc),
+                        duration_seconds=exc.duration_seconds,
+                        timed_out=exc.timed_out,
+                        retry_task_id=retry_task_id,
+                        commit=True,
+                    )
+                    send_alert(
+                        settings,
+                        title="Autonomous discovery job failed",
+                        body=(
+                            f"run_date={run_date.isoformat()} stage={exc.stage} timed_out={int(exc.timed_out)} "
+                            f"duration_seconds={round(exc.duration_seconds, 2)} retry_task_id={retry_task_id}"
+                        ),
+                        severity="error",
+                    )
+                    typer.echo(
+                        f"ts={now_iso} job=discovery status=failed error={str(exc)[:200]} retry_task_id={retry_task_id}"
+                    )
+                except Exception as exc:
+                    typer.echo(f"ts={now_iso} job=discovery status=failed error={str(exc)[:240]}")
+                next_discovery_at = now_mono + discovery_every
+
+            if due_score:
+                did_work = True
+                try:
+                    score_result, _ = _run_with_watchdog(
+                        "score_cycle",
+                        settings.stage_timeout_seconds,
+                        lambda: _run_score_cycle(run_date),
+                    )
+                    typer.echo(
+                        " ".join(
+                            [
+                                f"ts={now_iso}",
+                                "job=score",
+                                f"run_id={score_result['run_id']}",
+                                f"daily_scores_rows={score_result['daily_scores_rows']}",
+                                f"review_queue_rows={score_result['review_queue_rows']}",
+                                f"icp_coverage_rate={score_result['icp_coverage_rate']}",
+                            ]
+                        )
+                    )
+                except StageExecutionError as exc:
+                    retry_task_id = _enqueue_retry_task(
+                        lock_conn,
+                        settings,
+                        task_type="score_cycle",
+                        payload={"run_date": run_date.isoformat()},
+                        reason=str(exc),
+                    )
+                    db.record_stage_failure(
+                        lock_conn,
+                        run_type="autonomous_loop",
+                        run_date=run_date.isoformat(),
+                        stage=exc.stage,
+                        error_summary=str(exc),
+                        duration_seconds=exc.duration_seconds,
+                        timed_out=exc.timed_out,
+                        retry_task_id=retry_task_id,
+                        commit=True,
+                    )
+                    send_alert(
+                        settings,
+                        title="Autonomous score job failed",
+                        body=(
+                            f"run_date={run_date.isoformat()} stage={exc.stage} timed_out={int(exc.timed_out)} "
+                            f"duration_seconds={round(exc.duration_seconds, 2)} retry_task_id={retry_task_id}"
+                        ),
+                        severity="error",
+                    )
+                    typer.echo(
+                        f"ts={now_iso} job=score status=failed error={str(exc)[:200]} retry_task_id={retry_task_id}"
+                    )
+                except Exception as exc:
+                    typer.echo(f"ts={now_iso} job=score status=failed error={str(exc)[:240]}")
+                next_score_at = now_mono + score_every
+
+            if once and did_work:
+                return
+
+            time.sleep(float(sleep_seconds))
+    finally:
+        if lock_acquired:
+            db.release_advisory_lock(lock_conn, lock_name=_AUTONOMOUS_LOCK_NAME, owner_id=lock_owner)
+        lock_conn.close()
+
+
+def _execute_retry_task(task: dict[str, object], settings: Settings) -> None:
+    task_type = str(task.get("task_type", "") or "").strip().lower()
+    payload_raw = str(task.get("payload_json", "{}") or "{}")
+    try:
+        payload = json.loads(payload_raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid_retry_payload_json") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("invalid_retry_payload")
+
+    raw_run_date = payload.get("run_date")
+    run_date_value = str(raw_run_date).strip() if raw_run_date is not None else ""
+    run_date = parse_date(run_date_value or None, settings.run_timezone)
+    if task_type == "run_daily":
+        previous_flag = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE")
+        os.environ["SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE"] = "1"
+        try:
+            run_daily(date_str=run_date.isoformat())
+        finally:
+            if previous_flag is None:
+                os.environ.pop("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", None)
+            else:
+                os.environ["SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE"] = previous_flag
+        return
+
+    if task_type == "ingest_cycle":
+        _run_ingest_cycle(run_date)
+        return
+    if task_type == "score_cycle":
+        _run_score_cycle(run_date)
+        return
+    if task_type == "discovery_cycle":
+        profile = str(payload.get("hunt_profile", "light") or "light")
+        _run_hunt_cycle(run_date, profile_name=profile)
+        return
+    raise ValueError(f"unsupported_retry_task_type={task_type}")
+
+
+@app.command("retry-failures")
+def retry_failures(
+    limit: int = typer.Option(20, "--limit", min=1, help="Maximum due retry tasks to process in this run"),
+) -> None:
+    settings, conn, seeded = _bootstrap()
+    del seeded
+    processed = 0
+    completed = 0
+    rescheduled = 0
+    quarantined = 0
+    try:
+        tasks = db.fetch_due_retry_tasks(conn, limit=limit)
+        for task in tasks:
+            processed += 1
+            task_id = str(task["task_id"])
+            task_type = str(task["task_type"])
+            payload_json = str(task["payload_json"] or "{}")
+            db.mark_retry_task_running(conn, task_id, commit=True)
+            try:
+                _execute_retry_task(dict(task), settings=settings)
+                db.mark_retry_task_completed(conn, task_id, commit=True)
+                completed += 1
             except Exception as exc:
-                typer.echo(f"ts={now_iso} job=score status=failed error={str(exc)[:240]}")
-            next_score_at = now_mono + score_every
+                attempt_count = int(task.get("attempt_count", 0) or 0) + 1
+                max_attempts = int(task.get("max_attempts", settings.retry_attempt_limit) or settings.retry_attempt_limit)
+                if attempt_count >= max_attempts:
+                    db.quarantine_retry_task(
+                        conn,
+                        task_id=task_id,
+                        task_type=task_type,
+                        payload_json=payload_json,
+                        attempt_count=attempt_count,
+                        error_summary=str(exc),
+                        commit=True,
+                    )
+                    quarantined += 1
+                    send_alert(
+                        settings,
+                        title="Retry task quarantined",
+                        body=f"task_id={task_id} task_type={task_type} attempts={attempt_count} error={str(exc)[:300]}",
+                        severity="error",
+                    )
+                else:
+                    backoff_index = min(attempt_count, len(_RETRY_BACKOFF_SECONDS) - 1)
+                    db.reschedule_retry_task(
+                        conn,
+                        task_id=task_id,
+                        attempt_count=attempt_count,
+                        due_at=_retry_due_iso(_RETRY_BACKOFF_SECONDS[backoff_index]),
+                        error_summary=str(exc),
+                        commit=True,
+                    )
+                    rescheduled += 1
 
-        if once and did_work:
-            return
+        typer.echo(
+            " ".join(
+                [
+                    f"processed={processed}",
+                    f"completed={completed}",
+                    f"rescheduled={rescheduled}",
+                    f"quarantined={quarantined}",
+                    f"queue_size={db.fetch_retry_queue_size(conn)}",
+                    f"retry_depth={db.fetch_retry_depth(conn)}",
+                    f"quarantine_size={db.fetch_quarantine_size(conn)}",
+                ]
+            )
+        )
+    finally:
+        conn.close()
 
-        time.sleep(float(sleep_seconds))
+
+@app.command("replay-discovery-events")
+def replay_discovery_events(
+    date_str: str = typer.Option(None, "--date", help="Replay date YYYY-MM-DD"),
+    include_processed: bool = typer.Option(
+        False,
+        "--include-processed/--only-failed",
+        help="Replay both failed and processed events instead of failed-only",
+    ),
+) -> None:
+    settings, conn, seeded = _bootstrap()
+    run_date = parse_date(date_str, settings.run_timezone)
+    del seeded
+    try:
+        replayed = db.requeue_external_discovery_events(
+            conn,
+            run_date=run_date.isoformat(),
+            include_processed=include_processed,
+        )
+        typer.echo(
+            " ".join(
+                [
+                    f"run_date={run_date.isoformat()}",
+                    f"replayed_events={replayed}",
+                    f"include_processed={int(include_processed)}",
+                ]
+            )
+        )
+    finally:
+        conn.close()
+
+
+@app.command("backfill-run-daily")
+def backfill_run_daily(
+    start_date: str = typer.Option(..., "--start-date", help="Backfill start date YYYY-MM-DD"),
+    end_date: str = typer.Option(..., "--end-date", help="Backfill end date YYYY-MM-DD"),
+    continue_on_error: bool = typer.Option(
+        False,
+        "--continue-on-error/--stop-on-error",
+        help="Continue backfill even if one run fails",
+    ),
+) -> None:
+    settings = load_settings()
+    start = parse_date(start_date, settings.run_timezone)
+    end = parse_date(end_date, settings.run_timezone)
+    if end < start:
+        raise typer.BadParameter("end-date must be on or after start-date")
+
+    current = start
+    succeeded = 0
+    failed = 0
+    while current <= end:
+        try:
+            run_daily(date_str=current.isoformat())
+            succeeded += 1
+        except Exception:
+            failed += 1
+            if not continue_on_error:
+                raise
+        current += timedelta(days=1)
+
+    typer.echo(
+        " ".join(
+            [
+                f"start_date={start.isoformat()}",
+                f"end_date={end.isoformat()}",
+                f"succeeded={succeeded}",
+                f"failed={failed}",
+            ]
+        )
+    )
+
+
+@app.command("ops-metrics")
+def ops_metrics(date_str: str = typer.Option(None, "--date", help="Metrics date YYYY-MM-DD")) -> None:
+    settings, conn, seeded = _bootstrap()
+    run_date = parse_date(date_str, settings.run_timezone)
+    del seeded
+    try:
+        result = _persist_ops_metrics(conn, settings, run_date)
+        path = settings.out_dir / f"ops_metrics_{run_date.strftime('%Y%m%d')}.csv"
+        typer.echo(
+            " ".join(
+                [
+                    f"run_date={run_date.isoformat()}",
+                    f"ops_metrics_rows={result['ops_metrics_rows']}",
+                    f"retry_depth={result['retry_depth']}",
+                    f"retry_queue_size={result['retry_queue_size']}",
+                    f"quarantine_size={result['quarantine_size']}",
+                    f"lock_busy_24h={result['lock_busy_24h']}",
+                    f"lock_release_missed_24h={result['lock_release_missed_24h']}",
+                    f"handoff_success_rate={result['handoff_success_rate']}",
+                    f"path={path}",
+                ]
+            )
+        )
+    finally:
+        conn.close()
+
+
+@app.command("alert-test")
+def alert_test(
+    title: str = typer.Option("Signals alert test", "--title"),
+    body: str = typer.Option("Manual alert-test invocation.", "--body"),
+    severity: str = typer.Option("info", "--severity"),
+) -> None:
+    settings = load_settings()
+    ensure_project_directories([settings.out_dir])
+    result = send_alert(settings, title=title, body=body, severity=severity)
+    channels = ",".join(str(channel) for channel in result.get("delivered_channels", []))
+    errors = ",".join(str(item) for item in result.get("errors", []))
+    typer.echo(f"channels={channels} errors={errors}")
 
 
 @app.command("serve-discovery-webhook")
