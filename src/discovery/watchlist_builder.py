@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
+import logging
 import math
 import re
 from typing import Any
@@ -14,6 +15,8 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 from src.discovery.config import is_placeholder_domain
 from src.settings import Settings
 from src.utils import load_csv_rows, normalize_domain, write_csv_rows
+
+logger = logging.getLogger(__name__)
 
 try:
     import tldextract  # type: ignore
@@ -128,7 +131,7 @@ def _extract_registered_domain(url: str) -> str:
             if extracted.domain and extracted.suffix:
                 host = f"{extracted.domain}.{extracted.suffix}".lower()
         except Exception:
-            pass
+            logger.debug("tldextract failed for host=%s", host, exc_info=True)
 
     if is_placeholder_domain(host):
         return ""

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 
 from src.utils import load_csv_rows, normalize_domain
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SECONDARY_SIGNALS = {
     "kubernetes_detected",
@@ -242,7 +245,7 @@ def domain_family(domain: str) -> str:
         if extracted.domain:
             return extracted.domain.lower()
     except Exception:
-        pass
+        logger.debug("tldextract failed for domain=%s", normalized_domain, exc_info=True)
 
     parts = normalized_domain.split(".")
     if len(parts) >= 2:

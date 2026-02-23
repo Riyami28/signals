@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -13,6 +14,8 @@ from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_NEWS_TERMS = "(soc 2 OR iso 27001 OR hipaa OR pci OR outage OR migration OR cloud cost OR devops)"
@@ -76,7 +79,7 @@ def _parse_entry_observed_at(entry: Any) -> str:
         try:
             return datetime(*published_parsed[:6], tzinfo=timezone.utc).isoformat()
         except Exception:
-            pass
+            logger.debug("failed to parse published_parsed for entry", exc_info=True)
     published = entry.get("published")
     if published:
         return str(published)
@@ -210,6 +213,7 @@ def collect(
             try:
                 parsed = feedparser.parse(feed_url)
             except Exception:
+                logger.warning("failed to parse feed url=%s", feed_url, exc_info=True)
                 continue
 
             local_inserted, local_seen = _ingest_feed_entries(
@@ -227,7 +231,7 @@ def collect(
     if settings.enable_live_crawl:
         handles = load_account_source_handles(settings.account_source_handles_path)
         accounts = conn.execute(
-            "SELECT account_id, domain, company_name FROM accounts ORDER BY created_at LIMIT ?",
+            "SELECT account_id, domain, company_name FROM accounts ORDER BY created_at LIMIT %s",
             (settings.live_max_accounts,),
         ).fetchall()
 

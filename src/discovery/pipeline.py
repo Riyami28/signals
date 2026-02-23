@@ -333,10 +333,10 @@ def _query_poc_progression_accounts(conn, run_date: str, lookback_days: int) -> 
         FROM signal_observations
         WHERE signal_code = 'poc_stage_progression'
           AND source = 'first_party_csv'
-          AND date(observed_at) <= date(?)
-          AND date(observed_at) >= date(?, ?)
+          AND observed_at::date <= %s::date
+          AND observed_at::date >= (%s::date - make_interval(days => %s))
         """,
-        (run_date, run_date, f"-{max(1, int(lookback_days))} day"),
+        (run_date, run_date, max(1, int(lookback_days))),
     ).fetchall()
     return {str(row["account_id"]) for row in rows}
 
@@ -391,7 +391,7 @@ def score_discovery_candidates(
             """
             SELECT account_id, product, signal_code, component_score
             FROM score_components
-            WHERE run_id = ?
+            WHERE run_id = %s
             """,
             (score_run_id,),
         ).fetchall()

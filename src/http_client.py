@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import logging
 from threading import Lock
 import time
 from urllib import robotparser
@@ -11,6 +12,8 @@ import requests
 
 from src.settings import Settings
 from src.utils import normalize_domain
+
+logger = logging.getLogger(__name__)
 
 
 class RobotsDisallowedError(RuntimeError):
@@ -78,6 +81,7 @@ def _fetch_robots_parser(host: str, settings: Settings) -> robotparser.RobotFile
         parser.parse(response.text.splitlines())
         return parser
     except Exception:
+        logger.debug("failed to fetch robots.txt for %s", host, exc_info=True)
         parser.parse([])
         return parser
 
@@ -102,6 +106,7 @@ def _is_allowed_by_robots(url: str, settings: Settings) -> bool:
     try:
         return bool(parser.can_fetch(settings.http_user_agent, url))
     except Exception:
+        logger.debug("robots.txt check failed for %s, allowing", url, exc_info=True)
         return True
 
 

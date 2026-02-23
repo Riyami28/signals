@@ -175,7 +175,7 @@ def collect(
             conn.commit()
             return {"inserted": inserted, "seen": seen}
         accounts = conn.execute(
-            "SELECT account_id, domain FROM accounts ORDER BY created_at LIMIT ?",
+            "SELECT account_id, domain FROM accounts ORDER BY created_at LIMIT %s",
             (settings.live_max_accounts,),
         ).fetchall()
 

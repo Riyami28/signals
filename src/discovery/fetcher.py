@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from hashlib import sha256
+import logging
 from typing import Any
 
 from src.http_client import get as http_get
 from src.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 try:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -36,6 +39,7 @@ def _extract_inline_html(payload_json: str) -> str:
     try:
         payload = json.loads(payload_json)
     except Exception:
+        logger.debug("failed to parse payload JSON", exc_info=True)
         return ""
     if not isinstance(payload, dict):
         return ""
@@ -44,6 +48,7 @@ def _extract_inline_html(payload_json: str) -> str:
         try:
             nested = json.loads(raw_payload)
         except Exception:
+            logger.debug("failed to parse nested raw_payload_json", exc_info=True)
             nested = {}
         if isinstance(nested, dict):
             html = nested.get("html_content")
