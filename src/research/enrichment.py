@@ -101,18 +101,50 @@ def enrich_from_hunter(domain: str, api_key: str) -> EnrichmentResult | None:
         return None
 
 
-def run_enrichment_waterfall(domain: str, settings) -> dict:
+def enrich_from_web_scrape(domain: str, llm_client, settings=None) -> EnrichmentResult | None:
+    """
+    Web-scrape the company website and use LLM to extract structured data.
+    Returns None on any error or if no LLM client is provided.
+    """
+    if llm_client is None:
+        return None
+    try:
+        from src.research.web_scraper import scrape_company_info
+
+        data = scrape_company_info(domain, llm_client, settings)
+        if not data:
+            return None
+        return EnrichmentResult(
+            website=str(data.get("website", "")).strip(),
+            industry=str(data.get("industry", "")).strip(),
+            sub_industry=str(data.get("sub_industry", "")).strip(),
+            employees=int(data["employees"]) if data.get("employees") else None,
+            employee_range=str(data.get("employee_range", "")).strip(),
+            city=str(data.get("city", "")).strip(),
+            state=str(data.get("state", "")).strip(),
+            country=str(data.get("country", "")).strip(),
+            company_linkedin_url=str(data.get("company_linkedin_url", "")).strip(),
+            source="web_scrape",
+            confidence=0.7,
+        )
+    except Exception:
+        logger.debug("web scrape enrichment failed for domain=%s", domain, exc_info=True)
+        return None
+
+
+def run_enrichment_waterfall(domain: str, settings, llm_client=None) -> dict:
     """
     Try enrichment sources in order. Return a merged enrichment dict
     with _confidence for each filled field.
 
     Only fills fields that are currently empty — does not overwrite.
-    If both api_keys are empty strings, returns an empty dict immediately.
+    Order: Clearbit -> Hunter -> Web Scrape + LLM
     """
     clearbit_key = getattr(settings, "clearbit_api_key", "")
     hunter_key = getattr(settings, "hunter_api_key", "")
+    has_llm = llm_client is not None
 
-    if not clearbit_key and not hunter_key:
+    if not clearbit_key and not hunter_key and not has_llm:
         return {}
 
     merged: dict = {}
@@ -128,6 +160,10 @@ def run_enrichment_waterfall(domain: str, settings) -> dict:
             sources.append(result)
     if hunter_key:
         result = enrich_from_hunter(domain, hunter_key)
+        if result:
+            sources.append(result)
+    if has_llm:
+        result = enrich_from_web_scrape(domain, llm_client, settings)
         if result:
             sources.append(result)
 

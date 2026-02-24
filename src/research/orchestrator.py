@@ -6,12 +6,19 @@ import json
 import logging
 
 from src import db
-from src.research.client import ResearchClient
+from src.research.client import create_research_client
 from src.research.enrichment import run_enrichment_waterfall
 from src.research.parser import parse_extraction_response, parse_scoring_response
 from src.research.prompts import build_extraction_prompt, build_scoring_prompt, prompt_hash
 
 logger = logging.getLogger(__name__)
+
+
+def _empty_summary() -> dict:
+    return {
+        "attempted": 0, "completed": 0, "failed": 0, "skipped": 0,
+        "total_input_tokens": 0, "total_output_tokens": 0,
+    }
 
 
 def run_research_stage(conn, settings, run_date: str, score_run_id: str) -> dict:
@@ -22,23 +29,18 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str) -> dict
     """
     current_hash = prompt_hash()
 
-    # Skip entirely if no API key.
-    if not settings.claude_api_key:
-        logger.warning("claude_api_key is empty, skipping research stage")
-        return {
-            "attempted": 0,
-            "completed": 0,
-            "failed": 0,
-            "skipped": 0,
-            "total_input_tokens": 0,
-            "total_output_tokens": 0,
-        }
+    # Skip entirely if no API key for the configured provider.
+    provider = getattr(settings, "llm_provider", "claude")
+    if provider == "minimax":
+        if not getattr(settings, "minimax_api_key", ""):
+            logger.warning("minimax_api_key is empty, skipping research stage")
+            return _empty_summary()
+    else:
+        if not settings.claude_api_key:
+            logger.warning("claude_api_key is empty, skipping research stage")
+            return _empty_summary()
 
-    client = ResearchClient(
-        api_key=settings.claude_api_key,
-        model=settings.claude_model,
-        timeout_seconds=settings.research_timeout_seconds,
-    )
+    client = create_research_client(settings)
 
     research_run_id = db.create_research_run(conn, run_date, score_run_id)
 
@@ -70,8 +72,8 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str) -> dict
             # Step b: load signal observations.
             signals = _load_signals(conn, account_id)
 
-            # Step c: run waterfall enrichment.
-            pre_enrichment = run_enrichment_waterfall(account.get("domain", ""), settings)
+            # Step c: run waterfall enrichment (pass client for web-scrape fallback).
+            pre_enrichment = run_enrichment_waterfall(account.get("domain", ""), settings, llm_client=client)
 
             # Step d: build extraction prompt.
             ext_system, ext_user = build_extraction_prompt(account, signals, pre_enrichment)

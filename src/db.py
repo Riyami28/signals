@@ -455,6 +455,28 @@ CREATE TABLE IF NOT EXISTS research_runs (
     status              TEXT NOT NULL DEFAULT 'running'
         CHECK (status IN ('running', 'completed', 'failed'))
 );
+
+CREATE TABLE IF NOT EXISTS account_labels (
+    label_id            TEXT PRIMARY KEY,
+    account_id          TEXT NOT NULL,
+    label               TEXT NOT NULL,
+    reviewer            TEXT NOT NULL DEFAULT 'web_ui',
+    notes               TEXT NOT NULL DEFAULT '',
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_labels_account ON account_labels(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_labels_label ON account_labels(label);
+
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    pipeline_run_id     TEXT PRIMARY KEY,
+    started_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at         TIMESTAMP,
+    status              TEXT NOT NULL DEFAULT 'running',
+    account_ids_json    TEXT NOT NULL DEFAULT '[]',
+    stages_json         TEXT NOT NULL DEFAULT '[]',
+    result_json         TEXT NOT NULL DEFAULT '{}'
+);
 """
 
 
@@ -2645,5 +2667,166 @@ def finish_research_run(
         """,
         (status, accounts_attempted, accounts_completed, accounts_failed,
          accounts_skipped, research_run_id),
+    )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Account Labels (Web UI)
+# ---------------------------------------------------------------------------
+
+def insert_account_label(conn, account_id: str, label: str, reviewer: str = "web_ui", notes: str = "") -> str:
+    import uuid
+    label_id = f"lbl_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """
+        INSERT INTO account_labels (label_id, account_id, label, reviewer, notes)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (label_id) DO NOTHING
+        """,
+        (label_id, account_id, label, reviewer, notes),
+    )
+    conn.commit()
+    return label_id
+
+
+def delete_account_label(conn, label_id: str) -> None:
+    conn.execute("DELETE FROM account_labels WHERE label_id = %s", (label_id,))
+    conn.commit()
+
+
+def get_labels_for_account(conn, account_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM account_labels WHERE account_id = %s ORDER BY created_at DESC",
+        (account_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_accounts_paginated(
+    conn,
+    page: int = 1,
+    per_page: int = 50,
+    sort_by: str = "score",
+    sort_dir: str = "desc",
+    tier_filter: str = "",
+    label_filter: str = "",
+    search: str = "",
+) -> tuple[list[dict], int]:
+    """Return paginated accounts joined with latest scores and labels."""
+    where_parts = []
+    params: list = []
+
+    if search:
+        where_parts.append("(a.company_name ILIKE %s OR a.domain ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
+    if tier_filter:
+        where_parts.append("best.tier = %s")
+        params.append(tier_filter)
+
+    if label_filter:
+        where_parts.append("EXISTS (SELECT 1 FROM account_labels al WHERE al.account_id = a.account_id AND al.label = %s)")
+        params.append(label_filter)
+
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    sort_map = {
+        "score": "COALESCE(best.score, 0)",
+        "company_name": "a.company_name",
+        "domain": "a.domain",
+        "tier": "best.tier",
+    }
+    order_col = sort_map.get(sort_by, "COALESCE(best.score, 0)")
+    order_dir = "DESC" if sort_dir.lower() == "desc" else "ASC"
+
+    count_sql = f"""
+        SELECT COUNT(*) as total FROM (
+            SELECT a.account_id
+            FROM accounts a
+            LEFT JOIN LATERAL (
+                SELECT score, tier FROM account_scores
+                WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+            ) best ON true
+            {where_sql}
+        ) sub
+    """
+    total = conn.execute(count_sql, params).fetchone()["total"]
+
+    offset = (page - 1) * per_page
+    data_params = list(params) + [per_page, offset]
+    data_sql = f"""
+        SELECT
+            a.account_id, a.company_name, a.domain, a.source_type,
+            COALESCE(best.score, 0) AS score,
+            COALESCE(best.tier, 'low') AS tier,
+            cr.research_status,
+            (SELECT string_agg(al.label, ',') FROM account_labels al WHERE al.account_id = a.account_id) AS labels
+        FROM accounts a
+        LEFT JOIN LATERAL (
+            SELECT score, tier
+            FROM account_scores
+            WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+        ) best ON true
+        LEFT JOIN company_research cr ON cr.account_id = a.account_id
+        {where_sql}
+        ORDER BY {order_col} {order_dir}
+        LIMIT %s OFFSET %s
+    """
+    rows = conn.execute(data_sql, data_params).fetchall()
+    return [dict(r) for r in rows], total
+
+
+def get_account_detail(conn, account_id: str) -> dict | None:
+    """Full account detail with scores, signals, research, contacts, labels."""
+    account = conn.execute(
+        "SELECT * FROM accounts WHERE account_id = %s", (account_id,)
+    ).fetchone()
+    if not account:
+        return None
+    result = dict(account)
+
+    scores = conn.execute(
+        "SELECT product, score, tier FROM account_scores WHERE account_id = %s ORDER BY score DESC",
+        (account_id,),
+    ).fetchall()
+    result["scores"] = [dict(r) for r in scores]
+
+    signals = conn.execute(
+        """SELECT signal_code, source, evidence_url, evidence_text, observed_at
+           FROM signal_observations WHERE account_id = %s ORDER BY observed_at DESC LIMIT 50""",
+        (account_id,),
+    ).fetchall()
+    result["signals"] = [dict(r) for r in signals]
+
+    result["research"] = get_company_research(conn, account_id)
+    result["contacts"] = get_contacts_for_account(conn, account_id)
+    result["labels"] = get_labels_for_account(conn, account_id)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Runs (Web UI)
+# ---------------------------------------------------------------------------
+
+def create_ui_pipeline_run(conn, account_ids: list[str], stages: list[str]) -> str:
+    import uuid
+    import json as _json
+    run_id = f"prun_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """INSERT INTO pipeline_runs (pipeline_run_id, account_ids_json, stages_json)
+           VALUES (%s, %s, %s)""",
+        (run_id, _json.dumps(account_ids), _json.dumps(stages)),
+    )
+    conn.commit()
+    return run_id
+
+
+def finish_ui_pipeline_run(conn, pipeline_run_id: str, status: str, result: dict) -> None:
+    import json as _json
+    conn.execute(
+        """UPDATE pipeline_runs SET status = %s, result_json = %s, finished_at = CURRENT_TIMESTAMP
+           WHERE pipeline_run_id = %s""",
+        (status, _json.dumps(result), pipeline_run_id),
     )
     conn.commit()

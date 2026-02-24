@@ -2011,5 +2011,23 @@ def serve_discovery_webhook(
     uvicorn.run(discovery_app, host=host, port=port, log_level=log_level)
 
 
+@app.command("serve-web")
+def serve_web(
+    host: str = typer.Option("0.0.0.0", "--host"),
+    port: int = typer.Option(8080, "--port"),
+    log_level: str = typer.Option("info", "--log-level"),
+) -> None:
+    """Launch the Signals pipeline web UI."""
+    try:
+        import uvicorn  # type: ignore
+    except Exception as exc:
+        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
+
+    from src.web.app import create_app
+
+    web_app = create_app()
+    uvicorn.run(web_app, host=host, port=port, log_level=log_level)
+
+
 if __name__ == "__main__":
     app()

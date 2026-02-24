@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     research_stale_days: int = Field(default=30, ge=1)
     research_timeout_seconds: int = Field(default=120, ge=10)
 
+    # --- MiniMax LLM ---
+    minimax_api_key: str = Field(default="")
+    minimax_model: str = Field(default="MiniMax-M2.5")
+    llm_provider: str = Field(default="minimax")  # "minimax" or "claude"
+
     # --- new fields for waterfall enrichment ---
     clearbit_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")
