@@ -21,7 +21,7 @@ def _empty_summary() -> dict:
     }
 
 
-def run_research_stage(conn, settings, run_date: str, score_run_id: str) -> dict:
+def run_research_stage(conn, settings, run_date: str, score_run_id: str, account_ids: list[str] | None = None) -> dict:
     """
     Main entry point. Called from pipeline after scoring.
 
@@ -44,15 +44,26 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str) -> dict
 
     research_run_id = db.create_research_run(conn, run_date, score_run_id)
 
-    accounts = db.get_accounts_needing_research(
-        conn,
-        run_date=run_date,
-        score_run_id=score_run_id,
-        max_accounts=settings.research_max_accounts,
-        min_tier="medium",
-        stale_days=settings.research_stale_days,
-        current_prompt_hash=current_hash,
-    )
+    if account_ids:
+        # User explicitly selected accounts — research them regardless of tier/staleness.
+        placeholders = ",".join(["%s"] * len(account_ids))
+        accounts = [
+            dict(r)
+            for r in conn.execute(
+                f"SELECT account_id, company_name, domain FROM accounts WHERE account_id IN ({placeholders})",
+                tuple(account_ids),
+            ).fetchall()
+        ]
+    else:
+        accounts = db.get_accounts_needing_research(
+            conn,
+            run_date=run_date,
+            score_run_id=score_run_id,
+            max_accounts=settings.research_max_accounts,
+            min_tier="medium",
+            stale_days=settings.research_stale_days,
+            current_prompt_hash=current_hash,
+        )
 
     attempted = 0
     completed = 0

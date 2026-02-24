@@ -193,7 +193,7 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                         effective_score_run_id = row["run_id"]
 
                 if effective_score_run_id:
-                    result = run_research_stage(conn, settings, run_date, effective_score_run_id)
+                    result = run_research_stage(conn, settings, run_date, effective_score_run_id, account_ids=account_ids or None)
                     dt = time.monotonic() - t0
                     msg = f"Research: {result['completed']}/{result['attempted']} completed"
                     if result["failed"]:
