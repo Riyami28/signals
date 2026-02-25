@@ -27,3 +27,5 @@ data/local/
 # Generated outputs and logs
 data/out/*.csv
 data/out/*.log
+data/out/*.png
+output/

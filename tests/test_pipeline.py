@@ -59,6 +59,31 @@ def test_run_daily_creates_outputs(tmp_path, monkeypatch):
     assert (root / "data" / "out" / "promotion_readiness_20260216.csv").exists()
 
 
+def test_run_daily_accepts_runtime_overrides(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "run-daily",
+            "--date",
+            "2026-02-16",
+            "--live-max-accounts",
+            "5",
+            "--stage-timeout-seconds",
+            "120",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "stage=ingest status=started live_max_accounts=5" in result.stdout
+    assert "timeout_seconds=120" in result.stdout
+    assert "stage=score status=completed" in result.stdout
+
+
 def test_ingest_no_all_rejected(tmp_path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
@@ -329,3 +354,58 @@ def test_backfill_run_daily_command_single_day(tmp_path, monkeypatch):
     )
     assert result.exit_code == 0
     assert "succeeded=1" in result.stdout
+
+
+def test_eval_output_command_reports_quality_status(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(root / "config" / "thresholds.csv", "key,value\nhigh,95\nmedium,90\nlow,0\n")
+    _write(
+        root / "config" / "icp_reference_accounts.csv",
+        "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert daily_result.exit_code == 0
+
+    result = runner.invoke(app, ["eval-output", "--date", "2026-02-16"])
+    assert result.exit_code == 0
+    assert "quality_passed=0" in result.stdout
+    assert "failed_checks=" in result.stdout
+
+
+def test_self_improve_output_command_updates_thresholds(tmp_path, monkeypatch):
+    root = tmp_path / "signals"
+    _bootstrap_fixture(root)
+    _write(root / "config" / "thresholds.csv", "key,value\nhigh,95\nmedium,90\nlow,0\n")
+    _write(
+        root / "config" / "icp_reference_accounts.csv",
+        "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
+    )
+    monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
+
+    runner = CliRunner()
+    daily_result = runner.invoke(app, ["run-daily", "--date", "2026-02-16"])
+    assert daily_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "self-improve-output",
+            "--date",
+            "2026-02-16",
+            "--max-iterations",
+            "4",
+            "--write",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "quality_passed=1" in result.stdout
+    assert "written=1" in result.stdout
+
+    threshold_rows = load_csv_rows(root / "config" / "thresholds.csv")
+    threshold_map = {row["key"]: float(row["value"]) for row in threshold_rows}
+    assert threshold_map["high"] < 95.0
+    assert threshold_map["medium"] < 90.0

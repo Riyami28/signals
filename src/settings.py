@@ -4,11 +4,26 @@ from dataclasses import dataclass
 from pathlib import Path
 import os
 
+from src.utils import normalize_domain
+
 
 def _parse_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _auto_live_workers(min_domain_request_interval_ms: int) -> int:
+    cpu_count = max(1, int(os.cpu_count() or 1))
+    # Live crawl is network-bound; scale above CPU while respecting request pacing.
+    base = max(4, cpu_count * 4)
+    if min_domain_request_interval_ms >= 1500:
+        multiplier = 1
+    elif min_domain_request_interval_ms >= 500:
+        multiplier = 2
+    else:
+        multiplier = 3
+    return max(4, min(128, base * multiplier))
 
 
 def _load_dotenv(dotenv_path: Path) -> None:
@@ -55,6 +70,8 @@ class Settings:
     respect_robots_txt: bool
     min_domain_request_interval_ms: int
     live_max_accounts: int
+    live_workers_per_source: int
+    live_target_domains: tuple[str, ...]
     auto_discover_job_handles: bool
     live_max_jobs_per_source: int
     discovery_webhook_token: str
@@ -115,6 +132,28 @@ def load_settings(project_root: Path | None = None) -> Settings:
         live_max_accounts = max(1, int(max_accounts_raw))
     except ValueError:
         live_max_accounts = 100
+
+    workers_raw = os.getenv("SIGNALS_LIVE_WORKERS_PER_SOURCE", "auto").strip().lower()
+    if workers_raw in {"", "auto"}:
+        live_workers_per_source = _auto_live_workers(min_interval_ms)
+    else:
+        try:
+            parsed_workers = int(workers_raw)
+            live_workers_per_source = (
+                max(1, parsed_workers) if parsed_workers > 0 else _auto_live_workers(min_interval_ms)
+            )
+        except ValueError:
+            live_workers_per_source = _auto_live_workers(min_interval_ms)
+
+    target_domains_raw = os.getenv("SIGNALS_LIVE_TARGET_DOMAINS", "").strip()
+    parsed_target_domains: list[str] = []
+    if target_domains_raw:
+        for part in target_domains_raw.split(","):
+            normalized = normalize_domain(part)
+            if not normalized or normalized.endswith(".example"):
+                continue
+            parsed_target_domains.append(normalized)
+    live_target_domains = tuple(sorted(set(parsed_target_domains)))
 
     max_jobs_raw = os.getenv("SIGNALS_LIVE_MAX_JOBS_PER_SOURCE", "60")
     try:
@@ -218,6 +257,8 @@ def load_settings(project_root: Path | None = None) -> Settings:
         respect_robots_txt=_parse_bool(os.getenv("SIGNALS_RESPECT_ROBOTS_TXT"), default=True),
         min_domain_request_interval_ms=min_interval_ms,
         live_max_accounts=live_max_accounts,
+        live_workers_per_source=live_workers_per_source,
+        live_target_domains=live_target_domains,
         auto_discover_job_handles=_parse_bool(os.getenv("SIGNALS_AUTO_DISCOVER_JOB_HANDLES"), default=False),
         live_max_jobs_per_source=live_max_jobs_per_source,
         discovery_webhook_token=os.getenv("SIGNALS_DISCOVERY_WEBHOOK_TOKEN", "").strip(),

@@ -2,6 +2,46 @@
 
 Local-first buying signal tracker for `zop.dev`, `zopday`, and `zopnight`.
 
+## Quick Start (One Command)
+
+From the repo root, run:
+
+```bash
+./signals start
+```
+
+This runs the daily pipeline with live terminal progress so you can see:
+
+- which account is being processed
+- which source is running
+- scoring/export stage transitions
+- final run completion (`run_exit_code=0` on success)
+
+Useful variants:
+
+```bash
+# explicit date
+./signals start --date 2026-02-22
+
+# force higher parallelism for large backlogs
+./signals start --workers-per-source 32
+
+# run for one company only
+./signals company conagrabrands.com
+
+# fast one-company hunt (ingest + score + citations)
+./signals hunt conagrabrands.com
+
+# show scored companies with reason citations
+./signals conviction --date 2026-02-22 --top 15
+
+# source depth + quality report
+./signals sources --date 2026-02-22
+
+# run local UI
+./signals ui
+```
+
 ## Overview
 
 This repo implements a daily pipeline that:
@@ -51,6 +91,7 @@ Notes:
 
 - Live discovery is controlled per account via `config/account_source_handles.csv`.
 - Crawls are checkpointed (`crawl_checkpoints` table) to avoid repeated same-day endpoint fetches.
+- Run `./signals sources --date YYYY-MM-DD` to inspect source attempts, source reliability, evidence coverage, and weak-source recommendations.
 
 ## Scoring Behavior
 
@@ -123,39 +164,40 @@ Notes:
 - New generated rows get a default buying-signal news query template.
 - `seed_accounts.csv` and `watchlist_accounts.csv` are both auto-seeded into `accounts`.
 
-## Commands
+## CLI
+
+Primary commands (recommended):
 
 ```bash
-python -m src.main ingest --all
-python -m src.main score --date 2026-02-16
-python -m src.main export --date 2026-02-16
-python -m src.main prepare-review-input --date 2026-02-16
-python -m src.main sync-sheet --date 2026-02-16
-python -m src.main import-reviews --date 2026-02-16
-python -m src.main run-daily --date 2026-02-16
-python -m src.main icp-report --date 2026-02-16
-python -m src.main icp-signal-gaps --date 2026-02-16
-python -m src.main discover-ingest --date 2026-02-16
-python -m src.main discover-frontier --date 2026-02-16 --profile light
-python -m src.main discover-fetch --date 2026-02-16 --profile light
-python -m src.main discover-extract --date 2026-02-16 --profile light
-python -m src.main discover-score --date 2026-02-16
-python -m src.main discover-score --date 2026-02-16 --quality-gates
-python -m src.main discover-report --date 2026-02-16
-python -m src.main run-discovery --date 2026-02-16 --profile light
-python -m src.main run-hunt --date 2026-02-16 --profile light
-python -m src.main retry-failures --limit 20
-python -m src.main replay-discovery-events --date 2026-02-16 --only-failed
-python -m src.main backfill-run-daily --start-date 2026-02-14 --end-date 2026-02-16
-python -m src.main ops-metrics --date 2026-02-16
-python -m src.main alert-test --title "signals smoke alert" --body "local test"
-python -m src.main serve-discovery-webhook --host 127.0.0.1 --port 8787
-python -m src.main build-cpg-watchlist --limit 1000
-python -m src.main migrate-watchlist-from-db --limit 1000
-python -m src.main run-autonomous-loop --ingest-interval-minutes 15 --score-interval-minutes 60 --discovery-interval-minutes 180 --hunt-profile light
-python -m src.main crawl-diagnostics --date 2026-02-16
-python -m src.main calibrate-thresholds --date 2026-02-16
-python -m src.main tune-profile --date 2026-02-16
+# one-command operator run (real-time stream)
+./signals start
+
+# same monitor mode with explicit controls
+./signals watch --date 2026-02-22 --live-max-accounts 1000 --workers-per-source 24 --poll-interval-seconds 2
+
+# non-streaming run
+./signals run --date 2026-02-22 --live --workers-per-source 24
+
+# one-company targeted run
+./signals company conagrabrands.com --workers-per-source 8
+
+# fastest single-company flow for trust-building
+./signals hunt conagrabrands.com
+
+# conviction report (scores + reasons + evidence URLs)
+./signals conviction --date 2026-02-22 --top 15
+
+# source depth + quality report (attempts, success/error mix, evidence coverage)
+./signals sources --date 2026-02-22
+
+# local UI
+./signals ui --port 8788
+```
+
+Advanced low-level commands are still available via:
+
+```bash
+python -m src.main --help
 ```
 
 ## Runtime Configuration
@@ -171,6 +213,8 @@ Configure via `.env` (see `.env.example`):
 - `SIGNALS_RESPECT_ROBOTS_TXT`
 - `SIGNALS_MIN_DOMAIN_REQUEST_INTERVAL_MS`
 - `SIGNALS_LIVE_MAX_ACCOUNTS`
+- `SIGNALS_LIVE_WORKERS_PER_SOURCE` (`auto` by default; or set an integer like `24`)
+- `SIGNALS_LIVE_TARGET_DOMAINS` (optional comma-separated domain filter for live crawl)
 - `SIGNALS_AUTO_DISCOVER_JOB_HANDLES`
 - `SIGNALS_LIVE_MAX_JOBS_PER_SOURCE`
 - `SIGNALS_STAGE_TIMEOUT_SECONDS`
@@ -194,6 +238,7 @@ Typical outputs in `data/out/`:
 - `review_queue_YYYYMMDD.csv`
 - `daily_scores_YYYYMMDD.csv`
 - `source_quality_YYYYMMDD.csv`
+- `source_depth_YYYYMMDD.csv`
 - `promotion_readiness_YYYYMMDD.csv`
 - `icp_coverage_YYYYMMDD.csv`
 - `icp_signal_gaps_YYYYMMDD.csv`
@@ -229,7 +274,7 @@ Typical outputs in `data/out/`:
 ## Scheduler Example
 
 ```cron
-0 6 * * * cd /Users/raramuri/Projects/zopdev/signals && /usr/bin/env python -m src.main run-daily >> data/out/daily.log 2>&1
+0 6 * * * cd /Users/raramuri/Projects/zopdev/signals && ./signals run >> data/out/daily.log 2>&1
 ```
 
 Discovery-specific daily runner installed in this environment:

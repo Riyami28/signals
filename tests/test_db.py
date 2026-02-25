@@ -69,6 +69,73 @@ def test_crawl_attempt_summary_and_failures(tmp_path: Path):
     assert str(failures[0]["error_summary"]) == "timeout"
 
 
+def test_select_accounts_for_live_crawl_rotates_by_last_attempt(tmp_path: Path):
+    conn = db.get_connection()
+    db.init_db(conn)
+
+    acc_a = db.upsert_account(conn, company_name="Acme", domain="acme.com", source_type="seed")
+    acc_b = db.upsert_account(conn, company_name="Beta", domain="beta.com", source_type="seed")
+    acc_c = db.upsert_account(conn, company_name="Core", domain="core.com", source_type="seed")
+
+    source = "google_news_rss"
+    conn.execute(
+        """
+        INSERT INTO crawl_attempts (source, account_id, endpoint, attempted_at, status, error_summary)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (source, acc_a, "https://a.example/rss", "2026-02-21T10:00:00+00:00", "success", ""),
+    )
+    conn.execute(
+        """
+        INSERT INTO crawl_attempts (source, account_id, endpoint, attempted_at, status, error_summary)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (source, acc_b, "https://b.example/rss", "2026-02-20T10:00:00+00:00", "success", ""),
+    )
+    conn.commit()
+
+    ordered = db.select_accounts_for_live_crawl(conn, source=source, limit=3)
+    ordered_ids = [str(row["account_id"]) for row in ordered]
+
+    # Unseen accounts should be crawled first, then oldest-attempted accounts.
+    assert ordered_ids[0] == acc_c
+    assert ordered_ids[1] == acc_b
+    assert ordered_ids[2] == acc_a
+
+
+def test_select_accounts_for_live_crawl_excludes_example_domains(tmp_path: Path):
+    conn = db.get_connection()
+    db.init_db(conn)
+
+    ignored = db.upsert_account(conn, company_name="Template", domain="template.example", source_type="seed")
+    included = db.upsert_account(conn, company_name="Acme", domain="acme.com", source_type="seed")
+
+    ordered = db.select_accounts_for_live_crawl(conn, source="careers_live", limit=10)
+    ordered_ids = {str(row["account_id"]) for row in ordered}
+
+    assert included in ordered_ids
+    assert ignored not in ordered_ids
+
+
+def test_select_accounts_for_live_crawl_respects_include_domains(tmp_path: Path):
+    conn = db.get_connection()
+    db.init_db(conn)
+
+    chosen = db.upsert_account(conn, company_name="Chosen", domain="chosen.com", source_type="seed")
+    other = db.upsert_account(conn, company_name="Other", domain="other.com", source_type="seed")
+
+    ordered = db.select_accounts_for_live_crawl(
+        conn,
+        source="google_news_rss",
+        limit=10,
+        include_domains=["chosen.com"],
+    )
+    ordered_ids = {str(row["account_id"]) for row in ordered}
+
+    assert chosen in ordered_ids
+    assert other not in ordered_ids
+
+
 def test_advisory_lock_single_flight_behavior(tmp_path: Path):
     conn1 = db.get_connection()
     db.init_db(conn1)

@@ -41,7 +41,7 @@ INSERT INTO signals.account_metadata (
   updated_at
 )
 SELECT
-  ('acc_' || SUBSTRING(md5(lower(trim(sw.domain))) FROM 1 FOR 12)) AS account_id,
+  a.account_id,
   COALESCE(trim(sw.country), ''),
   COALESCE(trim(sw.region_group), ''),
   COALESCE(trim(sw.industry_label), ''),
@@ -55,6 +55,8 @@ SELECT
   NULLIF(trim(sw.last_refreshed_on), '')::DATE,
   NOW()
 FROM signals.stage_watchlist sw
+JOIN signals.accounts a
+  ON a.domain = lower(trim(sw.domain))
 WHERE trim(COALESCE(sw.domain, '')) <> ''
   AND lower(trim(sw.domain)) <> 'zop.dev'
   AND lower(trim(sw.domain)) NOT LIKE '%.example'
@@ -87,7 +89,7 @@ INSERT INTO signals.account_source_handles (
   updated_at
 )
 SELECT
-  ('acc_' || SUBSTRING(md5(lower(trim(sh.domain))) FROM 1 FOR 12)) AS account_id,
+  a.account_id,
   lower(trim(sh.domain)) AS domain,
   COALESCE(trim(sh.company_name), ''),
   COALESCE(trim(sh.greenhouse_board), ''),

@@ -1141,6 +1141,63 @@ def fetch_latest_crawl_failures(conn: Any, run_date: str, limit: int = 10) -> li
     return list(cur.fetchall())
 
 
+def select_accounts_for_live_crawl(
+    conn: Any,
+    source: str,
+    limit: int,
+    include_domains: list[str] | tuple[str, ...] | None = None,
+) -> list[dict[str, Any]]:
+    bounded_limit = max(1, int(limit))
+    domain_filters: list[str] = []
+    for raw in list(include_domains or []):
+        normalized = normalize_domain(str(raw))
+        if not normalized or normalized.endswith(".example"):
+            continue
+        domain_filters.append(normalized)
+    domain_filters = sorted(set(domain_filters))
+
+    where_clauses = [
+        "COALESCE(a.domain, '') <> ''",
+        "LOWER(a.domain) NOT LIKE ?",
+    ]
+    params: list[Any] = [str(source).strip(), "%.example"]
+    if domain_filters:
+        placeholders = ", ".join("?" for _ in domain_filters)
+        where_clauses.append(f"LOWER(a.domain) IN ({placeholders})")
+        params.extend(domain_filters)
+    where_sql = " AND ".join(where_clauses)
+
+    cur = conn.execute(
+        f"""
+        SELECT
+            a.account_id,
+            a.domain,
+            a.company_name,
+            a.created_at,
+            latest.last_attempted_at
+        FROM accounts a
+        LEFT JOIN (
+            SELECT account_id, MAX(attempted_at) AS last_attempted_at
+            FROM crawl_attempts
+            WHERE source = ?
+            GROUP BY account_id
+        ) latest
+          ON latest.account_id = a.account_id
+        WHERE {where_sql}
+        ORDER BY
+            CASE
+                WHEN latest.last_attempted_at IS NULL OR latest.last_attempted_at = '' THEN 0
+                ELSE 1
+            END,
+            latest.last_attempted_at ASC,
+            a.created_at ASC
+        LIMIT ?
+        """,
+        tuple(params + [bounded_limit]),
+    )
+    return list(cur.fetchall())
+
+
 def insert_external_discovery_event(
     conn: Any,
     source: str,

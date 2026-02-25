@@ -39,6 +39,9 @@ hunt_ml = [
   "spacy>=3.8.0",
 ]
 
+[project.scripts]
+signals = "src.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "."}
 

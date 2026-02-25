@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from datetime import datetime, timedelta, timezone
 import json
@@ -25,6 +26,8 @@ from src.export import csv_exporter
 from src.models import AccountScore
 from src.notifier import send_alert
 from src.reporting import calibration, icp_playbook, quality
+from src.reporting.evals import OutputQualityBar, evaluate_run_output_quality
+from src.reporting.improvement import run_threshold_self_improvement
 from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
 from src.scoring.engine import run_scoring
 from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry, load_thresholds
@@ -986,9 +989,190 @@ def tune_profile(
         conn.close()
 
 
-@app.command("run-daily")
-def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD")) -> None:
+@app.command("eval-output")
+def eval_output(
+    date_str: str = typer.Option(None, "--date", help="Evaluation date YYYY-MM-DD"),
+    min_icp_medium_coverage: float = typer.Option(0.6, "--min-icp-medium-coverage", min=0.0, max=1.0),
+    min_icp_high_coverage: float = typer.Option(0.2, "--min-icp-high-coverage", min=0.0, max=1.0),
+    max_non_icp_medium_hit_rate: float = typer.Option(0.5, "--max-non-icp-medium-hit-rate", min=0.0, max=1.0),
+    max_non_icp_high_hit_rate: float = typer.Option(0.25, "--max-non-icp-high-hit-rate", min=0.0, max=1.0),
+    min_scenario_pass_rate: float = typer.Option(0.9, "--min-scenario-pass-rate", min=0.0, max=1.0),
+    scenarios_path: str = typer.Option(
+        "config/profile_scenarios.csv",
+        "--scenarios-path",
+        help="Scenario CSV path relative to project root (or absolute path)",
+    ),
+) -> None:
     settings, conn, seeded = _bootstrap()
+    run_date = parse_date(date_str, settings.run_timezone)
+    del seeded
+    try:
+        run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
+        if not run_id:
+            raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
+
+        raw_scenario_path = Path(scenarios_path)
+        scenario_path = raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        scenarios = calibration.load_scenarios(scenario_path)
+        thresholds = load_thresholds(settings.thresholds_path)
+        quality_bar = OutputQualityBar(
+            min_icp_medium_coverage=min_icp_medium_coverage,
+            min_icp_high_coverage=min_icp_high_coverage,
+            max_non_icp_medium_hit_rate=max_non_icp_medium_hit_rate,
+            max_non_icp_high_hit_rate=max_non_icp_high_hit_rate,
+            min_scenario_pass_rate=min_scenario_pass_rate,
+        )
+        result = evaluate_run_output_quality(
+            conn=conn,
+            run_id=run_id,
+            reference_csv_path=settings.config_dir / "icp_reference_accounts.csv",
+            thresholds=thresholds,
+            quality_bar=quality_bar,
+            scenarios=scenarios,
+        )
+        typer.echo(
+            " ".join(
+                [
+                    f"run_id={run_id}",
+                    f"threshold_high={result.thresholds.high}",
+                    f"threshold_medium={result.thresholds.medium}",
+                    f"threshold_low={result.thresholds.low}",
+                    f"icp_accounts={result.icp_accounts}",
+                    f"non_icp_accounts={result.non_icp_accounts}",
+                    f"icp_high_coverage={result.icp_high_coverage}",
+                    f"icp_medium_coverage={result.icp_medium_coverage}",
+                    f"non_icp_high_hit_rate={result.non_icp_high_hit_rate}",
+                    f"non_icp_medium_hit_rate={result.non_icp_medium_hit_rate}",
+                    f"scenario_pass_rate={result.scenario_pass_rate}",
+                    f"quality_passed={int(result.passed)}",
+                    f"failed_checks={'|'.join(result.failed_checks) if result.failed_checks else 'none'}",
+                ]
+            )
+        )
+    finally:
+        conn.close()
+
+
+@app.command("self-improve-output")
+def self_improve_output(
+    date_str: str = typer.Option(None, "--date", help="Self-improvement date YYYY-MM-DD"),
+    max_iterations: int = typer.Option(5, "--max-iterations", min=1),
+    min_icp_medium_coverage: float = typer.Option(0.6, "--min-icp-medium-coverage", min=0.0, max=1.0),
+    min_icp_high_coverage: float = typer.Option(0.2, "--min-icp-high-coverage", min=0.0, max=1.0),
+    max_non_icp_medium_hit_rate: float = typer.Option(0.5, "--max-non-icp-medium-hit-rate", min=0.0, max=1.0),
+    max_non_icp_high_hit_rate: float = typer.Option(0.25, "--max-non-icp-high-hit-rate", min=0.0, max=1.0),
+    min_scenario_pass_rate: float = typer.Option(0.9, "--min-scenario-pass-rate", min=0.0, max=1.0),
+    scenarios_path: str = typer.Option(
+        "config/profile_scenarios.csv",
+        "--scenarios-path",
+        help="Scenario CSV path relative to project root (or absolute path)",
+    ),
+    write: bool = typer.Option(False, "--write", help="Persist tuned thresholds and regenerate scoring outputs"),
+) -> None:
+    settings, conn, seeded = _bootstrap()
+    run_date = parse_date(date_str, settings.run_timezone)
+    del seeded
+    try:
+        run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
+        if not run_id:
+            raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
+
+        current_thresholds = load_thresholds(settings.thresholds_path)
+        raw_scenario_path = Path(scenarios_path)
+        scenario_path = raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        scenarios = calibration.load_scenarios(scenario_path)
+        quality_bar = OutputQualityBar(
+            min_icp_medium_coverage=min_icp_medium_coverage,
+            min_icp_high_coverage=min_icp_high_coverage,
+            max_non_icp_medium_hit_rate=max_non_icp_medium_hit_rate,
+            max_non_icp_high_hit_rate=max_non_icp_high_hit_rate,
+            min_scenario_pass_rate=min_scenario_pass_rate,
+        )
+
+        result = run_threshold_self_improvement(
+            conn=conn,
+            run_id=run_id,
+            reference_csv_path=settings.config_dir / "icp_reference_accounts.csv",
+            current_thresholds=current_thresholds,
+            quality_bar=quality_bar,
+            max_iterations=max_iterations,
+            scenarios=scenarios,
+        )
+
+        latest_run_id = run_id
+        thresholds_changed = (
+            round(result.final_thresholds.high, 4) != round(current_thresholds.high, 4)
+            or round(result.final_thresholds.medium, 4) != round(current_thresholds.medium, 4)
+            or round(result.final_thresholds.low, 4) != round(current_thresholds.low, 4)
+        )
+        if write and thresholds_changed:
+            calibration.write_thresholds(
+                settings.thresholds_path,
+                high=result.final_thresholds.high,
+                medium=result.final_thresholds.medium,
+                low=result.final_thresholds.low,
+            )
+            latest_run_id = _run_scoring(conn, settings, run_date)
+            _run_exports(conn, settings, run_date, latest_run_id)
+            _write_icp_coverage_report(conn, settings, latest_run_id, run_date)
+
+        final_eval = result.iterations[-1].evaluation if result.iterations else evaluate_run_output_quality(
+            conn=conn,
+            run_id=run_id,
+            reference_csv_path=settings.config_dir / "icp_reference_accounts.csv",
+            thresholds=current_thresholds,
+            quality_bar=quality_bar,
+            scenarios=scenarios,
+        )
+        typer.echo(
+            " ".join(
+                [
+                    f"run_id={latest_run_id}",
+                    f"iterations={len(result.iterations)}",
+                    f"initial_high={current_thresholds.high}",
+                    f"initial_medium={current_thresholds.medium}",
+                    f"final_high={result.final_thresholds.high}",
+                    f"final_medium={result.final_thresholds.medium}",
+                    f"quality_passed={int(result.passed)}",
+                    f"converged={int(result.converged)}",
+                    f"failed_checks={'|'.join(final_eval.failed_checks) if final_eval.failed_checks else 'none'}",
+                    f"written={int(write and thresholds_changed)}",
+                ]
+            )
+        )
+    finally:
+        conn.close()
+
+
+@app.command("run-daily")
+def run_daily(
+    date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD"),
+    live_max_accounts: int | None = typer.Option(
+        None,
+        "--live-max-accounts",
+        min=1,
+        help="Override live crawl account budget for this run only.",
+    ),
+    live_workers_per_source: int | None = typer.Option(
+        None,
+        "--live-workers-per-source",
+        min=1,
+        help="Override live crawl workers per source for this run only.",
+    ),
+    stage_timeout_seconds: int | None = typer.Option(
+        None,
+        "--stage-timeout-seconds",
+        min=30,
+        help="Override per-stage timeout for this run only.",
+    ),
+) -> None:
+    settings, conn, seeded = _bootstrap()
+    if live_max_accounts is not None:
+        settings = replace(settings, live_max_accounts=max(1, int(live_max_accounts)))
+    if live_workers_per_source is not None:
+        settings = replace(settings, live_workers_per_source=max(1, int(live_workers_per_source)))
+    if stage_timeout_seconds is not None:
+        settings = replace(settings, stage_timeout_seconds=max(30, int(stage_timeout_seconds)))
     run_date = parse_date(date_str, settings.run_timezone)
     lock_owner = f"pid{os.getpid()}-{uuid.uuid4().hex[:8]}"
     lock_acquired = False
@@ -1003,37 +1187,64 @@ def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-M
             typer.echo(f"status=skipped reason=lock_busy lock_name={_RUN_DAILY_LOCK_NAME}")
             return
 
-        collect_results, _ = _run_with_watchdog("ingest", settings.stage_timeout_seconds, lambda: _collect_all(conn, settings))
+        typer.echo(
+            f"stage=ingest status=started live_max_accounts={settings.live_max_accounts} "
+            f"live_workers_per_source={settings.live_workers_per_source} "
+            f"timeout_seconds={settings.stage_timeout_seconds}"
+        )
+        collect_results, collect_elapsed = _run_with_watchdog(
+            "ingest",
+            settings.stage_timeout_seconds,
+            lambda: _collect_all(conn, settings),
+        )
         collect_inserted = sum(result["inserted"] for result in collect_results.values())
+        typer.echo(f"stage=ingest status=completed duration_seconds={round(collect_elapsed, 2)} inserted={collect_inserted}")
 
-        run_id, _ = _run_with_watchdog("score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date))
+        typer.echo("stage=score status=started")
+        run_id, score_elapsed = _run_with_watchdog("score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date))
+        typer.echo(f"stage=score status=completed duration_seconds={round(score_elapsed, 2)} run_id={run_id}")
+        typer.echo("stage=export status=started")
         export_result, _ = _run_with_watchdog(
             "export",
             settings.stage_timeout_seconds,
             lambda: _run_exports(conn, settings, run_date, run_id),
         )
+        typer.echo(
+            f"stage=export status=completed review_queue_rows={export_result['review_queue']} "
+            f"daily_scores_rows={export_result['daily_scores']}"
+        )
+        typer.echo("stage=prepare-review-input status=started")
         prepared_reviews, _ = _run_with_watchdog(
             "prepare-review-input",
             settings.stage_timeout_seconds,
             lambda: prepare_review_input_for_date(settings, run_date),
         )
+        typer.echo(f"stage=prepare-review-input status=completed prepared_review_rows={prepared_reviews}")
 
         sync_error = ""
         sync_result = {"review_queue_rows": 0, "daily_scores_rows": 0, "source_quality_rows": 0}
         try:
+            typer.echo("stage=sync-sheet status=started")
             sync_result, _ = _run_with_watchdog(
                 "sync-sheet",
                 settings.stage_timeout_seconds,
                 lambda: sync_outputs(settings, run_date),
             )
+            typer.echo(
+                f"stage=sync-sheet status=completed review_queue_rows={sync_result['review_queue_rows']} "
+                f"daily_scores_rows={sync_result['daily_scores_rows']}"
+            )
         except Exception as exc:
             sync_error = str(exc)
+            typer.echo(f"stage=sync-sheet status=failed error={sync_error[:220]}")
 
+        typer.echo("stage=import-reviews status=started")
         imported, _ = _run_with_watchdog(
             "import-reviews",
             settings.stage_timeout_seconds,
             lambda: import_reviews_for_date(conn, settings, run_date),
         )
+        typer.echo(f"stage=import-reviews status=completed imported_reviews={imported}")
 
         def _refresh_quality_outputs() -> dict[str, int]:
             quality.compute_and_persist_source_metrics(conn, run_date)
@@ -1043,20 +1254,35 @@ def run_daily(date_str: str = typer.Option(None, "--date", help="Run date YYYY-M
             readiness_count = csv_exporter.export_promotion_readiness(readiness_rows, paths["promotion_readiness"])
             return {"source_quality_rows": quality_rows, "promotion_readiness_rows": readiness_count}
 
-        quality_result, _ = _run_with_watchdog(
+        typer.echo("stage=quality-refresh status=started")
+        quality_result, quality_elapsed = _run_with_watchdog(
             "quality-refresh",
             settings.stage_timeout_seconds,
             _refresh_quality_outputs,
         )
-        icp_report, _ = _run_with_watchdog(
+        typer.echo(
+            f"stage=quality-refresh status=completed duration_seconds={round(quality_elapsed, 2)} "
+            f"source_quality_rows={quality_result['source_quality_rows']}"
+        )
+        typer.echo("stage=icp-coverage-report status=started")
+        icp_report, icp_elapsed = _run_with_watchdog(
             "icp-coverage-report",
             settings.stage_timeout_seconds,
             lambda: _write_icp_coverage_report(conn, settings, run_id, run_date),
         )
-        ops_result, _ = _run_with_watchdog(
+        typer.echo(
+            f"stage=icp-coverage-report status=completed duration_seconds={round(icp_elapsed, 2)} "
+            f"icp_coverage={icp_report['coverage_rate']}"
+        )
+        typer.echo("stage=ops-metrics status=started")
+        ops_result, ops_elapsed = _run_with_watchdog(
             "ops-metrics",
             settings.stage_timeout_seconds,
             lambda: _persist_ops_metrics(conn, settings, run_date),
+        )
+        typer.echo(
+            f"stage=ops-metrics status=completed duration_seconds={round(ops_elapsed, 2)} "
+            f"ops_metrics_rows={ops_result['ops_metrics_rows']}"
         )
 
         typer.echo(
@@ -1930,6 +2156,22 @@ def serve_discovery_webhook(
         raise typer.BadParameter("fastapi is required. Install project dependencies first.")
 
     uvicorn.run(discovery_app, host=host, port=port, log_level=log_level)
+
+
+@app.command("serve-local-ui")
+def serve_local_ui(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8788, "--port"),
+    log_level: str = typer.Option("info", "--log-level"),
+) -> None:
+    try:
+        import uvicorn  # type: ignore
+    except Exception as exc:
+        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
+
+    from src.ui.local_app import app as local_ui_app
+
+    uvicorn.run(local_ui_app, host=host, port=port, log_level=log_level)
 
 
 if __name__ == "__main__":

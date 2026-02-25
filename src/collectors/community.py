@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+import os
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -15,6 +17,13 @@ from src.settings import Settings
 from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
 
 DEFAULT_REDDIT_TERMS = "(devops OR platform engineering OR cloud cost OR finops OR kubernetes OR terraform OR soc2 OR audit)"
+_LIVE_PROGRESS_COMMIT_EVERY = 25
+_VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _emit_progress(message: str) -> None:
+    if _VERBOSE_PROGRESS:
+        print(message, flush=True)
 
 
 @retry(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True)
@@ -117,6 +126,177 @@ def _ingest_entries(
     return inserted, seen
 
 
+def _collect_live_reddit_account(
+    conn,
+    settings: Settings,
+    lexicon_rows: list[dict[str, str]],
+    account: dict[str, Any],
+    account_index: int,
+    handles: dict[str, dict[str, str]],
+    rss_source: str,
+    rss_reliability: float,
+) -> tuple[int, int, int]:
+    domain = str(account["domain"])
+    if domain.endswith(".example"):
+        return 0, 0, 0
+    account_id = str(account["account_id"])
+    _emit_progress(f"collector=community_live status=account_started account_index={account_index} domain={domain}")
+    company_name = str(account["company_name"] or domain)
+    handle_row = handles.get(domain, {})
+    query = handle_row.get("reddit_query", "").strip()
+    if not query:
+        query = f'"{company_name}" OR "{domain}" {DEFAULT_REDDIT_TERMS}'
+
+    rss_url = _reddit_search_rss_url(query)
+    if db.was_crawled_today(conn, source=rss_source, account_id=account_id, endpoint=rss_url):
+        db.record_crawl_attempt(
+            conn,
+            source=rss_source,
+            account_id=account_id,
+            endpoint=rss_url,
+            status="skipped",
+            error_summary="checkpoint_recent",
+            commit=False,
+        )
+        return 0, 0, 1
+
+    try:
+        xml_text = _request_text(rss_url, settings)
+        parsed = feedparser.parse(xml_text)
+    except requests.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 0
+        db.record_crawl_attempt(
+            conn,
+            source=rss_source,
+            account_id=account_id,
+            endpoint=rss_url,
+            status="http_error",
+            error_summary=f"status_code={status_code}",
+            commit=False,
+        )
+        db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
+        return 0, 0, 1
+    except Exception as exc:
+        db.record_crawl_attempt(
+            conn,
+            source=rss_source,
+            account_id=account_id,
+            endpoint=rss_url,
+            status="exception",
+            error_summary=str(exc),
+            commit=False,
+        )
+        db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
+        return 0, 0, 1
+
+    db.record_crawl_attempt(
+        conn,
+        source=rss_source,
+        account_id=account_id,
+        endpoint=rss_url,
+        status="success",
+        error_summary="",
+        commit=False,
+    )
+    db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
+
+    inserted_delta, seen_delta = _ingest_entries(
+        conn=conn,
+        account_id=account_id,
+        source=rss_source,
+        reliability=rss_reliability,
+        lexicon_rows=lexicon_rows,
+        entries=list(parsed.entries),
+        extra_payload={"query": query, "rss_url": rss_url},
+    )
+    _emit_progress(
+        "collector=community_live status=account_completed "
+        f"account_index={account_index} domain={domain} inserted_delta={inserted_delta} seen_delta={seen_delta}"
+    )
+    return inserted_delta, seen_delta, 1
+
+
+def _collect_live_reddit_parallel(
+    conn,
+    settings: Settings,
+    lexicon_rows: list[dict[str, str]],
+    accounts: list[dict[str, Any]],
+    handles: dict[str, dict[str, str]],
+    rss_source: str,
+    rss_reliability: float,
+) -> tuple[int, int]:
+    if not accounts:
+        return 0, 0
+
+    workers = min(max(1, int(settings.live_workers_per_source)), len(accounts))
+    if workers <= 1:
+        inserted_total = 0
+        seen_total = 0
+        processed = 0
+        for idx, account in enumerate(accounts, start=1):
+            inserted_delta, seen_delta, processed_delta = _collect_live_reddit_account(
+                conn=conn,
+                settings=settings,
+                lexicon_rows=lexicon_rows,
+                account=account,
+                account_index=idx,
+                handles=handles,
+                rss_source=rss_source,
+                rss_reliability=rss_reliability,
+            )
+            inserted_total += inserted_delta
+            seen_total += seen_delta
+            processed += processed_delta
+            if processed and processed % _LIVE_PROGRESS_COMMIT_EVERY == 0:
+                conn.commit()
+                _emit_progress(
+                    f"collector=community_live status=checkpoint committed_accounts={processed} "
+                    f"inserted_total={inserted_total} seen_total={seen_total}"
+                )
+        return inserted_total, seen_total
+
+    conn.commit()
+    indexed_accounts = list(enumerate(accounts, start=1))
+    batches = [indexed_accounts[i::workers] for i in range(workers)]
+
+    def _worker(batch: list[tuple[int, dict[str, Any]]]) -> tuple[int, int]:
+        worker_conn = db.get_connection(settings.pg_dsn)
+        worker_inserted = 0
+        worker_seen = 0
+        processed = 0
+        try:
+            for account_index, account in batch:
+                inserted_delta, seen_delta, processed_delta = _collect_live_reddit_account(
+                    conn=worker_conn,
+                    settings=settings,
+                    lexicon_rows=lexicon_rows,
+                    account=account,
+                    account_index=account_index,
+                    handles=handles,
+                    rss_source=rss_source,
+                    rss_reliability=rss_reliability,
+                )
+                worker_inserted += inserted_delta
+                worker_seen += seen_delta
+                processed += processed_delta
+                if processed and processed % _LIVE_PROGRESS_COMMIT_EVERY == 0:
+                    worker_conn.commit()
+            worker_conn.commit()
+            return worker_inserted, worker_seen
+        finally:
+            worker_conn.close()
+
+    inserted_total = 0
+    seen_total = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_worker, batch) for batch in batches if batch]
+        for future in as_completed(futures):
+            batch_inserted, batch_seen = future.result()
+            inserted_total += batch_inserted
+            seen_total += batch_seen
+    return inserted_total, seen_total
+
+
 def collect(
     conn,
     settings: Settings,
@@ -174,91 +354,36 @@ def collect(
 
     if settings.enable_live_crawl:
         handles = load_account_source_handles(settings.account_source_handles_path)
-        accounts = conn.execute(
-            "SELECT account_id, domain, company_name FROM accounts ORDER BY created_at LIMIT ?",
-            (settings.live_max_accounts,),
-        ).fetchall()
-
         rss_source = "reddit_rss"
         rss_reliability = source_reliability.get(rss_source, 0.62)
+        accounts = db.select_accounts_for_live_crawl(
+            conn,
+            source=rss_source,
+            limit=settings.live_max_accounts,
+            include_domains=list(settings.live_target_domains),
+        )
+        _emit_progress(
+            f"collector=community_live status=started accounts={len(accounts)} workers={settings.live_workers_per_source}"
+        )
         if rss_reliability <= 0:
             conn.commit()
             return {"inserted": inserted, "seen": seen}
 
-        for account in accounts:
-            domain = str(account["domain"])
-            if domain.endswith(".example"):
-                continue
-            account_id = str(account["account_id"])
-            company_name = str(account["company_name"] or domain)
-            handle_row = handles.get(domain, {})
-
-            query = handle_row.get("reddit_query", "").strip()
-            if not query:
-                query = f'"{company_name}" OR "{domain}" {DEFAULT_REDDIT_TERMS}'
-
-            rss_url = _reddit_search_rss_url(query)
-            if db.was_crawled_today(conn, source=rss_source, account_id=account_id, endpoint=rss_url):
-                db.record_crawl_attempt(
-                    conn,
-                    source=rss_source,
-                    account_id=account_id,
-                    endpoint=rss_url,
-                    status="skipped",
-                    error_summary="checkpoint_recent",
-                    commit=False,
-                )
-                continue
-            try:
-                xml_text = _request_text(rss_url, settings)
-                parsed = feedparser.parse(xml_text)
-            except requests.HTTPError as exc:
-                status_code = exc.response.status_code if exc.response is not None else 0
-                db.record_crawl_attempt(
-                    conn,
-                    source=rss_source,
-                    account_id=account_id,
-                    endpoint=rss_url,
-                    status="http_error",
-                    error_summary=f"status_code={status_code}",
-                    commit=False,
-                )
-                db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
-                continue
-            except Exception as exc:
-                db.record_crawl_attempt(
-                    conn,
-                    source=rss_source,
-                    account_id=account_id,
-                    endpoint=rss_url,
-                    status="exception",
-                    error_summary=str(exc),
-                    commit=False,
-                )
-                db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
-                continue
-            db.record_crawl_attempt(
-                conn,
-                source=rss_source,
-                account_id=account_id,
-                endpoint=rss_url,
-                status="success",
-                error_summary="",
-                commit=False,
-            )
-            db.mark_crawled(conn, source=rss_source, account_id=account_id, endpoint=rss_url, commit=False)
-
-            local_inserted, local_seen = _ingest_entries(
-                conn=conn,
-                account_id=account_id,
-                source=rss_source,
-                reliability=rss_reliability,
-                lexicon_rows=lexicon_rows,
-                entries=list(parsed.entries),
-                extra_payload={"query": query, "rss_url": rss_url},
-            )
-            inserted += local_inserted
-            seen += local_seen
+        live_inserted, live_seen = _collect_live_reddit_parallel(
+            conn=conn,
+            settings=settings,
+            lexicon_rows=lexicon_rows,
+            accounts=accounts,
+            handles=handles,
+            rss_source=rss_source,
+            rss_reliability=rss_reliability,
+        )
+        inserted += live_inserted
+        seen += live_seen
+        _emit_progress(
+            "collector=community_live status=completed "
+            f"accounts_targeted={len(accounts)} inserted_total={inserted} seen_total={seen}"
+        )
 
     conn.commit()
     return {"inserted": inserted, "seen": seen}
