@@ -29,3 +29,4 @@ data/out/*.csv
 data/out/*.log
 data/out/*.png
 output/
+.claude/
