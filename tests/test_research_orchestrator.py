@@ -114,9 +114,11 @@ class TestRunResearchStage:
         ]
 
         with patch("src.research.orchestrator.ResearchClient") as MockClient, \
+             patch("src.research.orchestrator.create_research_client") as mock_create, \
              patch("src.research.orchestrator.run_enrichment_waterfall", return_value={}), \
              patch("src.research.orchestrator.db.get_accounts_needing_research", return_value=fake_accounts):
             mock_instance = MockClient.return_value
+            mock_create.return_value = mock_instance
             mock_instance.research_company.side_effect = [
                 mock_ext_response,
                 mock_score_response,

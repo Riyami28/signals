@@ -1131,11 +1131,11 @@ def select_accounts_for_live_crawl(
 
     where_clauses = [
         "COALESCE(a.domain, '') <> ''",
-        "LOWER(a.domain) NOT LIKE ?",
+        "LOWER(a.domain) NOT LIKE %s",
     ]
     params: list[Any] = [str(source).strip(), "%.example"]
     if domain_filters:
-        placeholders = ", ".join("?" for _ in domain_filters)
+        placeholders = ", ".join("%s" for _ in domain_filters)
         where_clauses.append(f"LOWER(a.domain) IN ({placeholders})")
         params.extend(domain_filters)
     where_sql = " AND ".join(where_clauses)
@@ -1152,7 +1152,7 @@ def select_accounts_for_live_crawl(
         LEFT JOIN (
             SELECT account_id, MAX(attempted_at) AS last_attempted_at
             FROM crawl_attempts
-            WHERE source = ?
+            WHERE source = %s
             GROUP BY account_id
         ) latest
           ON latest.account_id = a.account_id
@@ -1164,7 +1164,7 @@ def select_accounts_for_live_crawl(
             END,
             latest.last_attempted_at ASC,
             a.created_at ASC
-        LIMIT ?
+        LIMIT %s
         """,
         tuple(params + [bounded_limit]),
     )

@@ -1221,12 +1221,15 @@ def run_daily(
     ),
 ) -> None:
     settings, conn, seeded = _bootstrap()
+    overrides: dict[str, object] = {}
     if live_max_accounts is not None:
-        settings = replace(settings, live_max_accounts=max(1, int(live_max_accounts)))
+        overrides["live_max_accounts"] = max(1, int(live_max_accounts))
     if live_workers_per_source is not None:
-        settings = replace(settings, live_workers_per_source=max(1, int(live_workers_per_source)))
+        overrides["live_workers_per_source"] = max(1, int(live_workers_per_source))
     if stage_timeout_seconds is not None:
-        settings = replace(settings, stage_timeout_seconds=max(30, int(stage_timeout_seconds)))
+        overrides["stage_timeout_seconds"] = max(30, int(stage_timeout_seconds))
+    if overrides:
+        settings = settings.model_copy(update=overrides)
     run_date = parse_date(date_str, settings.run_timezone)
     lock_owner = f"pid{os.getpid()}-{uuid.uuid4().hex[:8]}"
     lock_acquired = False
@@ -2012,7 +2015,12 @@ def _execute_retry_task(task: dict[str, object], settings: Settings) -> None:
         previous_flag = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE")
         os.environ["SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE"] = "1"
         try:
-            run_daily(date_str=run_date.isoformat())
+            run_daily(
+                date_str=run_date.isoformat(),
+                live_max_accounts=None,
+                live_workers_per_source=None,
+                stage_timeout_seconds=None,
+            )
         finally:
             if previous_flag is None:
                 os.environ.pop("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", None)
@@ -2156,7 +2164,12 @@ def backfill_run_daily(
     failed = 0
     while current <= end:
         try:
-            run_daily(date_str=current.isoformat())
+            run_daily(
+                date_str=current.isoformat(),
+                live_max_accounts=None,
+                live_workers_per_source=None,
+                stage_timeout_seconds=None,
+            )
             succeeded += 1
         except Exception:
             logger.warning("backfill failed for date=%s", current.isoformat(), exc_info=True)

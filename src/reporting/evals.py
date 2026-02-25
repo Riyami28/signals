@@ -76,7 +76,7 @@ def _load_score_segments(conn: Any, run_id: str, reference_csv_path: Path) -> tu
         SELECT a.domain, MAX(s.score) AS max_score
         FROM account_scores s
         JOIN accounts a ON a.account_id = s.account_id
-        WHERE s.run_id = ?
+        WHERE s.run_id = %s
         GROUP BY a.domain
         """,
         (run_id,),

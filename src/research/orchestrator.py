@@ -6,7 +6,7 @@ import json
 import logging
 
 from src import db
-from src.research.client import create_research_client
+from src.research.client import ResearchClient, create_research_client
 from src.research.enrichment import run_enrichment_waterfall
 from src.research.parser import parse_extraction_response, parse_scoring_response
 from src.research.prompts import build_extraction_prompt, build_scoring_prompt, prompt_hash

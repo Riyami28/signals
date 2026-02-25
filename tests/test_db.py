@@ -81,14 +81,14 @@ def test_select_accounts_for_live_crawl_rotates_by_last_attempt(tmp_path: Path):
     conn.execute(
         """
         INSERT INTO crawl_attempts (source, account_id, endpoint, attempted_at, status, error_summary)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (source, acc_a, "https://a.example/rss", "2026-02-21T10:00:00+00:00", "success", ""),
     )
     conn.execute(
         """
         INSERT INTO crawl_attempts (source, account_id, endpoint, attempted_at, status, error_summary)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (source, acc_b, "https://b.example/rss", "2026-02-20T10:00:00+00:00", "success", ""),
     )

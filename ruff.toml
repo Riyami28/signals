@@ -1,0 +1,16 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+  "E501",  # line too long — handled by formatter
+  "F401",  # unused import — too noisy during early development
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["E402"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
