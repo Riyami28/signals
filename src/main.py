@@ -4,12 +4,15 @@ from dataclasses import replace
 from datetime import date
 from datetime import datetime, timedelta, timezone
 import json
+import logging
 import os
 from pathlib import Path
 import time
 import uuid
 
 import typer
+
+from src.logging_config import configure_logging
 
 from src import db
 from src.collectors import community, first_party, jobs, news, technographics
@@ -23,6 +26,7 @@ from src.discovery.config import (
     load_signal_classes,
 )
 from src.export import csv_exporter
+from src.research.orchestrator import run_research_stage
 from src.models import AccountScore
 from src.notifier import send_alert
 from src.reporting import calibration, icp_playbook, quality
@@ -36,7 +40,15 @@ from src.source_policy import load_source_execution_policy
 from src.sync.google_sheets import sync_outputs
 from src.utils import ensure_project_directories, load_csv_rows, normalize_domain, parse_date, write_csv_rows
 
+logger = logging.getLogger(__name__)
+
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+
+@app.callback()
+def _app_callback() -> None:
+    """Signals pipeline — structured logging enabled at startup."""
+    configure_logging(os.environ.get("LOG_LEVEL", "INFO"))
 
 _RUN_DAILY_LOCK_NAME = "signals:run-daily"
 _AUTONOMOUS_LOCK_NAME = "signals:run-autonomous-loop"
@@ -259,10 +271,10 @@ def _baseline_score_7d(conn, account_id: str, product: str, run_date: str) -> fl
         SELECT s.score
         FROM account_scores s
         JOIN score_runs r ON r.run_id = s.run_id
-        WHERE s.account_id = ?
-          AND s.product = ?
-          AND date(r.run_date) <= date(?, '-7 day')
-        ORDER BY date(r.run_date) DESC, r.started_at DESC
+        WHERE s.account_id = %s
+          AND s.product = %s
+          AND r.run_date::date <= (%s::date - INTERVAL '7 day')
+        ORDER BY r.run_date::date DESC, r.started_at DESC
         LIMIT 1
         """,
         (account_id, product, run_date),
@@ -343,7 +355,7 @@ def _review_queue_excluded_domains(settings: Settings) -> set[str]:
         blocked_domains = load_discovery_blocklist(settings.discovery_blocklist_path)
         excluded.update(blocked_domains)
     except Exception:
-        pass
+        logger.warning("failed to load discovery blocklist from %s", settings.discovery_blocklist_path, exc_info=True)
 
     try:
         profiles = load_account_profiles(settings.account_profiles_path)
@@ -351,7 +363,7 @@ def _review_queue_excluded_domains(settings: Settings) -> set[str]:
             if profile.is_self or profile.exclude_from_crm:
                 excluded.add(domain)
     except Exception:
-        pass
+        logger.warning("failed to load account profiles from %s", settings.account_profiles_path, exc_info=True)
 
     normalized: set[str] = set()
     for domain in excluded:
@@ -586,6 +598,48 @@ def export(date_str: str = typer.Option(None, "--date", help="Export date YYYY-M
         conn.close()
 
 
+@app.command("research")
+def research(
+    date_str: str = typer.Option(..., "--date", help="Run date YYYY-MM-DD"),
+    score_run_id: str = typer.Option(..., "--score-run-id", help="Score run ID to research"),
+    max_accounts: int = typer.Option(None, "--max-accounts", help="Override research_max_accounts setting"),
+) -> None:
+    """Run LLM research on top-scoring accounts from a score run."""
+    settings, conn, seeded = _bootstrap()
+    del seeded
+    run_date = parse_date(date_str, settings.run_timezone)
+    if max_accounts is not None:
+        settings.research_max_accounts = max_accounts
+    try:
+        result = run_research_stage(conn, settings, run_date.isoformat(), score_run_id)
+        typer.echo(
+            " ".join(
+                f"{k}={v}" for k, v in result.items()
+            )
+        )
+    finally:
+        conn.close()
+
+
+@app.command("export-sales-ready")
+def export_sales_ready_cmd(
+    date_str: str = typer.Option(..., "--date", help="Run date YYYY-MM-DD"),
+    score_run_id: str = typer.Option(..., "--score-run-id", help="Score run ID to export"),
+    output: Path = typer.Option(None, "--output", help="Output path (default: out_dir/sales_ready_{date}.csv)"),
+) -> None:
+    """Export the unified sales-ready CSV for a given score run."""
+    settings, conn, seeded = _bootstrap()
+    del seeded
+    run_date = parse_date(date_str, settings.run_timezone)
+    out_path = output or settings.out_dir / f"sales_ready_{csv_exporter.date_suffix(run_date)}.csv"
+    try:
+        excluded = _review_queue_excluded_domains(settings)
+        rows = csv_exporter.export_sales_ready(conn, score_run_id, out_path, excluded)
+        typer.echo(f"sales_ready_rows={rows} path={out_path}")
+    finally:
+        conn.close()
+
+
 @app.command("sync-sheet")
 def sync_sheet(date_str: str = typer.Option(None, "--date", help="Sync date YYYY-MM-DD")) -> None:
     settings, conn, seeded = _bootstrap()
@@ -717,7 +771,7 @@ def migrate_watchlist_from_db(
             SELECT company_name, domain
             FROM accounts
             WHERE source_type = 'seed'
-            ORDER BY datetime(created_at) ASC, company_name ASC
+            ORDER BY created_at::timestamp ASC, company_name ASC
             """
         ).fetchall()
 
@@ -1203,6 +1257,27 @@ def run_daily(
         typer.echo("stage=score status=started")
         run_id, score_elapsed = _run_with_watchdog("score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date))
         typer.echo(f"stage=score status=completed duration_seconds={round(score_elapsed, 2)} run_id={run_id}")
+
+        # Research stage — non-blocking. If it fails, export still happens.
+        research_result = {"attempted": 0, "completed": 0, "failed": 0, "skipped": 0}
+        try:
+            research_result, _ = _run_with_watchdog(
+                "research",
+                settings.stage_timeout_seconds,
+                lambda: run_research_stage(conn, settings, run_date.isoformat(), run_id),
+            )
+        except Exception as exc:
+            logger.warning("research stage failed, continuing to export: %s", exc, exc_info=True)
+
+        # Sales-ready CSV export.
+        excluded = _review_queue_excluded_domains(settings)
+        sales_ready_path = settings.out_dir / f"sales_ready_{csv_exporter.date_suffix(run_date)}.csv"
+        sales_ready_rows = 0
+        try:
+            sales_ready_rows = csv_exporter.export_sales_ready(conn, run_id, sales_ready_path, excluded)
+        except Exception as exc:
+            logger.warning("sales-ready export failed: %s", exc, exc_info=True)
+
         typer.echo("stage=export status=started")
         export_result, _ = _run_with_watchdog(
             "export",
@@ -1307,6 +1382,9 @@ def run_daily(
                     f"quarantine_size={ops_result['quarantine_size']}",
                     f"lock_busy_24h={ops_result['lock_busy_24h']}",
                     f"lock_release_missed_24h={ops_result['lock_release_missed_24h']}",
+                    f"research_attempted={research_result['attempted']}",
+                    f"research_completed={research_result['completed']}",
+                    f"sales_ready_rows={sales_ready_rows}",
                     f"sync_error={sync_error}",
                 ]
             )
@@ -2081,6 +2159,7 @@ def backfill_run_daily(
             run_daily(date_str=current.isoformat())
             succeeded += 1
         except Exception:
+            logger.warning("backfill failed for date=%s", current.isoformat(), exc_info=True)
             failed += 1
             if not continue_on_error:
                 raise
@@ -2172,6 +2251,24 @@ def serve_local_ui(
     from src.ui.local_app import app as local_ui_app
 
     uvicorn.run(local_ui_app, host=host, port=port, log_level=log_level)
+
+
+@app.command("serve-web")
+def serve_web(
+    host: str = typer.Option("0.0.0.0", "--host"),
+    port: int = typer.Option(8080, "--port"),
+    log_level: str = typer.Option("info", "--log-level"),
+) -> None:
+    """Launch the Signals pipeline web UI."""
+    try:
+        import uvicorn  # type: ignore
+    except Exception as exc:
+        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
+
+    from src.web.app import create_app
+
+    web_app = create_app()
+    uvicorn.run(web_app, host=host, port=port, log_level=log_level)
 
 
 if __name__ == "__main__":

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import csv
+import logging
 from pathlib import Path
 from typing import Any
 
 from src.export.csv_exporter import output_paths
 from src.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 def _require_google_config(settings: Settings) -> None:
@@ -34,6 +37,7 @@ def _get_or_create_worksheet(sheet: Any, title: str) -> Any:
     try:
         return sheet.worksheet(title)
     except Exception:
+        logger.debug("worksheet %s not found, creating new", title, exc_info=True)
         return sheet.add_worksheet(title=title, rows=2000, cols=40)
 
 

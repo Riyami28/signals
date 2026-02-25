@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import json
+import logging
 import os
 from typing import Any
 from urllib.parse import urljoin
@@ -16,6 +17,8 @@ from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 
 FALLBACK_ROLE_SIGNALS = {
@@ -593,6 +596,124 @@ def _collect_careers_pages(
     return inserted_total, seen_total
 
 
+def _collect_ashby(
+    conn,
+    account_id: str,
+    domain: str,
+    settings: Settings,
+    lexicon_rows: list[dict[str, str]],
+    source_reliability: dict[str, float],
+) -> tuple[int, int]:
+    source = "ashby_api"
+    reliability = source_reliability.get(source, 0.25)
+    if reliability <= 0:
+        return 0, 0
+
+    slug_candidates = _derive_slug_candidates(domain)
+    inserted_total = 0
+    seen_total = 0
+
+    for slug in slug_candidates:
+        url = f"https://jobs.ashbyhq.com/{slug}"
+        if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=url):
+            continue
+        try:
+            response = _request(url, settings)
+            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
+            if response.status_code >= 400:
+                continue
+            titles = _extract_job_titles_from_html(response.text)
+            if not titles:
+                continue
+        except Exception:
+            logger.debug("ashby fetch failed for slug=%s", slug, exc_info=True)
+            db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
+            continue
+
+        observed_at = _today_start_iso()
+        for title in titles[: settings.live_max_jobs_per_source]:
+            matches = _matches_from_text(title, lexicon_rows)
+            if not matches:
+                continue
+            inserted, seen = _insert_matches(
+                conn=conn,
+                account_id=account_id,
+                source=source,
+                reliability=reliability,
+                observed_at=observed_at,
+                evidence_url=url,
+                evidence_text=title,
+                payload={"slug": slug, "title": title},
+                matches=matches,
+            )
+            inserted_total += inserted
+            seen_total += seen
+        break  # Found valid page, stop trying slugs.
+
+    return inserted_total, seen_total
+
+
+def _collect_workday(
+    conn,
+    account_id: str,
+    domain: str,
+    settings: Settings,
+    lexicon_rows: list[dict[str, str]],
+    source_reliability: dict[str, float],
+) -> tuple[int, int]:
+    source = "workday_api"
+    reliability = source_reliability.get(source, 0.25)
+    if reliability <= 0:
+        return 0, 0
+
+    slug_candidates = _derive_slug_candidates(domain)
+    board_candidates = [f"{s}_External_Career_Site" for s in slug_candidates]
+    inserted_total = 0
+    seen_total = 0
+
+    for tenant in slug_candidates:
+        for board in board_candidates:
+            url = f"https://{tenant}.wd1.myworkdayjobs.com/wday/cxs/{board}/jobs"
+            if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=url):
+                continue
+            try:
+                response = _request(url, settings)
+                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
+                if response.status_code >= 400:
+                    continue
+                data = response.json()
+                postings = data.get("jobPostings") or data.get("jobs") or []
+                titles = [p.get("title", "") for p in postings if p.get("title")]
+                if not titles:
+                    continue
+            except Exception:
+                logger.debug("workday fetch failed for tenant=%s board=%s", tenant, board, exc_info=True)
+                db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
+                continue
+
+            observed_at = _today_start_iso()
+            for title in titles[: settings.live_max_jobs_per_source]:
+                matches = _matches_from_text(title, lexicon_rows)
+                if not matches:
+                    continue
+                inserted, seen = _insert_matches(
+                    conn=conn,
+                    account_id=account_id,
+                    source=source,
+                    reliability=reliability,
+                    observed_at=observed_at,
+                    evidence_url=url,
+                    evidence_text=title,
+                    payload={"tenant": tenant, "board": board, "title": title},
+                    matches=matches,
+                )
+                inserted_total += inserted
+                seen_total += seen
+            return inserted_total, seen_total  # Found valid endpoint, stop.
+
+    return inserted_total, seen_total
+
+
 def _process_live_account(
     conn,
     settings: Settings,
@@ -628,6 +749,27 @@ def _process_live_account(
         lexicon_rows,
         source_reliability,
     )
+
+    ashby_inserted, ashby_seen = (0, 0)
+    workday_inserted, workday_seen = (0, 0)
+    if settings.auto_discover_job_handles:
+        ashby_inserted, ashby_seen = _collect_ashby(
+            conn,
+            account_id,
+            domain,
+            settings,
+            lexicon_rows,
+            source_reliability,
+        )
+        workday_inserted, workday_seen = _collect_workday(
+            conn,
+            account_id,
+            domain,
+            settings,
+            lexicon_rows,
+            source_reliability,
+        )
+
     careers_inserted, careers_seen = _collect_careers_pages(
         conn,
         account_id,
@@ -638,8 +780,8 @@ def _process_live_account(
         source_reliability,
     )
 
-    inserted_delta = gh_inserted + lever_inserted + careers_inserted
-    seen_delta = gh_seen + lever_seen + careers_seen
+    inserted_delta = gh_inserted + lever_inserted + ashby_inserted + workday_inserted + careers_inserted
+    seen_delta = gh_seen + lever_seen + ashby_seen + workday_seen + careers_seen
     _emit_progress(
         "collector=jobs_live status=account_completed "
         f"account_index={account_index} domain={domain} inserted_delta={inserted_delta} seen_delta={seen_delta}"
@@ -722,7 +864,6 @@ def _collect_live_jobs_parallel(
             batch_inserted, batch_seen = future.result()
             inserted_total += batch_inserted
             seen_total += batch_seen
-
     return inserted_total, seen_total
 
 

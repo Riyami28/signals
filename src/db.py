@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import logging
 import os
 from pathlib import Path
-import re
 from typing import Any
 import uuid
 
 from src.models import Account, AccountScore, ComponentScore, ReviewLabel, SignalObservation
 from src.utils import load_csv_rows, normalize_domain, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 try:
     import psycopg
@@ -17,101 +19,6 @@ try:
 except Exception:  # pragma: no cover - psycopg may be absent in lightweight envs.
     psycopg = None  # type: ignore[assignment]
     dict_row = None  # type: ignore[assignment]
-
-
-_RE_INSERT_OR_IGNORE = re.compile(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", flags=re.IGNORECASE)
-_RE_DATE_TWO_ARG = re.compile(r"date\(\s*([^,()]+?)\s*,\s*([^)]+?)\s*\)", flags=re.IGNORECASE)
-_RE_DATE_ONE_ARG = re.compile(r"date\(\s*([^)]+?)\s*\)", flags=re.IGNORECASE)
-_RE_DATETIME_NOW_OFFSET = re.compile(r"datetime\(\s*'now'\s*,\s*'([^']+)'\s*\)", flags=re.IGNORECASE)
-_RE_DATETIME_NOW = re.compile(r"datetime\(\s*'now'\s*\)", flags=re.IGNORECASE)
-_RE_DATETIME_ONE_ARG = re.compile(r"datetime\(\s*([^)]+?)\s*\)", flags=re.IGNORECASE)
-
-
-class PostgresCompatCursor:
-    def __init__(self, cursor: Any):
-        self._cursor = cursor
-
-    def fetchone(self):
-        return self._cursor.fetchone()
-
-    def fetchall(self):
-        return list(self._cursor.fetchall())
-
-
-class PostgresCompatConnection:
-    backend = "postgres"
-
-    def __init__(self, raw_conn: Any):
-        self._raw_conn = raw_conn
-
-    def execute(self, sql: str, params: tuple[Any, ...] | list[Any] | None = None) -> PostgresCompatCursor:
-        cursor = self._raw_conn.execute(_rewrite_sql_for_postgres(sql), tuple(params or ()))
-        return PostgresCompatCursor(cursor)
-
-    def executemany(self, sql: str, params_seq: list[tuple[Any, ...]] | tuple[tuple[Any, ...], ...]) -> Any:
-        with self._raw_conn.cursor() as cursor:
-            return cursor.executemany(_rewrite_sql_for_postgres(sql), params_seq)
-
-    def executescript(self, sql_script: str) -> None:
-        for statement in _split_sql_statements(sql_script):
-            self._raw_conn.execute(_rewrite_sql_for_postgres(statement))
-
-    def commit(self) -> None:
-        self._raw_conn.commit()
-
-    def rollback(self) -> None:
-        self._raw_conn.rollback()
-
-    def close(self) -> None:
-        self._raw_conn.close()
-
-
-def _split_sql_statements(script: str) -> list[str]:
-    statements: list[str] = []
-    current: list[str] = []
-    in_single_quote = False
-    for char in script:
-        if char == "'":
-            in_single_quote = not in_single_quote
-        if char == ";" and not in_single_quote:
-            statement = "".join(current).strip()
-            if statement:
-                statements.append(statement)
-            current = []
-            continue
-        current.append(char)
-    tail = "".join(current).strip()
-    if tail:
-        statements.append(tail)
-    return statements
-
-
-def _rewrite_sql_for_postgres(sql: str) -> str:
-    rewritten = sql.replace("?", "%s")
-    rewritten = rewritten.replace("COLLATE NOCASE", "")
-    rewritten = rewritten.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
-
-    replaced_insert_ignore = bool(_RE_INSERT_OR_IGNORE.search(rewritten))
-    rewritten = _RE_INSERT_OR_IGNORE.sub("INSERT INTO", rewritten)
-
-    rewritten = _RE_DATETIME_NOW_OFFSET.sub(
-        lambda match: f"(CURRENT_TIMESTAMP + INTERVAL '{match.group(1)}')",
-        rewritten,
-    )
-    rewritten = _RE_DATETIME_NOW.sub("CURRENT_TIMESTAMP", rewritten)
-    rewritten = _RE_DATETIME_ONE_ARG.sub(lambda match: f"CAST({match.group(1)} AS TIMESTAMP)", rewritten)
-    rewritten = _RE_DATE_TWO_ARG.sub(
-        lambda match: f"CAST((CAST({match.group(1)} AS DATE) + CAST({match.group(2)} AS INTERVAL)) AS DATE)",
-        rewritten,
-    )
-    rewritten = _RE_DATE_ONE_ARG.sub(lambda match: f"CAST({match.group(1)} AS DATE)", rewritten)
-
-    if replaced_insert_ignore and "ON CONFLICT" not in rewritten.upper():
-        trimmed = rewritten.rstrip()
-        if trimmed.endswith(";"):
-            trimmed = trimmed[:-1].rstrip()
-        rewritten = f"{trimmed} ON CONFLICT DO NOTHING"
-    return rewritten
 
 
 def _is_integrity_error(exc: Exception) -> bool:
@@ -223,7 +130,7 @@ CREATE TABLE IF NOT EXISTS crawl_checkpoints (
 );
 
 CREATE TABLE IF NOT EXISTS crawl_attempts (
-  attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  attempt_id BIGSERIAL PRIMARY KEY,
   source TEXT NOT NULL,
   account_id TEXT NOT NULL,
   endpoint TEXT NOT NULL,
@@ -236,7 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_crawl_attempts_attempted_at ON crawl_attempts(att
 CREATE INDEX IF NOT EXISTS idx_crawl_attempts_source_attempted_at ON crawl_attempts(source, attempted_at);
 
 CREATE TABLE IF NOT EXISTS external_discovery_events (
-  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id BIGSERIAL PRIMARY KEY,
   source TEXT NOT NULL,
   source_event_id TEXT NOT NULL,
   dedupe_key TEXT NOT NULL UNIQUE,
@@ -377,7 +284,7 @@ CREATE TABLE IF NOT EXISTS document_mentions (
   document_id TEXT NOT NULL,
   account_id TEXT NOT NULL,
   signal_code TEXT NOT NULL,
-  matched_phrase TEXT NOT NULL COLLATE NOCASE,
+  matched_phrase TEXT NOT NULL,
   evidence_sentence TEXT NOT NULL,
   evidence_sentence_en TEXT NOT NULL,
   language TEXT NOT NULL,
@@ -434,7 +341,7 @@ CREATE TABLE IF NOT EXISTS people_activity (
 );
 
 CREATE TABLE IF NOT EXISTS run_lock_events (
-  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id BIGSERIAL PRIMARY KEY,
   lock_name TEXT NOT NULL,
   owner_id TEXT NOT NULL,
   action TEXT NOT NULL CHECK (action IN ('acquired', 'released', 'busy', 'release_missed')),
@@ -446,7 +353,7 @@ CREATE INDEX IF NOT EXISTS idx_run_lock_events_lock_name_created
 ON run_lock_events(lock_name, created_at);
 
 CREATE TABLE IF NOT EXISTS stage_failures (
-  failure_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  failure_id BIGSERIAL PRIMARY KEY,
   run_type TEXT NOT NULL,
   run_date TEXT NOT NULL,
   stage TEXT NOT NULL,
@@ -477,7 +384,7 @@ CREATE INDEX IF NOT EXISTS idx_retry_queue_status_due
 ON retry_queue(status, due_at);
 
 CREATE TABLE IF NOT EXISTS quarantine_failures (
-  quarantine_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quarantine_id BIGSERIAL PRIMARY KEY,
   task_id TEXT NOT NULL,
   task_type TEXT NOT NULL,
   payload_json TEXT NOT NULL,
@@ -493,7 +400,7 @@ CREATE INDEX IF NOT EXISTS idx_quarantine_failures_resolved
 ON quarantine_failures(resolved, quarantined_at);
 
 CREATE TABLE IF NOT EXISTS ops_metrics (
-  metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  metric_id BIGSERIAL PRIMARY KEY,
   run_date TEXT NOT NULL,
   recorded_at TEXT NOT NULL,
   metric TEXT NOT NULL,
@@ -503,6 +410,73 @@ CREATE TABLE IF NOT EXISTS ops_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_ops_metrics_run_date_metric
 ON ops_metrics(run_date, metric, recorded_at);
+
+CREATE TABLE IF NOT EXISTS company_research (
+    account_id          TEXT PRIMARY KEY REFERENCES accounts(account_id),
+    research_brief      TEXT,
+    research_profile    TEXT,
+    enrichment_json     TEXT NOT NULL DEFAULT '{}',
+    research_status     TEXT NOT NULL DEFAULT 'pending'
+        CHECK (research_status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')),
+    researched_at       TEXT,
+    model_used          TEXT,
+    prompt_hash         TEXT,
+    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS contact_research (
+    contact_id          TEXT PRIMARY KEY,
+    account_id          TEXT NOT NULL REFERENCES accounts(account_id),
+    first_name          TEXT NOT NULL,
+    last_name           TEXT NOT NULL,
+    title               TEXT,
+    email               TEXT,
+    linkedin_url        TEXT,
+    management_level    TEXT
+        CHECK (management_level IN ('C-Level', 'VP', 'Director', 'Manager', 'IC')),
+    year_joined         INTEGER,
+    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_contact_research_account
+    ON contact_research(account_id);
+
+CREATE TABLE IF NOT EXISTS research_runs (
+    research_run_id     TEXT PRIMARY KEY,
+    run_date            TEXT NOT NULL,
+    score_run_id        TEXT NOT NULL,
+    accounts_attempted  INTEGER NOT NULL DEFAULT 0,
+    accounts_completed  INTEGER NOT NULL DEFAULT 0,
+    accounts_failed     INTEGER NOT NULL DEFAULT 0,
+    accounts_skipped    INTEGER NOT NULL DEFAULT 0,
+    started_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at         TEXT,
+    status              TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'completed', 'failed'))
+);
+
+CREATE TABLE IF NOT EXISTS account_labels (
+    label_id            TEXT PRIMARY KEY,
+    account_id          TEXT NOT NULL,
+    label               TEXT NOT NULL,
+    reviewer            TEXT NOT NULL DEFAULT 'web_ui',
+    notes               TEXT NOT NULL DEFAULT '',
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_labels_account ON account_labels(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_labels_label ON account_labels(label);
+
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    pipeline_run_id     TEXT PRIMARY KEY,
+    started_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at         TIMESTAMP,
+    status              TEXT NOT NULL DEFAULT 'running',
+    account_ids_json    TEXT NOT NULL DEFAULT '[]',
+    stages_json         TEXT NOT NULL DEFAULT '[]',
+    result_json         TEXT NOT NULL DEFAULT '{}'
+);
 """
 
 
@@ -522,12 +496,11 @@ def get_connection(pg_dsn: str | Path | None = None):
         dsn = f"postgresql://{user}:{password}@{host}:{port}/{database}"
     if not dsn:
         raise ValueError("Postgres DSN is required. Set SIGNALS_PG_DSN or SIGNALS_PG_* environment variables.")
-    raw_conn = psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
-    return PostgresCompatConnection(raw_conn)
+    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
 
 
 def init_db(conn) -> None:
-    conn.executescript(SCHEMA_SQL)
+    conn.execute(SCHEMA_SQL)
     _run_schema_migrations(conn)
     conn.commit()
 
@@ -538,8 +511,8 @@ def _column_exists(conn, table: str, column: str) -> bool:
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = current_schema()
-          AND table_name = ?
-          AND column_name = ?
+          AND table_name = %s
+          AND column_name = %s
         LIMIT 1
         """,
         (table, column),
@@ -581,7 +554,7 @@ def get_account_by_domain(conn: Any, domain: str) -> dict[str, Any] | None:
     normalized = normalize_domain(domain)
     if not normalized:
         return None
-    cur = conn.execute("SELECT * FROM accounts WHERE domain = ?", (normalized,))
+    cur = conn.execute("SELECT * FROM accounts WHERE domain = %s", (normalized,))
     return cur.fetchone()
 
 
@@ -609,7 +582,7 @@ def upsert_account(
     conn.execute(
         """
         INSERT INTO accounts (account_id, company_name, domain, source_type, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (
             account.account_id,
@@ -670,7 +643,7 @@ def insert_signal_observation(conn: Any, observation: SignalObservation, commit:
             source_reliability,
             raw_payload_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT DO NOTHING
         RETURNING obs_id
         """,
@@ -709,7 +682,7 @@ def create_score_run(conn: Any, run_date: str) -> str:
     conn.execute(
         """
         INSERT INTO score_runs (run_id, run_date, status, started_at)
-        VALUES (?, ?, 'running', ?)
+        VALUES (%s, %s, 'running', %s)
         """,
         (run_id, run_date, utc_now_iso()),
     )
@@ -726,8 +699,8 @@ def finish_score_run(
     conn.execute(
         """
         UPDATE score_runs
-        SET status = ?, finished_at = ?, error_summary = ?
-        WHERE run_id = ?
+        SET status = %s, finished_at = %s, error_summary = %s
+        WHERE run_id = %s
         """,
         (status, utc_now_iso(), error_summary or "", run_id),
     )
@@ -743,10 +716,10 @@ def fetch_observations_for_scoring(
         """
         SELECT *
         FROM signal_observations
-        WHERE date(observed_at) <= date(?)
-          AND date(observed_at) >= date(?, ?)
+        WHERE observed_at::date <= %s::date
+          AND observed_at::date >= (%s::date + %s::interval)
         """,
-        (run_date, run_date, f"-{lookback_days} day"),
+        (run_date, run_date, f"-{lookback_days} days"),
     )
     return list(cur.fetchall())
 
@@ -757,14 +730,14 @@ def replace_run_scores(
     component_scores: list[ComponentScore],
     account_scores: list[AccountScore],
 ) -> None:
-    conn.execute("DELETE FROM score_components WHERE run_id = ?", (run_id,))
-    conn.execute("DELETE FROM account_scores WHERE run_id = ?", (run_id,))
+    conn.execute("DELETE FROM score_components WHERE run_id = %s", (run_id,))
+    conn.execute("DELETE FROM account_scores WHERE run_id = %s", (run_id,))
 
     for component in component_scores:
         conn.execute(
             """
             INSERT INTO score_components (run_id, account_id, product, signal_code, component_score)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (
                 component.run_id,
@@ -787,7 +760,7 @@ def replace_run_scores(
                 top_reasons_json,
                 delta_7d
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 score.run_id,
@@ -808,10 +781,10 @@ def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) 
         SELECT s.score
         FROM account_scores s
         JOIN score_runs r ON s.run_id = r.run_id
-        WHERE s.account_id = ?
-          AND s.product = ?
-          AND date(r.run_date) <= date(?, '-7 day')
-        ORDER BY date(r.run_date) DESC
+        WHERE s.account_id = %s
+          AND s.product = %s
+          AND r.run_date::date <= (%s::date - INTERVAL '7 days')
+        ORDER BY r.run_date::date DESC
         LIMIT 1
         """,
         (account_id, product, run_date),
@@ -825,9 +798,9 @@ def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) 
         SELECT s.score
         FROM account_scores s
         JOIN score_runs r ON s.run_id = r.run_id
-        WHERE s.account_id = ?
-          AND s.product = ?
-          AND date(r.run_date) = date(?)
+        WHERE s.account_id = %s
+          AND s.product = %s
+          AND r.run_date::date = %s::date
         ORDER BY r.started_at DESC
         LIMIT 1
         """,
@@ -844,7 +817,7 @@ def get_latest_run_id_for_date(conn: Any, run_date: str) -> str | None:
         """
         SELECT run_id
         FROM score_runs
-        WHERE date(run_date) = date(?)
+        WHERE run_date::date = %s::date
         ORDER BY started_at DESC
         LIMIT 1
         """,
@@ -875,7 +848,7 @@ def fetch_scores_for_run(conn: Any, run_id: str) -> list[dict[str, Any]]:
         FROM account_scores s
         JOIN accounts a ON a.account_id = s.account_id
         JOIN score_runs r ON r.run_id = s.run_id
-        WHERE s.run_id = ?
+        WHERE s.run_id = %s
         ORDER BY s.score DESC
         """,
         (run_id,),
@@ -887,7 +860,7 @@ def insert_review_label(conn: Any, label: ReviewLabel) -> bool:
     cur = conn.execute(
         """
         INSERT INTO review_labels (review_id, run_id, account_id, decision, reviewer, notes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT DO NOTHING
         RETURNING review_id
         """,
@@ -911,7 +884,7 @@ def fetch_review_rows_for_date(conn: Any, run_date: str) -> list[dict[str, Any]]
         SELECT rl.*, r.run_date
         FROM review_labels rl
         JOIN score_runs r ON r.run_id = rl.run_id
-        WHERE date(r.run_date) = date(?)
+        WHERE r.run_date::date = %s::date
         """,
         (run_date,),
     )
@@ -928,12 +901,12 @@ def fetch_sources_for_account_window(
         """
         SELECT DISTINCT source
         FROM signal_observations
-        WHERE account_id = ?
-          AND date(observed_at) <= date(?)
-          AND date(observed_at) >= date(?, ?)
+        WHERE account_id = %s
+          AND observed_at::date <= %s::date
+          AND observed_at::date >= (%s::date + %s::interval)
         ORDER BY source
         """,
-        (account_id, run_date, run_date, f"-{lookback_days} day"),
+        (account_id, run_date, run_date, f"-{lookback_days} days"),
     )
     return [str(row["source"]) for row in cur.fetchall()]
 
@@ -947,8 +920,8 @@ def fetch_scored_sources_for_run_account(
         """
         SELECT top_reasons_json
         FROM account_scores
-        WHERE run_id = ?
-          AND account_id = ?
+        WHERE run_id = %s
+          AND account_id = %s
         """,
         (run_id, account_id),
     )
@@ -984,7 +957,7 @@ def upsert_source_metrics(
         conn.execute(
             """
             INSERT INTO source_metrics (run_date, source, approved_rate, sample_size)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT(run_date, source)
             DO UPDATE SET approved_rate = excluded.approved_rate,
                           sample_size = excluded.sample_size
@@ -1004,7 +977,7 @@ def fetch_source_metrics(conn: Any, run_date: str) -> list[dict[str, Any]]:
         """
         SELECT run_date, source, approved_rate, sample_size
         FROM source_metrics
-        WHERE date(run_date) = date(?)
+        WHERE run_date::date = %s::date
         ORDER BY source
         """,
         (run_date,),
@@ -1018,17 +991,17 @@ def fetch_recent_reviews(conn: Any, run_date: str, days: int) -> list[dict[str, 
         SELECT rl.*, r.run_date
         FROM review_labels rl
         JOIN score_runs r ON r.run_id = rl.run_id
-        WHERE date(r.run_date) <= date(?)
-          AND date(r.run_date) >= date(?, ?)
-        ORDER BY date(r.run_date) DESC
+        WHERE r.run_date::date <= %s::date
+          AND r.run_date::date >= (%s::date + %s::interval)
+        ORDER BY r.run_date::date DESC
         """,
-        (run_date, run_date, f"-{days} day"),
+        (run_date, run_date, f"-{days} days"),
     )
     return list(cur.fetchall())
 
 
 def account_exists(conn: Any, account_id: str) -> bool:
-    cur = conn.execute("SELECT 1 FROM accounts WHERE account_id = ? LIMIT 1", (account_id,))
+    cur = conn.execute("SELECT 1 FROM accounts WHERE account_id = %s LIMIT 1", (account_id,))
     return cur.fetchone() is not None
 
 
@@ -1039,7 +1012,7 @@ def dump_run_summary(conn: Any, run_id: str) -> dict[str, object]:
             COUNT(*) AS score_rows,
             COUNT(DISTINCT account_id) AS account_count
         FROM account_scores
-        WHERE run_id = ?
+        WHERE run_id = %s
         """,
         (run_id,),
     )
@@ -1061,10 +1034,10 @@ def was_crawled_today(
         """
         SELECT 1
         FROM crawl_checkpoints
-        WHERE source = ?
-          AND account_id = ?
-          AND endpoint = ?
-          AND datetime(last_crawled_at) >= datetime('now', '-20 hours')
+        WHERE source = %s
+          AND account_id = %s
+          AND endpoint = %s
+          AND last_crawled_at::timestamp >= (CURRENT_TIMESTAMP - INTERVAL '20 hours')
         LIMIT 1
         """,
         (source, account_id, endpoint),
@@ -1082,7 +1055,7 @@ def mark_crawled(
     conn.execute(
         """
         INSERT INTO crawl_checkpoints (source, account_id, endpoint, last_crawled_at)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
         ON CONFLICT(source, account_id, endpoint)
         DO UPDATE SET last_crawled_at = excluded.last_crawled_at
         """,
@@ -1104,7 +1077,7 @@ def record_crawl_attempt(
     conn.execute(
         """
         INSERT INTO crawl_attempts (source, account_id, endpoint, attempted_at, status, error_summary)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (source, account_id, endpoint, utc_now_iso(), status, (error_summary or "")[:500]),
     )
@@ -1117,7 +1090,7 @@ def fetch_crawl_attempt_summary(conn: Any, run_date: str) -> list[dict[str, Any]
         """
         SELECT source, status, COUNT(*) AS attempt_count
         FROM crawl_attempts
-        WHERE date(attempted_at) = date(?)
+        WHERE attempted_at::date = %s::date
         GROUP BY source, status
         ORDER BY source, status
         """,
@@ -1131,10 +1104,10 @@ def fetch_latest_crawl_failures(conn: Any, run_date: str, limit: int = 10) -> li
         """
         SELECT source, account_id, endpoint, status, error_summary, attempted_at
         FROM crawl_attempts
-        WHERE date(attempted_at) = date(?)
+        WHERE attempted_at::date = %s::date
           AND status IN ('http_error', 'exception')
         ORDER BY attempted_at DESC
-        LIMIT ?
+        LIMIT %s
         """,
         (run_date, max(1, int(limit))),
     )
@@ -1257,7 +1230,7 @@ def insert_external_discovery_event(
             processed_at,
             error_summary
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', '')
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', '', '', '')
         ON CONFLICT DO NOTHING
         RETURNING event_id
         """,
@@ -1294,9 +1267,9 @@ def fetch_pending_external_discovery_events(
         SELECT *
         FROM external_discovery_events
         WHERE processing_status = 'pending'
-          AND date(observed_at) <= date(?)
-        ORDER BY datetime(observed_at) ASC, event_id ASC
-        LIMIT ?
+          AND observed_at::date <= %s::date
+        ORDER BY observed_at::timestamp ASC, event_id ASC
+        LIMIT %s
         """,
         (run_date, max(1, int(limit))),
     )
@@ -1313,10 +1286,10 @@ def mark_external_discovery_event_processed(
         """
         UPDATE external_discovery_events
         SET processing_status = 'processed',
-            processed_run_id = ?,
-            processed_at = ?,
+            processed_run_id = %s,
+            processed_at = %s,
             error_summary = ''
-        WHERE event_id = ?
+        WHERE event_id = %s
         """,
         ((processed_run_id or "").strip(), utc_now_iso(), int(event_id)),
     )
@@ -1335,10 +1308,10 @@ def mark_external_discovery_event_failed(
         """
         UPDATE external_discovery_events
         SET processing_status = 'failed',
-            processed_run_id = ?,
-            processed_at = ?,
-            error_summary = ?
-        WHERE event_id = ?
+            processed_run_id = %s,
+            processed_at = %s,
+            error_summary = %s
+        WHERE event_id = %s
         """,
         (
             (processed_run_id or "").strip(),
@@ -1398,7 +1371,7 @@ def insert_crawl_frontier(
             last_error,
             payload_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, '', '', ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', 0, %s, %s, '', '', %s)
         ON CONFLICT DO NOTHING
         RETURNING frontier_id
         """,
@@ -1435,10 +1408,10 @@ def fetch_crawl_frontier_by_status(
         """
         SELECT *
         FROM crawl_frontier
-        WHERE run_date = ?
-          AND status = ?
+        WHERE run_date = %s
+          AND status = %s
         ORDER BY priority DESC, first_seen_at ASC
-        LIMIT ?
+        LIMIT %s
         """,
         (run_date, status, max(1, int(limit))),
     )
@@ -1457,11 +1430,11 @@ def mark_crawl_frontier_status(
         conn.execute(
             """
             UPDATE crawl_frontier
-            SET status = ?,
+            SET status = %s,
                 retry_count = retry_count + 1,
-                last_attempt_at = ?,
-                last_error = ?
-            WHERE frontier_id = ?
+                last_attempt_at = %s,
+                last_error = %s
+            WHERE frontier_id = %s
             """,
             (status, utc_now_iso(), (error_summary or "")[:500], frontier_id),
         )
@@ -1469,10 +1442,10 @@ def mark_crawl_frontier_status(
         conn.execute(
             """
             UPDATE crawl_frontier
-            SET status = ?,
-                last_attempt_at = ?,
-                last_error = ?
-            WHERE frontier_id = ?
+            SET status = %s,
+                last_attempt_at = %s,
+                last_error = %s
+            WHERE frontier_id = %s
             """,
             (status, utc_now_iso(), (error_summary or "")[:500], frontier_id),
         )
@@ -1485,7 +1458,7 @@ def get_document_by_frontier_id(conn: Any, frontier_id: str) -> dict[str, Any] |
         """
         SELECT *
         FROM documents
-        WHERE frontier_id = ?
+        WHERE frontier_id = %s
         LIMIT 1
         """,
         (frontier_id,),
@@ -1551,7 +1524,7 @@ def upsert_document(
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(canonical_url) DO UPDATE
             SET frontier_id = excluded.frontier_id,
                 account_id = excluded.account_id,
@@ -1616,8 +1589,8 @@ def upsert_document(
             """
             SELECT document_id
             FROM documents
-            WHERE canonical_url = ?
-               OR content_sha256 = ?
+            WHERE canonical_url = %s
+               OR content_sha256 = %s
             LIMIT 1
             """,
             ((canonical_url or "").strip(), (content_sha256 or "").strip()),
@@ -1639,10 +1612,10 @@ def fetch_documents_for_run_by_frontier_status(
         SELECT d.*, f.url_type, f.depth, f.priority, f.payload_json, f.frontier_id, f.source_event_id, f.source
         FROM documents d
         JOIN crawl_frontier f ON f.frontier_id = d.frontier_id
-        WHERE f.run_date = ?
-          AND f.status = ?
+        WHERE f.run_date = %s
+          AND f.status = %s
         ORDER BY f.priority DESC, d.updated_at ASC
-        LIMIT ?
+        LIMIT %s
         """,
         (run_date, frontier_status, max(1, int(limit))),
     )
@@ -1693,7 +1666,7 @@ def insert_document_mention(
             relevance_score,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT DO NOTHING
         RETURNING mention_id
         """,
@@ -1740,7 +1713,7 @@ def insert_observation_lineage(
             run_date,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT DO NOTHING
         RETURNING obs_id
         """,
@@ -1788,7 +1761,7 @@ def upsert_people_watchlist_entry(
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT(account_id, person_name, role_title) DO UPDATE
         SET role_weight = excluded.role_weight,
             source_url = excluded.source_url,
@@ -1848,7 +1821,7 @@ def insert_people_activity(
             url,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT DO NOTHING
         RETURNING activity_id
         """,
@@ -1890,7 +1863,7 @@ def fetch_story_evidence_rows(conn: Any, run_date: str) -> list[dict[str, Any]]:
         FROM documents d
         JOIN accounts a ON a.account_id = d.account_id
         JOIN crawl_frontier f ON f.frontier_id = d.frontier_id
-        WHERE f.run_date = ?
+        WHERE f.run_date = %s
         ORDER BY d.evidence_quality DESC, d.relevance_score DESC, d.updated_at DESC
         """,
         (run_date,),
@@ -1924,7 +1897,7 @@ def fetch_signal_lineage_rows(conn: Any, run_date: str) -> list[dict[str, Any]]:
         FROM observation_lineage ol
         JOIN signal_observations so ON so.obs_id = ol.obs_id
         JOIN accounts a ON a.account_id = ol.account_id
-        WHERE ol.run_date = ?
+        WHERE ol.run_date = %s
         ORDER BY so.evidence_quality DESC, so.relevance_score DESC, so.confidence DESC
         """,
         (run_date,),
@@ -1948,7 +1921,7 @@ def create_discovery_run(conn: Any, run_date: str, score_run_id: str) -> str:
             crm_eligible_candidates,
             error_summary
         )
-        VALUES (?, ?, ?, ?, 'running', 0, 0, 0, 0, '')
+        VALUES (%s, %s, %s, %s, 'running', 0, 0, 0, 0, '')
         """,
         (discovery_run_id, run_date, score_run_id, utc_now_iso()),
     )
@@ -1969,13 +1942,13 @@ def finish_discovery_run(
     conn.execute(
         """
         UPDATE discovery_runs
-        SET status = ?,
-            source_events_processed = ?,
-            observations_inserted = ?,
-            total_candidates = ?,
-            crm_eligible_candidates = ?,
-            error_summary = ?
-        WHERE discovery_run_id = ?
+        SET status = %s,
+            source_events_processed = %s,
+            observations_inserted = %s,
+            total_candidates = %s,
+            crm_eligible_candidates = %s,
+            error_summary = %s
+        WHERE discovery_run_id = %s
         """,
         (
             status,
@@ -1996,8 +1969,8 @@ def replace_discovery_candidates(
     candidates: list[dict[str, object]],
     evidence_rows: list[dict[str, object]],
 ) -> None:
-    conn.execute("DELETE FROM discovery_candidates WHERE discovery_run_id = ?", (discovery_run_id,))
-    conn.execute("DELETE FROM discovery_evidence WHERE discovery_run_id = ?", (discovery_run_id,))
+    conn.execute("DELETE FROM discovery_candidates WHERE discovery_run_id = %s", (discovery_run_id,))
+    conn.execute("DELETE FROM discovery_evidence WHERE discovery_run_id = %s", (discovery_run_id,))
 
     for row in candidates:
         conn.execute(
@@ -2026,7 +1999,7 @@ def replace_discovery_candidates(
                 rank_score,
                 reasons_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 discovery_run_id,
@@ -2066,7 +2039,7 @@ def replace_discovery_candidates(
                 evidence_text,
                 component_score
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(discovery_run_id, account_id, signal_code, source, evidence_url) DO UPDATE
             SET evidence_text = excluded.evidence_text,
                 component_score = excluded.component_score
@@ -2090,7 +2063,7 @@ def get_latest_discovery_run_id_for_date(conn: Any, run_date: str) -> str | None
         """
         SELECT discovery_run_id
         FROM discovery_runs
-        WHERE date(run_date) = date(?)
+        WHERE run_date::date = %s::date
           AND status = 'completed'
         ORDER BY created_at DESC
         LIMIT 1
@@ -2106,7 +2079,7 @@ def fetch_discovery_candidates_for_run(conn: Any, discovery_run_id: str) -> list
         """
         SELECT *
         FROM discovery_candidates
-        WHERE discovery_run_id = ?
+        WHERE discovery_run_id = %s
         ORDER BY rank_score DESC, score DESC, company_name ASC
         """,
         (discovery_run_id,),
@@ -2119,7 +2092,7 @@ def fetch_discovery_run(conn: Any, discovery_run_id: str) -> dict[str, Any] | No
         """
         SELECT *
         FROM discovery_runs
-        WHERE discovery_run_id = ?
+        WHERE discovery_run_id = %s
         LIMIT 1
         """,
         (discovery_run_id,),
@@ -2128,12 +2101,12 @@ def fetch_discovery_run(conn: Any, discovery_run_id: str) -> dict[str, Any] | No
 
 
 def try_advisory_lock(conn: Any, lock_name: str, owner_id: str, details: str = "") -> bool:
-    row = conn.execute("SELECT pg_try_advisory_lock(hashtext(?)) AS locked", (lock_name,)).fetchone()
+    row = conn.execute("SELECT pg_try_advisory_lock(hashtext(%s)) AS locked", (lock_name,)).fetchone()
     locked = bool(row and bool(row["locked"]))
     conn.execute(
         """
         INSERT INTO run_lock_events (lock_name, owner_id, action, details, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (
             (lock_name or "")[:120],
@@ -2148,12 +2121,12 @@ def try_advisory_lock(conn: Any, lock_name: str, owner_id: str, details: str = "
 
 
 def release_advisory_lock(conn: Any, lock_name: str, owner_id: str, details: str = "") -> bool:
-    row = conn.execute("SELECT pg_advisory_unlock(hashtext(?)) AS unlocked", (lock_name,)).fetchone()
+    row = conn.execute("SELECT pg_advisory_unlock(hashtext(%s)) AS unlocked", (lock_name,)).fetchone()
     unlocked = bool(row and bool(row["unlocked"]))
     conn.execute(
         """
         INSERT INTO run_lock_events (lock_name, owner_id, action, details, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (
             (lock_name or "")[:120],
@@ -2190,7 +2163,7 @@ def record_stage_failure(
             retry_task_id,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING failure_id
         """,
         (
@@ -2235,7 +2208,7 @@ def enqueue_retry_task(
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, 0, ?, 'pending', ?, '', ?, ?)
+        VALUES (%s, %s, %s, 0, %s, 'pending', %s, '', %s, %s)
         """,
         (
             task_id,
@@ -2258,9 +2231,9 @@ def fetch_due_retry_tasks(conn: Any, limit: int = 20, now_iso: str | None = None
         SELECT *
         FROM retry_queue
         WHERE status = 'pending'
-          AND CAST(due_at AS TIMESTAMP) <= CAST(? AS TIMESTAMP)
+          AND CAST(due_at AS TIMESTAMP) <= CAST(%s AS TIMESTAMP)
         ORDER BY due_at ASC, created_at ASC
-        LIMIT ?
+        LIMIT %s
         """,
         ((now_iso or utc_now_iso()), max(1, int(limit))),
     )
@@ -2271,8 +2244,8 @@ def mark_retry_task_running(conn: Any, task_id: str, commit: bool = True) -> Non
     conn.execute(
         """
         UPDATE retry_queue
-        SET status = 'running', updated_at = ?
-        WHERE task_id = ?
+        SET status = 'running', updated_at = %s
+        WHERE task_id = %s
         """,
         (utc_now_iso(), task_id),
     )
@@ -2284,8 +2257,8 @@ def mark_retry_task_completed(conn: Any, task_id: str, commit: bool = True) -> N
     conn.execute(
         """
         UPDATE retry_queue
-        SET status = 'completed', updated_at = ?, last_error = ''
-        WHERE task_id = ?
+        SET status = 'completed', updated_at = %s, last_error = ''
+        WHERE task_id = %s
         """,
         (utc_now_iso(), task_id),
     )
@@ -2305,11 +2278,11 @@ def reschedule_retry_task(
         """
         UPDATE retry_queue
         SET status = 'pending',
-            attempt_count = ?,
-            due_at = ?,
-            last_error = ?,
-            updated_at = ?
-        WHERE task_id = ?
+            attempt_count = %s,
+            due_at = %s,
+            last_error = %s,
+            updated_at = %s
+        WHERE task_id = %s
         """,
         (
             max(0, int(attempt_count)),
@@ -2337,10 +2310,10 @@ def quarantine_retry_task(
         """
         UPDATE retry_queue
         SET status = 'quarantined',
-            attempt_count = ?,
-            last_error = ?,
-            updated_at = ?
-        WHERE task_id = ?
+            attempt_count = %s,
+            last_error = %s,
+            updated_at = %s
+        WHERE task_id = %s
         """,
         (max(0, int(attempt_count)), (error_summary or "")[:1000], now_iso, task_id),
     )
@@ -2357,7 +2330,7 @@ def quarantine_retry_task(
             resolved_at,
             resolution_note
         )
-        VALUES (?, ?, ?, ?, ?, ?, 0, '', '')
+        VALUES (%s, %s, %s, %s, %s, %s, 0, '', '')
         """,
         (
             task_id,
@@ -2412,7 +2385,7 @@ def fetch_pending_retry_tasks(conn: Any, limit: int = 100) -> list[dict[str, Any
         FROM retry_queue
         WHERE status IN ('pending', 'running')
         ORDER BY due_at ASC
-        LIMIT ?
+        LIMIT %s
         """,
         (max(1, int(limit)),),
     )
@@ -2432,7 +2405,7 @@ def requeue_external_discovery_events(conn: Any, run_date: str, include_processe
             processed_run_id = '',
             processed_at = '',
             error_summary = ''
-        WHERE date(observed_at) = date(?)
+        WHERE observed_at::date = %s::date
           AND {where_clause}
         RETURNING event_id
         """,
@@ -2444,13 +2417,13 @@ def requeue_external_discovery_events(conn: Any, run_date: str, include_processe
 
 
 def replace_ops_metrics(conn: Any, run_date: str, rows: list[dict[str, Any]]) -> None:
-    conn.execute("DELETE FROM ops_metrics WHERE date(run_date) = date(?)", (run_date,))
+    conn.execute("DELETE FROM ops_metrics WHERE run_date::date = %s::date", (run_date,))
     now_iso = utc_now_iso()
     for row in rows:
         conn.execute(
             """
             INSERT INTO ops_metrics (run_date, recorded_at, metric, value, meta_json)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (
                 run_date,
@@ -2468,7 +2441,7 @@ def fetch_ops_metrics(conn: Any, run_date: str) -> list[dict[str, Any]]:
         """
         SELECT run_date, recorded_at, metric, value, meta_json
         FROM ops_metrics
-        WHERE date(run_date) = date(?)
+        WHERE run_date::date = %s::date
         ORDER BY metric ASC, recorded_at ASC
         """,
         (run_date,),
@@ -2481,7 +2454,7 @@ def fetch_latest_event_ingest_lag_seconds(conn: Any, run_date: str) -> float | N
         """
         SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MAX(CAST(ingested_at AS TIMESTAMP)))) AS lag_seconds
         FROM external_discovery_events
-        WHERE date(observed_at) <= date(?)
+        WHERE observed_at::date <= %s::date
         """,
         (run_date,),
     ).fetchone()
@@ -2497,8 +2470,8 @@ def fetch_precision_by_band(conn: Any, run_date: str, lookback_days: int = 14) -
             SELECT rl.run_id, rl.account_id, rl.decision
             FROM review_labels rl
             JOIN score_runs sr ON sr.run_id = rl.run_id
-            WHERE date(sr.run_date) <= date(?)
-              AND date(sr.run_date) >= date(?, ?)
+            WHERE sr.run_date::date <= %s::date
+              AND sr.run_date::date >= (%s::date + %s::interval)
               AND rl.decision IN ('approved', 'rejected')
         ),
         best_band AS (
@@ -2523,7 +2496,7 @@ def fetch_precision_by_band(conn: Any, run_date: str, lookback_days: int = 14) -
         GROUP BY b.band
         ORDER BY b.band
         """,
-        (run_date, run_date, f"-{max(1, int(lookback_days))} day"),
+        (run_date, run_date, f"-{max(1, int(lookback_days))} days"),
     )
     return list(cur.fetchall())
 
@@ -2533,7 +2506,7 @@ def fetch_lock_event_counts(conn: Any, lookback_hours: int = 24) -> dict[str, in
         """
         SELECT action, COUNT(*) AS c
         FROM run_lock_events
-        WHERE CAST(created_at AS TIMESTAMP) >= (CURRENT_TIMESTAMP - CAST(? AS INTERVAL))
+        WHERE CAST(created_at AS TIMESTAMP) >= (CURRENT_TIMESTAMP - CAST(%s AS INTERVAL))
         GROUP BY action
         """,
         (f"{max(1, int(lookback_hours))} hours",),
@@ -2542,3 +2515,375 @@ def fetch_lock_event_counts(conn: Any, lookback_hours: int = 24) -> dict[str, in
     for row in cur.fetchall():
         counts[str(row["action"])] = int(row["c"])
     return counts
+
+
+# ---------------------------------------------------------------------------
+# Research CRUD
+# ---------------------------------------------------------------------------
+
+
+def upsert_company_research(
+    conn,
+    account_id: str,
+    *,
+    research_brief: str | None = None,
+    research_profile: str | None = None,
+    enrichment_json: str = "{}",
+    research_status: str,
+    model_used: str | None = None,
+    prompt_hash: str | None = None,
+) -> None:
+    """Insert or update a company research record."""
+    conn.execute(
+        """
+        INSERT INTO company_research
+            (account_id, research_brief, research_profile, enrichment_json,
+             research_status, researched_at, model_used, prompt_hash,
+             created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (account_id) DO UPDATE SET
+            research_brief   = EXCLUDED.research_brief,
+            research_profile = EXCLUDED.research_profile,
+            enrichment_json  = EXCLUDED.enrichment_json,
+            research_status  = EXCLUDED.research_status,
+            researched_at    = EXCLUDED.researched_at,
+            model_used       = EXCLUDED.model_used,
+            prompt_hash      = EXCLUDED.prompt_hash,
+            updated_at       = CURRENT_TIMESTAMP
+        """,
+        (account_id, research_brief, research_profile, enrichment_json,
+         research_status, model_used, prompt_hash),
+    )
+    conn.commit()
+
+
+def get_company_research(conn, account_id: str) -> dict | None:
+    """Return the company_research row or None."""
+    row = conn.execute(
+        "SELECT * FROM company_research WHERE account_id = %s",
+        (account_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_accounts_needing_research(
+    conn,
+    run_date: str,
+    score_run_id: str,
+    max_accounts: int,
+    min_tier: str,
+    stale_days: int,
+    current_prompt_hash: str,
+) -> list[dict]:
+    """
+    Returns accounts that:
+    1. Have a current score at min_tier or above
+    2. Have no completed research, OR research older than stale_days,
+       OR a different prompt_hash than current_prompt_hash
+    3. Limited to max_accounts rows, ordered by signal_score DESC
+    """
+    tier_filter = ("high",) if min_tier == "high" else ("high", "medium")
+    rows = conn.execute(
+        """
+        SELECT
+            a.account_id,
+            a.company_name,
+            a.domain,
+            s.score AS signal_score,
+            s.tier AS signal_tier,
+            s.delta_7d,
+            s.top_reasons_json
+        FROM account_scores s
+        JOIN accounts a ON a.account_id = s.account_id
+        LEFT JOIN company_research cr ON cr.account_id = a.account_id
+        WHERE s.run_id = %s
+          AND s.tier = ANY(%s)
+          AND (
+              cr.account_id IS NULL
+              OR cr.research_status NOT IN ('completed', 'in_progress')
+              OR cr.researched_at::timestamp < (CURRENT_TIMESTAMP - make_interval(days => %s))
+              OR cr.prompt_hash IS DISTINCT FROM %s
+          )
+        ORDER BY s.score DESC
+        LIMIT %s
+        """,
+        (score_run_id, list(tier_filter), stale_days, current_prompt_hash, max_accounts),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_research_in_progress(conn, account_id: str) -> None:
+    """Set research_status='in_progress' before making the API call."""
+    conn.execute(
+        """
+        INSERT INTO company_research (account_id, research_status, created_at, updated_at)
+        VALUES (%s, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (account_id) DO UPDATE SET
+            research_status = 'in_progress',
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (account_id,),
+    )
+    conn.commit()
+
+
+def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
+    """Delete all existing contacts for account, then insert new ones."""
+    conn.execute(
+        "DELETE FROM contact_research WHERE account_id = %s",
+        (account_id,),
+    )
+    for contact in contacts:
+        identifier = contact.get("linkedin_url") or (
+            contact.get("first_name", "") + contact.get("last_name", "")
+        )
+        contact_id = stable_hash(
+            {"account_id": account_id, "identifier": identifier},
+            prefix="contact",
+            length=16,
+        )
+        conn.execute(
+            """
+            INSERT INTO contact_research
+                (contact_id, account_id, first_name, last_name, title,
+                 email, linkedin_url, management_level, year_joined, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (contact_id) DO NOTHING
+            """,
+            (
+                contact_id,
+                account_id,
+                contact.get("first_name", ""),
+                contact.get("last_name", ""),
+                contact.get("title"),
+                contact.get("email"),
+                contact.get("linkedin_url"),
+                contact.get("management_level"),
+                contact.get("year_joined"),
+            ),
+        )
+    conn.commit()
+
+
+def get_contacts_for_account(conn, account_id: str) -> list[dict]:
+    """Return all contacts for an account, ordered by management_level seniority."""
+    rows = conn.execute(
+        """
+        SELECT * FROM contact_research
+        WHERE account_id = %s
+        ORDER BY CASE management_level
+            WHEN 'C-Level' THEN 1
+            WHEN 'VP' THEN 2
+            WHEN 'Director' THEN 3
+            WHEN 'Manager' THEN 4
+            WHEN 'IC' THEN 5
+            ELSE 6
+        END
+        """,
+        (account_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_research_run(conn, run_date: str, score_run_id: str) -> str:
+    """Insert a new research_runs row with status='running'. Returns research_run_id."""
+    research_run_id = f"rr_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """
+        INSERT INTO research_runs
+            (research_run_id, run_date, score_run_id, started_at, status)
+        VALUES (%s, %s, %s, CURRENT_TIMESTAMP, 'running')
+        """,
+        (research_run_id, run_date, score_run_id),
+    )
+    conn.commit()
+    return research_run_id
+
+
+def finish_research_run(
+    conn,
+    research_run_id: str,
+    status: str,
+    accounts_attempted: int,
+    accounts_completed: int,
+    accounts_failed: int,
+    accounts_skipped: int,
+) -> None:
+    """Update research_run with final counts and finished_at timestamp."""
+    conn.execute(
+        """
+        UPDATE research_runs SET
+            status = %s,
+            accounts_attempted = %s,
+            accounts_completed = %s,
+            accounts_failed = %s,
+            accounts_skipped = %s,
+            finished_at = CURRENT_TIMESTAMP
+        WHERE research_run_id = %s
+        """,
+        (status, accounts_attempted, accounts_completed, accounts_failed,
+         accounts_skipped, research_run_id),
+    )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Account Labels (Web UI)
+# ---------------------------------------------------------------------------
+
+def insert_account_label(conn, account_id: str, label: str, reviewer: str = "web_ui", notes: str = "") -> str:
+    import uuid
+    label_id = f"lbl_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """
+        INSERT INTO account_labels (label_id, account_id, label, reviewer, notes)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (label_id) DO NOTHING
+        """,
+        (label_id, account_id, label, reviewer, notes),
+    )
+    conn.commit()
+    return label_id
+
+
+def delete_account_label(conn, label_id: str) -> None:
+    conn.execute("DELETE FROM account_labels WHERE label_id = %s", (label_id,))
+    conn.commit()
+
+
+def get_labels_for_account(conn, account_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM account_labels WHERE account_id = %s ORDER BY created_at DESC",
+        (account_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_accounts_paginated(
+    conn,
+    page: int = 1,
+    per_page: int = 50,
+    sort_by: str = "score",
+    sort_dir: str = "desc",
+    tier_filter: str = "",
+    label_filter: str = "",
+    search: str = "",
+) -> tuple[list[dict], int]:
+    """Return paginated accounts joined with latest scores and labels."""
+    where_parts = []
+    params: list = []
+
+    if search:
+        where_parts.append("(a.company_name ILIKE %s OR a.domain ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
+    if tier_filter:
+        where_parts.append("best.tier = %s")
+        params.append(tier_filter)
+
+    if label_filter:
+        where_parts.append("EXISTS (SELECT 1 FROM account_labels al WHERE al.account_id = a.account_id AND al.label = %s)")
+        params.append(label_filter)
+
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    sort_map = {
+        "score": "COALESCE(best.score, 0)",
+        "company_name": "a.company_name",
+        "domain": "a.domain",
+        "tier": "best.tier",
+    }
+    order_col = sort_map.get(sort_by, "COALESCE(best.score, 0)")
+    order_dir = "DESC" if sort_dir.lower() == "desc" else "ASC"
+
+    count_sql = f"""
+        SELECT COUNT(*) as total FROM (
+            SELECT a.account_id
+            FROM accounts a
+            LEFT JOIN LATERAL (
+                SELECT score, tier FROM account_scores
+                WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+            ) best ON true
+            {where_sql}
+        ) sub
+    """
+    total = conn.execute(count_sql, params).fetchone()["total"]
+
+    offset = (page - 1) * per_page
+    data_params = list(params) + [per_page, offset]
+    data_sql = f"""
+        SELECT
+            a.account_id, a.company_name, a.domain, a.source_type,
+            COALESCE(best.score, 0) AS score,
+            COALESCE(best.tier, 'low') AS tier,
+            cr.research_status,
+            (SELECT string_agg(al.label, ',') FROM account_labels al WHERE al.account_id = a.account_id) AS labels
+        FROM accounts a
+        LEFT JOIN LATERAL (
+            SELECT score, tier
+            FROM account_scores
+            WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+        ) best ON true
+        LEFT JOIN company_research cr ON cr.account_id = a.account_id
+        {where_sql}
+        ORDER BY {order_col} {order_dir}
+        LIMIT %s OFFSET %s
+    """
+    rows = conn.execute(data_sql, data_params).fetchall()
+    return [dict(r) for r in rows], total
+
+
+def get_account_detail(conn, account_id: str) -> dict | None:
+    """Full account detail with scores, signals, research, contacts, labels."""
+    account = conn.execute(
+        "SELECT * FROM accounts WHERE account_id = %s", (account_id,)
+    ).fetchone()
+    if not account:
+        return None
+    result = dict(account)
+
+    scores = conn.execute(
+        "SELECT product, score, tier FROM account_scores WHERE account_id = %s ORDER BY score DESC",
+        (account_id,),
+    ).fetchall()
+    result["scores"] = [dict(r) for r in scores]
+
+    signals = conn.execute(
+        """SELECT signal_code, source, evidence_url, evidence_text, observed_at
+           FROM signal_observations WHERE account_id = %s ORDER BY observed_at DESC LIMIT 50""",
+        (account_id,),
+    ).fetchall()
+    result["signals"] = [dict(r) for r in signals]
+
+    result["research"] = get_company_research(conn, account_id)
+    result["contacts"] = get_contacts_for_account(conn, account_id)
+    result["labels"] = get_labels_for_account(conn, account_id)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Runs (Web UI)
+# ---------------------------------------------------------------------------
+
+def create_ui_pipeline_run(conn, account_ids: list[str], stages: list[str]) -> str:
+    import uuid
+    import json as _json
+    run_id = f"prun_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """INSERT INTO pipeline_runs (pipeline_run_id, account_ids_json, stages_json)
+           VALUES (%s, %s, %s)""",
+        (run_id, _json.dumps(account_ids), _json.dumps(stages)),
+    )
+    conn.commit()
+    return run_id
+
+
+def finish_ui_pipeline_run(conn, pipeline_run_id: str, status: str, result: dict) -> None:
+    import json as _json
+    conn.execute(
+        """UPDATE pipeline_runs SET status = %s, result_json = %s, finished_at = CURRENT_TIMESTAMP
+           WHERE pipeline_run_id = %s""",
+        (status, _json.dumps(result), pipeline_run_id),
+    )
+    conn.commit()

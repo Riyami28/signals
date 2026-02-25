@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signals Pipeline</title>
+<link rel="stylesheet" href="/static/styles.css">
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+</head>
+<body>
+<div class="container" x-data="signalsApp()" x-init="init()">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Signals Pipeline</h1>
+    <div class="header-right">
+      <button class="btn btn-primary" @click="runPipelineAll()" :disabled="pipelineRunning">
+        Run Full Pipeline
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat blue"><div class="n" x-text="stats.total"></div><div class="l">Total Accounts</div></div>
+    <div class="stat green"><div class="n" x-text="stats.high"></div><div class="l">High Tier</div></div>
+    <div class="stat orange"><div class="n" x-text="stats.medium"></div><div class="l">Medium Tier</div></div>
+    <div class="stat purple"><div class="n" x-text="stats.researched"></div><div class="l">Researched</div></div>
+    <div class="stat blue"><div class="n" x-text="stats.labeled"></div><div class="l">Labeled</div></div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <input class="search-input" type="text" placeholder="Search company or domain..."
+           x-model.debounce.300ms="search" @input="loadAccounts()">
+    <select class="filter-select" x-model="tierFilter" @change="loadAccounts()">
+      <option value="">All Tiers</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select class="filter-select" x-model="labelFilter" @change="loadAccounts()">
+      <option value="">All Labels</option>
+      <option value="qualified">Qualified</option>
+      <option value="not_qualified">Not Qualified</option>
+      <option value="sql">SQL</option>
+      <option value="mql">MQL</option>
+      <option value="sal">SAL</option>
+      <option value="abm">ABM</option>
+    </select>
+  </div>
+
+  <!-- Action Bar (when items selected) -->
+  <template x-if="selected.length > 0">
+    <div class="action-bar">
+      <span class="count" x-text="selected.length + ' selected'"></span>
+      <button class="btn btn-primary" @click="runPipelineSelected()" :disabled="pipelineRunning">
+        Run Pipeline
+      </button>
+      <select class="filter-select" x-model="bulkLabel">
+        <option value="">Apply Label...</option>
+        <option value="qualified">Qualified</option>
+        <option value="not_qualified">Not Qualified</option>
+        <option value="sql">SQL</option>
+        <option value="mql">MQL</option>
+        <option value="sal">SAL</option>
+        <option value="abm">ABM</option>
+      </select>
+      <button class="btn btn-blue btn-sm" x-show="bulkLabel" @click="applyBulkLabel()">Apply</button>
+      <button class="btn btn-sm" @click="selected = []">Clear</button>
+    </div>
+  </template>
+
+  <!-- Accounts Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" @change="toggleAll($event)"></th>
+          <th @click="setSort('company_name')" :class="{'sorted': sortBy==='company_name'}">Company</th>
+          <th @click="setSort('domain')">Domain</th>
+          <th @click="setSort('score')" :class="{'sorted': sortBy==='score'}">Score</th>
+          <th>Tier</th>
+          <th>Research</th>
+          <th>Labels</th>
+          <th style="width:36px"></th>
+        </tr>
+      </thead>
+      <template x-for="acc in accounts" :key="acc.account_id">
+        <tbody>
+          <tr :class="{'expanded': expandedId === acc.account_id}" @click="toggleExpand(acc.account_id)">
+            <td @click.stop><input type="checkbox" :value="acc.account_id" x-model="selected"></td>
+            <td style="font-weight:600;color:var(--text-bright)" x-text="acc.company_name"></td>
+            <td style="color:var(--text-muted);font-size:12px" x-text="acc.domain"></td>
+            <td>
+              <span class="score" :class="'score-' + (acc.tier || 'low')" x-text="Number(acc.score || 0).toFixed(1)"></span>
+            </td>
+            <td><span class="tier" :class="'tier-' + acc.tier" x-text="acc.tier ? acc.tier.toUpperCase() : ''"></span></td>
+            <td>
+              <span x-show="acc.research_status === 'completed'" style="color:var(--green);font-size:12px">Done</span>
+              <span x-show="acc.research_status === 'in_progress'" style="color:var(--blue);font-size:12px">Running</span>
+              <span x-show="!acc.research_status || acc.research_status === 'pending'" style="color:var(--text-muted);font-size:12px">--</span>
+            </td>
+            <td>
+              <template x-for="lbl in (acc.labels || '').split(',').filter(l => l)">
+                <span class="label-badge" :class="'label-' + lbl" x-text="lbl.toUpperCase()"></span>
+              </template>
+            </td>
+            <td style="color:var(--text-muted);font-size:12px;cursor:pointer">
+              <span x-text="expandedId === acc.account_id ? '&#9660;' : '&#9654;'"></span>
+            </td>
+          </tr>
+          <!-- Detail Panel -->
+          <tr x-show="expandedId === acc.account_id" class="detail-panel">
+            <td colspan="8">
+              <div class="detail-inner" x-data="detailPanel()" x-init="load(acc.account_id)">
+                  <!-- Tabs -->
+                  <div class="tabs">
+                    <div class="tab" :class="{'active': dtab==='signals'}" @click="dtab='signals'">Signals</div>
+                    <div class="tab" :class="{'active': dtab==='research'}" @click="dtab='research'; loadResearch(acc.account_id)">Research</div>
+                    <div class="tab" :class="{'active': dtab==='contacts'}" @click="dtab='contacts'">Contacts</div>
+                    <div class="tab" :class="{'active': dtab==='labels'}" @click="dtab='labels'; loadLabels(acc.account_id)">Labels</div>
+                  </div>
+
+                  <!-- Signals Tab -->
+                  <div x-show="dtab==='signals'">
+                    <template x-if="detail && detail.signals && detail.signals.length > 0">
+                      <div>
+                        <template x-for="sig in detail.signals">
+                          <div class="signal-card">
+                            <span class="signal-code" x-text="sig.signal_code"></span>
+                            <div class="signal-evidence" x-text="sig.evidence_text"></div>
+                            <div class="signal-meta">
+                              source: <span x-text="sig.source"></span>
+                              <template x-if="sig.evidence_url">
+                                <span> | <a class="signal-url" :href="sig.evidence_url" x-text="sig.evidence_url"></a></span>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                    <div x-show="!detail || !detail.signals || detail.signals.length === 0" class="empty">No signals detected</div>
+                  </div>
+
+                  <!-- Research Tab -->
+                  <div x-show="dtab==='research'">
+                    <template x-if="researchData && researchData.research">
+                      <div>
+                        <div class="research-brief" x-text="researchData.research.research_brief || 'No research brief available'"></div>
+                        <template x-if="researchData.research.enrichment_json">
+                          <div>
+                            <h4 style="color:var(--blue);font-size:13px;margin-top:16px;margin-bottom:8px">Enrichment Data</h4>
+                            <div class="enrichment-grid" x-data="{ enr: JSON.parse(researchData.research.enrichment_json || '{}') }">
+                              <template x-for="[k,v] in Object.entries(enr).filter(([k]) => !k.endsWith('_confidence') && !k.endsWith('_source'))">
+                                <div class="enr-item">
+                                  <div class="enr-label" x-text="k.replace(/_/g, ' ')"></div>
+                                  <div class="enr-value" x-text="typeof v === 'object' ? JSON.stringify(v) : v"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                    <div x-show="!researchData || !researchData.research" class="empty">No research data. Run the pipeline to generate research.</div>
+                  </div>
+
+                  <!-- Contacts Tab -->
+                  <div x-show="dtab==='contacts'">
+                    <template x-if="detail && detail.contacts && detail.contacts.length > 0">
+                      <div>
+                        <template x-for="c in detail.contacts">
+                          <div class="contact-card">
+                            <div class="contact-name" x-text="c.first_name + ' ' + c.last_name"></div>
+                            <div class="contact-title" x-text="c.title || ''"></div>
+                            <template x-if="c.email"><div><a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a></div></template>
+                            <template x-if="c.linkedin_url"><div><a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a></div></template>
+                            <template x-if="c.management_level"><span class="tier tier-medium" style="margin-top:4px;display:inline-block" x-text="c.management_level"></span></template>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                    <div x-show="!detail || !detail.contacts || detail.contacts.length === 0" class="empty">No contacts found. Run research to discover contacts.</div>
+                  </div>
+
+                  <!-- Labels Tab -->
+                  <div x-show="dtab==='labels'">
+                    <div style="margin-bottom:12px">
+                      <template x-for="lbl in accountLabels">
+                        <div style="display:inline-flex;align-items:center;gap:4px;margin:4px">
+                          <span class="label-badge" :class="'label-' + lbl.label" x-text="lbl.label.toUpperCase()"></span>
+                          <span style="font-size:11px;color:var(--text-muted)" x-text="lbl.notes || ''"></span>
+                          <button class="btn btn-sm btn-danger" @click.stop="removeLabel(lbl.label_id, acc.account_id)" style="padding:2px 6px;font-size:10px">x</button>
+                        </div>
+                      </template>
+                    </div>
+                    <div class="label-form">
+                      <select class="label-select" x-model="newLabel">
+                        <option value="">Add label...</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="not_qualified">Not Qualified</option>
+                        <option value="sql">SQL</option>
+                        <option value="mql">MQL</option>
+                        <option value="sal">SAL</option>
+                        <option value="abm">ABM</option>
+                      </select>
+                      <input class="notes-input" type="text" placeholder="Notes (optional)" x-model="newNotes">
+                      <button class="btn btn-blue btn-sm" @click.stop="addLabel(acc.account_id)" :disabled="!newLabel">Add</button>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+        </tbody>
+      </template>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" x-show="totalPages > 1">
+    <button class="btn btn-sm" @click="page = Math.max(1, page-1); loadAccounts()" :disabled="page <= 1">Prev</button>
+    <span class="info" x-text="'Page ' + page + ' of ' + totalPages"></span>
+    <button class="btn btn-sm" @click="page = Math.min(totalPages, page+1); loadAccounts()" :disabled="page >= totalPages">Next</button>
+  </div>
+
+  <!-- Pipeline Modal -->
+  <template x-if="showPipelineModal">
+    <div class="modal-overlay" @click.self="!pipelineRunning && (showPipelineModal = false)">
+      <div class="modal">
+        <h2>Pipeline Execution</h2>
+        <div class="stage-timeline">
+          <template x-for="stage in pipelineStages">
+            <div class="stage-item">
+              <div class="stage-icon" :class="stage.status">
+                <span x-show="stage.status==='pending'">&#9711;</span>
+                <span x-show="stage.status==='running'">&#9881;</span>
+                <span x-show="stage.status==='completed'">&#10003;</span>
+                <span x-show="stage.status==='failed'">&#10007;</span>
+              </div>
+              <div style="flex:1">
+                <div class="stage-name" x-text="stage.name"></div>
+                <div class="stage-msg" x-text="stage.message || 'Waiting...'"></div>
+                <div class="stage-logs">
+                  <template x-for="log in stage.logs">
+                    <div class="stage-log" x-text="log"></div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div style="margin-top:16px;text-align:right">
+          <button class="btn" @click="showPipelineModal = false; loadAccounts()" :disabled="pipelineRunning">
+            <span x-text="pipelineRunning ? 'Running...' : 'Close'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

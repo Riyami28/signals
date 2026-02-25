@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+import logging
 import os
 from typing import Any
 from urllib.parse import quote_plus
@@ -15,6 +16,8 @@ from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_REDDIT_TERMS = "(devops OR platform engineering OR cloud cost OR finops OR kubernetes OR terraform OR soc2 OR audit)"
 _LIVE_PROGRESS_COMMIT_EVERY = 25
@@ -80,7 +83,7 @@ def _parse_entry_observed_at(entry: Any) -> str:
         try:
             return datetime(*published_parsed[:6], tzinfo=timezone.utc).isoformat()
         except Exception:
-            pass
+            logger.debug("failed to parse published_parsed for entry", exc_info=True)
     published = entry.get("published")
     if published:
         return str(published)

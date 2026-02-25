@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import json
+import logging
 from typing import Any
 
 from src import db
@@ -11,6 +12,8 @@ from src.models import SignalObservation
 from src.scoring.rules import load_keyword_lexicon, load_source_registry
 from src.settings import Settings
 from src.utils import stable_hash, utc_now_iso, write_csv_rows
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -76,6 +79,7 @@ def _parse_payload(payload_json: str) -> dict[str, Any]:
     try:
         parsed = json.loads(payload_json)
     except Exception:
+        logger.debug("failed to parse hunt payload JSON", exc_info=True)
         return {}
     return parsed if isinstance(parsed, dict) else {}
 

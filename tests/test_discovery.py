@@ -492,7 +492,7 @@ def test_replay_discovery_events_command_requeues_failed(tmp_path: Path, monkeyp
     )
     assert inserted is True
     row = conn.execute(
-        "SELECT event_id FROM external_discovery_events WHERE source_event_id = ? LIMIT 1",
+        "SELECT event_id FROM external_discovery_events WHERE source_event_id = %s LIMIT 1",
         ("evt-replay-1",),
     ).fetchone()
     assert row is not None
@@ -512,7 +512,7 @@ def test_replay_discovery_events_command_requeues_failed(tmp_path: Path, monkeyp
 
     conn2 = db.get_connection()
     row2 = conn2.execute(
-        "SELECT processing_status FROM external_discovery_events WHERE source_event_id = ? LIMIT 1",
+        "SELECT processing_status FROM external_discovery_events WHERE source_event_id = %s LIMIT 1",
         ("evt-replay-1",),
     ).fetchone()
     conn2.close()

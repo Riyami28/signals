@@ -193,7 +193,7 @@ def compute_icp_signal_gaps(
         SELECT a.domain, a.company_name, s.product, s.score, s.tier
         FROM account_scores s
         JOIN accounts a ON a.account_id = s.account_id
-        WHERE s.run_id = ?
+        WHERE s.run_id = %s
         """,
         (run_id,),
     ).fetchall():
@@ -208,7 +208,7 @@ def compute_icp_signal_gaps(
         SELECT a.domain, c.product, c.signal_code, c.component_score
         FROM score_components c
         JOIN accounts a ON a.account_id = c.account_id
-        WHERE c.run_id = ?
+        WHERE c.run_id = %s
         """,
         (run_id,),
     ).fetchall():

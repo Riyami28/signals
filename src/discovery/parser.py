@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -11,6 +12,8 @@ from bs4 import BeautifulSoup
 from src.discovery import multilingual
 from src.discovery.speaker_intel import Speaker, closest_speaker, extract_speakers
 from src.utils import classify_text
+
+logger = logging.getLogger(__name__)
 
 try:
     import trafilatura
@@ -85,6 +88,7 @@ def _extract_with_trafilatura(html: str) -> tuple[str, str]:
             title = str(meta.title or "")
         return title.strip(), text.strip()
     except Exception:
+        logger.debug("trafilatura extraction failed", exc_info=True)
         return "", ""
 
 

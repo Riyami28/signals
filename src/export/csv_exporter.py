@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 from datetime import date
 import json
 from pathlib import Path
@@ -7,6 +9,8 @@ from typing import Any
 
 from src import db
 from src.utils import normalize_domain, write_csv_rows
+
+logger = logging.getLogger(__name__)
 
 
 def date_suffix(run_date: date) -> str:
@@ -213,4 +217,234 @@ def export_ops_metrics(conn, run_date: str, output_path: Path) -> int:
         export_rows,
         fieldnames=["run_date", "recorded_at", "metric", "value", "meta_json"],
     )
+    return len(export_rows)
+
+
+_SALES_READY_COLUMNS = [
+    "company_name",
+    "domain",
+    "website",
+    "industry",
+    "sub_industry",
+    "country",
+    "city",
+    "state",
+    "employees",
+    "employee_range",
+    "revenue_range",
+    "company_linkedin_url",
+    "signal_score",
+    "signal_tier",
+    "delta_7d",
+    "top_signals",
+    "evidence_links",
+    "top_reason_1",
+    "top_reason_2",
+    "top_reason_3",
+    "research_brief",
+    "research_summary",
+    "key_contacts",
+    "conversation_starters",
+    "research_status",
+    "source_type",
+    "first_seen_date",
+    "last_signal_date",
+]
+
+_CONFIDENCE_THRESHOLD = 0.5
+
+
+def _enrichment_field(enrichment: dict, field_name: str) -> str:
+    """Extract a field from enrichment JSON, respecting confidence threshold."""
+    conf_key = f"{field_name}_confidence"
+    conf = enrichment.get(conf_key, 1.0)
+    try:
+        conf = float(conf)
+    except (ValueError, TypeError):
+        conf = 1.0
+    if conf < _CONFIDENCE_THRESHOLD:
+        return ""
+    val = enrichment.get(field_name, "")
+    if val is None:
+        return ""
+    if isinstance(val, list):
+        return ", ".join(str(v) for v in val)
+    return str(val).strip()
+
+
+def _format_delta(delta: Any) -> str:
+    """Format delta as +5.2 or -3.1."""
+    try:
+        val = float(delta or 0)
+    except (ValueError, TypeError):
+        return ""
+    return f"{val:+.1f}"
+
+
+def _extract_starters_from_profile(profile: str) -> str:
+    """Extract conversation starters section from research profile."""
+    if not profile:
+        return ""
+    match = re.search(r"##\s*Conversation\s*Starters?\s*\n(.*?)(?:\n##|\Z)", profile, re.DOTALL | re.IGNORECASE)
+    if match:
+        lines = match.group(1).strip().splitlines()
+        items = []
+        for line in lines:
+            stripped = line.strip()
+            m = re.match(r"^[-*•]\s*(.*)", stripped)
+            if m and m.group(1).strip():
+                items.append(m.group(1).strip())
+        return "\n".join(items)
+    return ""
+
+
+def _iso_date(ts: Any) -> str:
+    """Extract YYYY-MM-DD from a timestamp string."""
+    if not ts:
+        return ""
+    s = str(ts).strip()
+    if len(s) >= 10:
+        return s[:10]
+    return s
+
+
+def export_sales_ready(
+    conn,
+    score_run_id: str,
+    output_path: Path,
+    excluded_domains: set[str] | None = None,
+) -> int:
+    """Export the unified sales-ready CSV. Returns number of rows written."""
+    excluded = excluded_domains or set()
+
+    # Fetch scores for this run.
+    score_rows = db.fetch_scores_for_run(conn, score_run_id)
+
+    # Dedupe to best product per account.
+    tier_rank = {"high": 2, "medium": 1}
+    best_by_account: dict[str, dict] = {}
+    for row in score_rows:
+        tier = str(row.get("tier", "") or "").lower()
+        if tier not in {"high", "medium"}:
+            continue
+        domain = normalize_domain(str(row.get("domain", "") or ""))
+        if domain in excluded:
+            continue
+        account_id = str(row["account_id"])
+        score = float(row.get("score", 0) or 0)
+        current = best_by_account.get(account_id)
+        if current:
+            ct = str(current.get("tier", "")).lower()
+            cs = float(current.get("score", 0) or 0)
+            if (tier_rank.get(ct, 0), cs) >= (tier_rank.get(tier, 0), score):
+                continue
+        best_by_account[account_id] = dict(row)
+
+    # Sort by signal_score DESC.
+    sorted_rows = sorted(
+        best_by_account.values(),
+        key=lambda r: float(r.get("score", 0) or 0),
+        reverse=True,
+    )
+
+    # Batch fetch last signal dates.
+    account_ids = [str(r["account_id"]) for r in sorted_rows]
+    last_signal_dates: dict[str, str] = {}
+    if account_ids:
+        signal_rows = conn.execute(
+            """
+            SELECT account_id, MAX(observed_at) AS last_observed
+            FROM signal_observations
+            WHERE account_id = ANY(%s)
+            GROUP BY account_id
+            """,
+            (account_ids,),
+        ).fetchall()
+        for sr in signal_rows:
+            last_signal_dates[str(sr["account_id"])] = _iso_date(sr["last_observed"])
+
+    export_rows: list[dict[str, Any]] = []
+
+    for row in sorted_rows:
+        account_id = str(row["account_id"])
+
+        # Research data (may be absent).
+        research = db.get_company_research(conn, account_id)
+        enrichment: dict = {}
+        if research:
+            try:
+                enrichment = json.loads(research.get("enrichment_json", "{}") or "{}")
+            except json.JSONDecodeError:
+                enrichment = {}
+
+        # Contacts.
+        contacts = db.get_contacts_for_account(conn, account_id)
+        contact_lines = []
+        for c in contacts[:5]:
+            line = f"{c.get('first_name', '')} {c.get('last_name', '')}".strip()
+            title = c.get("title", "")
+            if title:
+                line += f" ({title})"
+            linkedin = c.get("linkedin_url", "")
+            if linkedin:
+                line += f" \u2014 {linkedin}"
+            contact_lines.append(line)
+
+        # Top reasons.
+        reasons = _parse_reasons(str(row.get("top_reasons_json", "") or ""))
+        top_signals = [str(r.get("signal_code", "")) for r in reasons if r.get("signal_code")]
+        evidence_urls: list[str] = []
+        seen_urls: set[str] = set()
+        for r in reasons:
+            url = str(r.get("evidence_url", "")).strip()
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                evidence_urls.append(url)
+
+        def _reason_str(idx: int) -> str:
+            if idx >= len(reasons):
+                return ""
+            r = reasons[idx]
+            code = r.get("signal_code", "")
+            source = r.get("source", "")
+            return f"{code} via {source}" if source else code
+
+        research_brief = (research or {}).get("research_brief", "") or ""
+        research_profile = (research or {}).get("research_profile", "") or ""
+        starters = _extract_starters_from_profile(research_profile)
+        research_status = (research or {}).get("research_status", "skipped") or "skipped"
+
+        export_rows.append({
+            "company_name": str(row.get("company_name", "") or ""),
+            "domain": str(row.get("domain", "") or ""),
+            "website": _enrichment_field(enrichment, "website"),
+            "industry": _enrichment_field(enrichment, "industry"),
+            "sub_industry": _enrichment_field(enrichment, "sub_industry"),
+            "country": _enrichment_field(enrichment, "country"),
+            "city": _enrichment_field(enrichment, "city"),
+            "state": _enrichment_field(enrichment, "state"),
+            "employees": _enrichment_field(enrichment, "employees"),
+            "employee_range": _enrichment_field(enrichment, "employee_range"),
+            "revenue_range": _enrichment_field(enrichment, "revenue_range"),
+            "company_linkedin_url": _enrichment_field(enrichment, "company_linkedin_url"),
+            "signal_score": str(row.get("score", "") or ""),
+            "signal_tier": str(row.get("tier", "") or ""),
+            "delta_7d": _format_delta(row.get("delta_7d")),
+            "top_signals": "|".join(top_signals),
+            "evidence_links": "|".join(evidence_urls),
+            "top_reason_1": _reason_str(0),
+            "top_reason_2": _reason_str(1),
+            "top_reason_3": _reason_str(2),
+            "research_brief": research_brief,
+            "research_summary": research_profile,
+            "key_contacts": "\n".join(contact_lines),
+            "conversation_starters": starters,
+            "research_status": research_status,
+            "source_type": str(row.get("source_type", "") or ""),
+            "first_seen_date": _iso_date(row.get("created_at", "")),
+            "last_signal_date": last_signal_dates.get(account_id, ""),
+        })
+
+    write_csv_rows(output_path, export_rows, fieldnames=_SALES_READY_COLUMNS)
+    logger.info("export_sales_ready rows=%d path=%s", len(export_rows), output_path)
     return len(export_rows)

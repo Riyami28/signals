@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from langdetect import detect as detect_language_raw
@@ -38,6 +41,7 @@ def detect_language(text: str, language_hint: str = "") -> str:
     try:
         detected = str(detect_language_raw(text or "")).strip().lower()
     except Exception:
+        logger.debug("language detection failed, defaulting to en", exc_info=True)
         return "en"
     if detected in SUPPORTED_LANGS:
         return detected
@@ -51,6 +55,7 @@ def _load_translator(model_name: str):
     try:
         return hf_pipeline("translation", model=model_name)
     except Exception:
+        logger.debug("failed to load translator model=%s", model_name, exc_info=True)
         return None
 
 
@@ -78,6 +83,7 @@ def translate_to_english(text: str, language: str) -> tuple[str, str]:
             return translated, "translated"
         return text, "translator_empty_output"
     except Exception:
+        logger.warning("translation failed for language=%s", language, exc_info=True)
         return text, "translator_error"
 
 

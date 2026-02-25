@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from datetime import date
 import csv
+from datetime import date
+import logging
 
 from src import db
 from src.models import ReviewLabel
 from src.settings import Settings
 from src.utils import load_csv_rows, parse_datetime, stable_hash
+
+logger = logging.getLogger(__name__)
 
 VALID_DECISIONS = {"approved", "rejected", "needs_more_info"}
 REVIEW_INPUT_FIELDS = ["run_date", "account_id", "decision", "reviewer", "notes", "created_at"]
@@ -20,6 +23,7 @@ def _normalize_created_at(value: str, run_date_str: str) -> str:
         parsed = parse_datetime(raw).replace(microsecond=0)
         return parsed.isoformat()
     except Exception:
+        logger.debug("failed to parse created_at=%s", raw, exc_info=True)
         return f"{run_date_str}T00:00:00+00:00"
 
 
@@ -106,6 +110,7 @@ def _read_rows_from_google_sheet(settings: Settings) -> list[dict[str, str]]:
     try:
         ws = sheet.worksheet("review_input")
     except Exception:
+        logger.warning("failed to read review_input worksheet from Google Sheets", exc_info=True)
         return []
 
     rows = ws.get_all_records()

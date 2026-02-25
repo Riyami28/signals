@@ -126,7 +126,7 @@ def compute_icp_coverage(
         SELECT a.domain, a.company_name, s.product, s.score, s.tier
         FROM account_scores s
         JOIN accounts a ON a.account_id = s.account_id
-        WHERE s.run_id = ?
+        WHERE s.run_id = %s
         """,
         (run_id,),
     ).fetchall()
