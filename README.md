@@ -2,9 +2,49 @@
 
 Local-first buying signal tracker for `zop.dev`, `zopday`, and `zopnight`.
 
+## Prerequisites
+
+- **Python 3.12+** — `python3 --version`
+- **Docker Desktop** — running and accessible
+- **git** and **gh** CLI
+
+## Setup (New Clone)
+
+```bash
+git clone https://github.com/talvinder/signals.git
+cd signals
+make setup        # Creates venv, installs deps, starts Docker, initialises DB
+make dev          # Starts web UI at http://localhost:8788
+```
+
+The `make setup` command runs `scripts/bootstrap.sh` which:
+1. Creates `.venv` and installs all Python dependencies
+2. Installs Playwright Chromium (used for JS-fallback crawling)
+3. Copies `.env.example` → `.env` (edit to add API keys)
+4. Starts Docker services: Postgres (55432), Redis (56379), Huginn (3000)
+5. Waits for Postgres health check
+6. Runs `python -m src.main migrate` to apply DB migrations
+7. Loads seed accounts from `config/seed_accounts.csv`
+
+### After setup, add your API keys to `.env`:
+```
+SIGNALS_CLAUDE_API_KEY=sk-ant-...    # Required for LLM research stage
+SIGNALS_CLAUDE_MODEL=claude-sonnet-4-6
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `docker: command not found` | Install Docker Desktop and make sure it's running |
+| `psycopg.OperationalError: connection refused` | Run `make setup` or `docker compose -f docker-compose.local.yml up -d` |
+| Tests skipped (not failing) | DB not running — start Docker first |
+| `ImportError` on `src.*` | Activate venv: `source .venv/bin/activate` |
+| Schema mismatch errors | Run `make migrate` to apply pending migrations |
+
 ## Quick Start (One Command)
 
-From the repo root, run:
+After `make setup`, run the full pipeline:
 
 ```bash
 ./signals start
