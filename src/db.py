@@ -496,13 +496,83 @@ def get_connection(pg_dsn: str | Path | None = None):
         dsn = f"postgresql://{user}:{password}@{host}:{port}/{database}"
     if not dsn:
         raise ValueError("Postgres DSN is required. Set SIGNALS_PG_DSN or SIGNALS_PG_* environment variables.")
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+    conn = psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+    conn.execute("SET search_path = signals, public")
+    return conn
 
 
 def init_db(conn) -> None:
     conn.execute(SCHEMA_SQL)
-    _run_schema_migrations(conn)
+    _run_column_migrations(conn)
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Versioned migration system
+# ---------------------------------------------------------------------------
+
+def _migration_dir() -> Path:
+    """Return the migrations/ directory relative to this file's package root."""
+    return Path(__file__).parent.parent / "migrations"
+
+
+def _ensure_schema_version_table(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_version (
+          version     INTEGER PRIMARY KEY,
+          description TEXT    NOT NULL,
+          applied_at  TEXT    NOT NULL
+        )
+        """
+    )
+
+
+def _applied_versions(conn) -> set[int]:
+    _ensure_schema_version_table(conn)
+    rows = conn.execute("SELECT version FROM schema_version ORDER BY version").fetchall()
+    return {int(r["version"]) for r in rows}
+
+
+def run_migrations(conn) -> list[int]:
+    """Apply any unapplied numbered SQL files from migrations/.
+
+    Returns the list of newly applied version numbers.
+    """
+    migrations_path = _migration_dir()
+    if not migrations_path.is_dir():
+        logger.warning("migrations/ directory not found at %s — skipping", migrations_path)
+        return []
+
+    applied = _applied_versions(conn)
+    sql_files = sorted(migrations_path.glob("*.sql"))
+    newly_applied: list[int] = []
+
+    for sql_file in sql_files:
+        # Expect filenames like: 001_initial_schema.sql
+        stem = sql_file.stem
+        try:
+            version = int(stem.split("_")[0])
+        except (ValueError, IndexError):
+            logger.warning("Skipping migration file with unexpected name: %s", sql_file.name)
+            continue
+
+        if version in applied:
+            continue
+
+        logger.info("Applying migration %d from %s", version, sql_file.name)
+        sql = sql_file.read_text(encoding="utf-8")
+        conn.execute(sql)
+        conn.execute(
+            "INSERT INTO schema_version (version, description, applied_at) VALUES (%s, %s, NOW()::TEXT)"
+            " ON CONFLICT (version) DO NOTHING",
+            (version, stem),
+        )
+        conn.commit()
+        newly_applied.append(version)
+        logger.info("Migration %d applied", version)
+
+    return newly_applied
 
 
 def _column_exists(conn, table: str, column: str) -> bool:
@@ -526,8 +596,8 @@ def _ensure_column(conn, table: str, column: str, ddl_fragment: str) -> None:
     conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_fragment}")
 
 
-def _run_schema_migrations(conn) -> None:
-    # Backfill newly introduced lineage columns in legacy PostgreSQL databases.
+def _run_column_migrations(conn) -> None:
+    """Backfill legacy columns for databases created before SCHEMA_SQL was updated."""
     _ensure_column(conn, "signal_observations", "document_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "mention_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "evidence_sentence", "TEXT NOT NULL DEFAULT ''")

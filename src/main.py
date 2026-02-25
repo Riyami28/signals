@@ -545,6 +545,20 @@ def _run_hunt_cycle(run_date: date, profile_name: str = "light") -> dict[str, in
         conn.close()
 
 
+@app.command("migrate")
+def migrate() -> None:
+    """Apply any pending versioned SQL migrations from the migrations/ directory."""
+    settings, conn, _ = _bootstrap()
+    try:
+        newly_applied = db.run_migrations(conn)
+        if newly_applied:
+            typer.echo(f"migrations_applied={len(newly_applied)} versions={','.join(str(v) for v in newly_applied)}")
+        else:
+            typer.echo("migrations_applied=0 status=already_up_to_date")
+    finally:
+        conn.close()
+
+
 @app.command("ingest")
 def ingest(all_sources: bool = typer.Option(True, "--all/--no-all", help="Run all collectors")) -> None:
     if not all_sources:
