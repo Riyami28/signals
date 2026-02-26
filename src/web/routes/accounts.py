@@ -7,6 +7,7 @@ import re
 from fastapi import APIRouter, HTTPException, Query
 
 from src import db
+from src.export.dossier import render_dossier
 from src.settings import load_settings
 
 router = APIRouter(tags=["accounts"])

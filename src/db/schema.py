@@ -473,4 +473,18 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     stages_json         TEXT NOT NULL DEFAULT '[]',
     result_json         TEXT NOT NULL DEFAULT '{}'
 );
+
+CREATE TABLE IF NOT EXISTS dossiers (
+    dossier_id          TEXT PRIMARY KEY,
+    account_id          TEXT NOT NULL,
+    dossier_type        TEXT NOT NULL DEFAULT 'full'
+        CHECK (dossier_type IN ('full', 'brief', 'summary', 'skipped')),
+    version             INTEGER NOT NULL DEFAULT 1,
+    sections_json       TEXT NOT NULL DEFAULT '[]',
+    markdown            TEXT NOT NULL DEFAULT '',
+    generated_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(account_id) REFERENCES accounts(account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dossiers_account ON dossiers(account_id);
 """
