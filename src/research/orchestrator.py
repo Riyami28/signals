@@ -18,6 +18,7 @@ def _empty_summary() -> dict:
     return {
         "attempted": 0,
         "completed": 0,
+        "partial": 0,
         "failed": 0,
         "skipped": 0,
         "total_input_tokens": 0,
@@ -71,6 +72,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
 
     attempted = 0
     completed = 0
+    partial = 0
     failed = 0
     skipped = 0
     total_input_tokens = 0
@@ -110,6 +112,34 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
             research_brief = ext_parsed.research_brief
             enrichment_dict = _enrichment_to_dict(ext_parsed.enrichment, pre_enrichment)
 
+            # Step f2: persist extraction results immediately as "partial".
+            db.upsert_company_research(
+                conn,
+                account_id,
+                research_brief=research_brief,
+                research_profile=research_brief,
+                enrichment_json=json.dumps(enrichment_dict, ensure_ascii=False),
+                research_status="partial",
+                model_used=ext_response.model,
+                prompt_hash=current_hash,
+            )
+
+        except Exception as exc:
+            failed += 1
+            logger.warning("research extraction failed for account=%s: %s", account_id, exc, exc_info=True)
+            try:
+                db.upsert_company_research(
+                    conn,
+                    account_id,
+                    research_status="failed",
+                    prompt_hash=current_hash,
+                )
+            except Exception:
+                logger.debug("failed to mark research as failed for account=%s", account_id, exc_info=True)
+            continue
+
+        # --- Pass 2: scoring (extraction data is already persisted) ---
+        try:
             # Step g: build scoring prompt.
             score_system, score_user = build_scoring_prompt(account, research_brief)
 
@@ -127,7 +157,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
                     score_parsed.parse_errors,
                 )
 
-            # Step j: store results.
+            # Step j: store full results (upgrade partial → completed).
             conversation_starters = "\n".join(f"- {s}" for s in score_parsed.conversation_starters)
             profile = research_brief
             if conversation_starters:
@@ -167,25 +197,20 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
             )
 
         except Exception as exc:
-            failed += 1
-            logger.warning("research failed for account=%s: %s", account_id, exc, exc_info=True)
-            # Store partial failure.
-            try:
-                db.upsert_company_research(
-                    conn,
-                    account_id,
-                    research_status="failed",
-                    prompt_hash=current_hash,
-                )
-            except Exception:
-                logger.debug("failed to mark research as failed for account=%s", account_id, exc_info=True)
+            partial += 1
+            logger.warning(
+                "research scoring failed for account=%s (extraction preserved as partial): %s",
+                account_id,
+                exc,
+                exc_info=True,
+            )
 
     db.finish_research_run(
         conn,
         research_run_id,
-        status="completed" if failed == 0 else "failed",
+        status="completed" if failed == 0 and partial == 0 else "failed",
         accounts_attempted=attempted,
-        accounts_completed=completed,
+        accounts_completed=completed + partial,
         accounts_failed=failed,
         accounts_skipped=skipped,
     )
@@ -193,6 +218,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
     return {
         "attempted": attempted,
         "completed": completed,
+        "partial": partial,
         "failed": failed,
         "skipped": skipped,
         "total_input_tokens": total_input_tokens,

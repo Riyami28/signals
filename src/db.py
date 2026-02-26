@@ -424,7 +424,7 @@ CREATE TABLE IF NOT EXISTS company_research (
     research_profile    TEXT,
     enrichment_json     TEXT NOT NULL DEFAULT '{}',
     research_status     TEXT NOT NULL DEFAULT 'pending'
-        CHECK (research_status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')),
+        CHECK (research_status IN ('pending', 'in_progress', 'completed', 'partial', 'failed', 'skipped')),
     researched_at       TEXT,
     model_used          TEXT,
     prompt_hash         TEXT,
@@ -645,6 +645,36 @@ def _run_column_migrations(conn) -> None:
     _ensure_column(conn, "external_discovery_events", "language_hint", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "external_discovery_events", "author_hint", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "external_discovery_events", "published_at_hint", "TEXT NOT NULL DEFAULT ''")
+
+    # Add 'partial' to the research_status CHECK constraint for existing databases.
+    _migrate_research_status_check(conn)
+
+
+def _migrate_research_status_check(conn) -> None:
+    """Add 'partial' to company_research.research_status CHECK constraint if missing."""
+    row = conn.execute(
+        """
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'company_research'::regclass
+          AND conname = 'company_research_research_status_check'
+        """,
+    ).fetchone()
+    if row is None:
+        return
+    # Check if 'partial' is already in the constraint definition.
+    defn = conn.execute(
+        "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = %s",
+        (row["conname"],),
+    ).fetchone()
+    if defn and "partial" in str(defn.get("pg_get_constraintdef", "")):
+        return
+    conn.execute("ALTER TABLE company_research DROP CONSTRAINT company_research_research_status_check")
+    conn.execute(
+        """
+        ALTER TABLE company_research ADD CONSTRAINT company_research_research_status_check
+        CHECK (research_status IN ('pending', 'in_progress', 'completed', 'partial', 'failed', 'skipped'))
+        """
+    )
 
 
 def _build_account_id(domain: str) -> str:

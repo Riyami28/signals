@@ -401,7 +401,7 @@ CREATE TABLE IF NOT EXISTS company_research (
   research_profile TEXT,
   enrichment_json  TEXT NOT NULL DEFAULT '{}',
   research_status  TEXT NOT NULL DEFAULT 'pending'
-    CHECK (research_status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')),
+    CHECK (research_status IN ('pending', 'in_progress', 'completed', 'partial', 'failed', 'skipped')),
   researched_at    TEXT,
   model_used       TEXT,
   prompt_hash      TEXT,
