@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from src import db
+from src.scoring.rules import legacy_tier_from_v2
 from src.utils import normalize_domain, write_csv_rows
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,18 @@ def _parse_reasons(top_reasons_json: str) -> list[dict[str, Any]]:
     return []
 
 
+def _legacy_tier(row: dict[str, Any]) -> str:
+    tier_v2 = str(row.get("tier_v2", "") or "").strip().lower()
+    legacy = str(row.get("tier", "") or "").strip().lower()
+    # Backward compatibility: rows inserted by legacy paths may only set tier (high/medium/low),
+    # while tier_v2 is left at the DB default tier_4.
+    if tier_v2 == "tier_4" and legacy in {"high", "medium"}:
+        return legacy
+    if tier_v2:
+        return legacy_tier_from_v2(tier_v2)
+    return legacy
+
+
 def export_daily_scores(conn, run_id: str, output_path: Path) -> int:
     rows = db.fetch_scores_for_run(conn, run_id)
     export_rows: list[dict[str, Any]] = []
@@ -53,6 +66,7 @@ def export_daily_scores(conn, run_id: str, output_path: Path) -> int:
                 "product": row["product"],
                 "score": row["score"],
                 "tier": row["tier"],
+                "tier_v2": row.get("tier_v2", ""),
                 "delta_7d": row["delta_7d"],
                 "velocity_7d": row.get("velocity_7d", 0.0),
                 "velocity_14d": row.get("velocity_14d", 0.0),
@@ -75,6 +89,7 @@ def export_daily_scores(conn, run_id: str, output_path: Path) -> int:
             "product",
             "score",
             "tier",
+            "tier_v2",
             "delta_7d",
             "velocity_7d",
             "velocity_14d",
@@ -101,7 +116,7 @@ def export_review_queue(
     tier_rank = {"high": 2, "medium": 1}
 
     for row in rows:
-        tier = str(row["tier"]).lower()
+        tier = _legacy_tier(row)
         if tier not in {"high", "medium"}:
             continue
         domain = normalize_domain(str(row["domain"] or ""))
@@ -356,7 +371,7 @@ def export_sales_ready(
     tier_rank = {"high": 2, "medium": 1}
     best_by_account: dict[str, dict] = {}
     for row in score_rows:
-        tier = str(row.get("tier", "") or "").lower()
+        tier = _legacy_tier(row)
         if tier not in {"high", "medium"}:
             continue
         domain = normalize_domain(str(row.get("domain", "") or ""))
@@ -461,7 +476,7 @@ def export_sales_ready(
                 "revenue_range": _enrichment_field(enrichment, "revenue_range"),
                 "company_linkedin_url": _enrichment_field(enrichment, "company_linkedin_url"),
                 "signal_score": str(row.get("score", "") or ""),
-                "signal_tier": str(row.get("tier", "") or ""),
+                "signal_tier": str(row.get("tier_v2", "") or row.get("tier", "") or ""),
                 "delta_7d": _format_delta(row.get("delta_7d")),
                 "velocity_7d": _format_delta(row.get("velocity_7d")),
                 "velocity_14d": _format_delta(row.get("velocity_14d")),

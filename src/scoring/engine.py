@@ -10,10 +10,13 @@ from typing import Callable
 from src.models import AccountScore, ComponentScore
 from src.scoring.explain import rank_top_reasons, reasons_to_json
 from src.scoring.rules import (
+    TIER_ORDER,
     VALID_DIMENSIONS,
     DimensionWeight,
     SignalRule,
     Thresholds,
+    TierUpgradeRule,
+    legacy_tier_from_v2,
 )
 from src.utils import parse_datetime
 
@@ -43,12 +46,51 @@ def recency_decay(days_since_observed: int, half_life_days: float) -> float:
     return math.pow(0.5, max(0, days_since_observed) / half_life_days)
 
 
-def classify_tier(score: float, thresholds: Thresholds) -> str:
-    if score >= thresholds.high:
-        return "high"
-    if score >= thresholds.medium:
-        return "medium"
-    return "low"
+def _promote_one_tier(tier_name: str) -> str:
+    current = str(tier_name or "").strip().lower()
+    if current not in TIER_ORDER:
+        return "tier_4"
+    idx = TIER_ORDER.index(current)
+    return TIER_ORDER[max(0, idx - 1)]
+
+
+def _apply_upgrade_rules(
+    base_tier: str,
+    dimension_scores: dict[str, float],
+    rules: tuple[TierUpgradeRule, ...],
+) -> str:
+    if base_tier not in TIER_ORDER or not rules:
+        return base_tier if base_tier in TIER_ORDER else "tier_4"
+
+    upgraded = base_tier
+    for _ in range(len(TIER_ORDER)):
+        changed = False
+        for rule in rules:
+            if rule.current_tier != "*" and upgraded != rule.current_tier:
+                continue
+            if float(dimension_scores.get(rule.condition_dimension, 0.0)) < float(rule.condition_threshold):
+                continue
+            target = _promote_one_tier(upgraded) if rule.promote_to_tier == "+1" else rule.promote_to_tier
+            if target not in TIER_ORDER:
+                continue
+            if TIER_ORDER.index(target) < TIER_ORDER.index(upgraded):
+                upgraded = target
+                changed = True
+        if not changed:
+            break
+    return upgraded
+
+
+def classify_tier(score: float, thresholds: Thresholds, dimension_scores: dict[str, float] | None = None) -> str:
+    if score >= float(thresholds.tier_1):
+        base_tier = "tier_1"
+    elif score >= float(thresholds.tier_2):
+        base_tier = "tier_2"
+    elif score >= float(thresholds.tier_3):
+        base_tier = "tier_3"
+    else:
+        base_tier = "tier_4"
+    return _apply_upgrade_rules(base_tier, dimension_scores or {}, thresholds.upgrade_rules)
 
 
 def classify_velocity(velocity_7d: float) -> VelocityCategory:
@@ -315,7 +357,8 @@ def run_scoring(
                 2,
             ),
         )
-        tier = classify_tier(total_score, thresholds)
+        tier_v2 = classify_tier(total_score, thresholds, dimension_scores=dimension_scores)
+        tier = legacy_tier_from_v2(tier_v2)
 
         reasons: list[dict] = []
         for signal_code, _ in items:
@@ -364,6 +407,7 @@ def run_scoring(
                 product=product,
                 score=total_score,
                 tier=tier,
+                tier_v2=tier_v2,
                 top_reasons_json=reasons_to_json(top_reasons),
                 delta_7d=delta,
                 dimension_scores_json=json.dumps(dimension_scores, sort_keys=True),

@@ -150,6 +150,12 @@ def _run_column_migrations(conn) -> None:
     _ensure_column(conn, "signal_observations", "evidence_quality", "REAL NOT NULL DEFAULT 0.0")
     _ensure_column(conn, "signal_observations", "relevance_score", "REAL NOT NULL DEFAULT 0.0")
     _ensure_column(conn, "account_scores", "dimension_scores_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(
+        conn,
+        "account_scores",
+        "tier_v2",
+        "TEXT NOT NULL DEFAULT 'tier_4' CHECK (tier_v2 IN ('tier_1', 'tier_2', 'tier_3', 'tier_4'))",
+    )
 
     _ensure_column(conn, "external_discovery_events", "entry_url", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "external_discovery_events", "url_type", "TEXT NOT NULL DEFAULT ''")

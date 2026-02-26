@@ -1,0 +1,3 @@
+rule_name,condition_dimension,condition_threshold,current_tier,promote_to_tier
+strong_trigger_upgrade,trigger_intent,70,tier_2,tier_1
+pql_engagement_upgrade,engagement_pql,80,*,+1

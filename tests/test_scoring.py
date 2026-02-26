@@ -2,14 +2,16 @@ import json
 from datetime import date
 from pathlib import Path
 
-from src.scoring.engine import recency_decay, run_scoring
+from src.scoring.engine import classify_tier, recency_decay, run_scoring
 from src.scoring.rules import (
     VALID_DIMENSIONS,
     DimensionWeight,
     SignalRule,
     Thresholds,
+    TierUpgradeRule,
     load_dimension_weights,
     load_signal_rules,
+    load_thresholds,
 )
 
 
@@ -351,3 +353,62 @@ def test_load_dimension_weights_reads_config_file():
     weights = load_dimension_weights(Path("config/dimension_weights.csv"))
     assert set(weights.keys()) == VALID_DIMENSIONS
     assert round(sum(value.weight for value in weights.values()), 6) == 1.0
+
+
+def test_load_thresholds_supports_new_4_tier_format(tmp_path: Path):
+    path = tmp_path / "thresholds.csv"
+    path.write_text("key,value\ntier_1,80\ntier_2,60\ntier_3,40\ntier_4,0\n", encoding="utf-8")
+    rules_path = tmp_path / "tier_upgrade_rules.csv"
+    rules_path.write_text(
+        (
+            "rule_name,condition_dimension,condition_threshold,current_tier,promote_to_tier\n"
+            "strong_trigger_upgrade,trigger_intent,70,tier_2,tier_1\n"
+        ),
+        encoding="utf-8",
+    )
+
+    thresholds = load_thresholds(path)
+    assert thresholds.tier_1 == 80.0
+    assert thresholds.tier_2 == 60.0
+    assert thresholds.tier_3 == 40.0
+    assert thresholds.tier_4 == 0.0
+    assert thresholds.high == 80.0
+    assert thresholds.medium == 40.0
+    assert len(thresholds.upgrade_rules) == 1
+
+
+def test_classify_tier_applies_upgrade_rules():
+    thresholds = Thresholds(
+        high=80.0,
+        medium=40.0,
+        low=0.0,
+        tier_1=80.0,
+        tier_2=60.0,
+        tier_3=40.0,
+        tier_4=0.0,
+        upgrade_rules=(
+            # PQL score upgrades tier_3 -> tier_2.
+            TierUpgradeRule(
+                rule_name="pql_engagement_upgrade",
+                condition_dimension="engagement_pql",
+                condition_threshold=80.0,
+                current_tier="*",
+                promote_to_tier="+1",
+            ),
+            # Trigger intent can then upgrade tier_2 -> tier_1.
+            TierUpgradeRule(
+                rule_name="strong_trigger_upgrade",
+                condition_dimension="trigger_intent",
+                condition_threshold=70.0,
+                current_tier="tier_2",
+                promote_to_tier="tier_1",
+            ),
+        ),
+    )
+
+    tier = classify_tier(
+        58.0,
+        thresholds,
+        dimension_scores={"engagement_pql": 81.0, "trigger_intent": 75.0},
+    )
+    assert tier == "tier_1"

@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS account_scores (
   product TEXT NOT NULL CHECK (product IN ('zopdev', 'zopday', 'zopnight')),
   score REAL NOT NULL,
   tier TEXT NOT NULL CHECK (tier IN ('high', 'medium', 'low')),
+  tier_v2 TEXT NOT NULL DEFAULT 'tier_4' CHECK (tier_v2 IN ('tier_1', 'tier_2', 'tier_3', 'tier_4')),
   top_reasons_json TEXT NOT NULL,
   delta_7d REAL NOT NULL,
   dimension_scores_json TEXT NOT NULL DEFAULT '{}',

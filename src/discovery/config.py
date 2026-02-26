@@ -148,12 +148,11 @@ def load_discovery_thresholds(path: Path) -> DiscoveryThresholds:
         except (TypeError, ValueError):
             return default
 
-    return DiscoveryThresholds(
-        high=_parse("high", 20.0),
-        medium=_parse("medium", 10.0),
-        explore=_parse("explore", 6.0),
-        low=_parse("low", 0.0),
-    )
+    tier_1 = _parse("tier_1", _parse("high", 20.0))
+    tier_2 = _parse("tier_2", _parse("medium", 10.0))
+    tier_3 = _parse("tier_3", _parse("explore", 6.0))
+    tier_4 = _parse("tier_4", _parse("low", 0.0))
+    return DiscoveryThresholds(high=tier_1, medium=tier_2, explore=tier_3, low=tier_4)
 
 
 def load_discovery_blocklist(path: Path) -> set[str]:

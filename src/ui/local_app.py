@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -430,7 +430,7 @@ def _parse_key_values(text: str) -> dict[str, str]:
     return parsed
 
 
-def _parse_iso(value: str) -> datetime | None:
+def _parse_iso(value: str) -> Optional[datetime]:
     raw = (value or "").strip()
     if not raw:
         return None
@@ -570,7 +570,7 @@ def _run_history(limit: int = _MAX_RUN_HISTORY) -> list[dict[str, Any]]:
         finished_raw = str(run.get("finished_at", "") or "")
         started = _parse_iso(started_raw)
         finished = _parse_iso(finished_raw)
-        duration_seconds: float | None = None
+        duration_seconds: Optional[float] = None
         if started and finished:
             duration_seconds = max(0.0, (finished - started).total_seconds())
         rows.append(
@@ -587,7 +587,7 @@ def _run_history(limit: int = _MAX_RUN_HISTORY) -> list[dict[str, Any]]:
     return rows
 
 
-def _latest_output_bundle(preferred_output_date: str | None = None) -> dict[str, Any]:
+def _latest_output_bundle(preferred_output_date: Optional[str] = None) -> dict[str, Any]:
     candidate_dates: list[str] = []
     if preferred_output_date:
         candidate_dates.append(preferred_output_date)
@@ -707,7 +707,7 @@ def _term_glossary() -> list[dict[str, str]]:
 class RunDailyRequest(BaseModel):
     run_date: str = Field(default_factory=lambda: date.today().isoformat())
     live_crawl: bool = False
-    workers_per_source: int | None = None
+    workers_per_source: Optional[int] = None
 
 
 app = FastAPI(title="signals-local-ui", version="0.2.0")
@@ -1676,7 +1676,7 @@ def index() -> str:
 
 
 @app.get("/api/overview")
-def overview(output_date: str | None = Query(default=None)) -> dict[str, Any]:
+def overview(output_date: Optional[str] = Query(default=None)) -> dict[str, Any]:
     today_iso = date.today().isoformat()
     available_dates = _available_output_dates()
     selected = output_date or _default_output_date()
@@ -1743,10 +1743,10 @@ def tracked_companies(
 def preview(
     area: Literal["input", "output"] = Query(...),
     key: str = Query(...),
-    output_date: str | None = Query(default=None),
+    output_date: Optional[str] = Query(default=None),
     limit: int = Query(default=25, ge=1, le=200),
 ) -> dict[str, Any]:
-    path: Path | None = None
+    path: Optional[Path] = None
     label = key
     if area == "input":
         match = next((item for item in _INPUT_FILES if item.key == key), None)

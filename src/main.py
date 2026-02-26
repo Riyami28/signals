@@ -14,6 +14,7 @@ import uuid
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -230,7 +231,7 @@ def _persist_ops_metrics(conn, settings: Settings, run_date: date) -> dict[str, 
     }
 
 
-def _bootstrap(settings: Settings | None = None):
+def _bootstrap(settings: Optional[Settings] = None):
     local_settings = settings or load_settings()
     ensure_project_directories(
         [
@@ -298,7 +299,7 @@ def _collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
             logger.info("db_pool_closed")
 
 
-def _baseline_score_7d(conn, account_id: str, product: str, run_date: str) -> float | None:
+def _baseline_score_7d(conn, account_id: str, product: str, run_date: str) -> Optional[float]:
     cur = conn.execute(
         """
         SELECT s.score
@@ -373,6 +374,7 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
                         product=product,
                         score=0.0,
                         tier="low",
+                        tier_v2="tier_4",
                         top_reasons_json="[]",
                         delta_7d=0.0,
                         dimension_scores_json="{}",
@@ -400,6 +402,7 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
             )
             if score.tier in {"medium", "high"} and not has_primary:
                 score.tier = "low"
+                score.tier_v2 = "tier_4"
 
         db.replace_run_scores(conn, run_id, result.component_scores, result.account_scores)
         db.finish_score_run(conn, run_id, status="completed", error_summary=None)

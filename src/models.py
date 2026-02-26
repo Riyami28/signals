@@ -56,6 +56,7 @@ class AccountScore(BaseModel):
     product: Literal["zopdev", "zopday", "zopnight"]
     score: float
     tier: Literal["high", "medium", "low"]
+    tier_v2: Literal["tier_1", "tier_2", "tier_3", "tier_4"] = "tier_4"
     top_reasons_json: str
     delta_7d: float
     dimension_scores_json: str = "{}"

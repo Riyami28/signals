@@ -60,7 +60,7 @@ class DiscoveryEventPayload(BaseModel):
     published_at_hint: str = ""
     company_name_hint: str = ""
     domain_hint: str = ""
-    raw_payload: dict[str, Any] | list[Any] | str | None = None
+    raw_payload: Any = None
 
 
 def _extract_domain_from_url(value: str) -> str:
@@ -122,7 +122,7 @@ def create_app():
     def receive_discovery_event(
         request: Request,
         payload: DiscoveryEventPayload,
-        x_discovery_token: str | None = Header(default=None, alias="X-Discovery-Token"),
+        x_discovery_token: Optional[str] = Header(default=None, alias="X-Discovery-Token"),
     ):
         # Rate limiting.
         client_ip = request.client.host if request.client else "unknown"

@@ -1,5 +1,5 @@
 key,value
-high,20
-medium,10
-explore,6
-low,0
+tier_1,80
+tier_2,60
+tier_3,40
+tier_4,0

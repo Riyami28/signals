@@ -6,6 +6,7 @@ import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -29,7 +30,7 @@ def _today_iso() -> str:
     return date.today().isoformat()
 
 
-def _normalize_date(value: str | None) -> str:
+def _normalize_date(value: Optional[str]) -> str:
     raw = (value or "").strip()
     if not raw:
         return _today_iso()
@@ -55,7 +56,7 @@ def _apply_fast_fail_network(env: dict[str, str], enabled: bool) -> None:
     env["SIGNALS_RESPECT_ROBOTS_TXT"] = "0"
 
 
-def _apply_workers_per_source(env: dict[str, str], workers_per_source: int | None) -> None:
+def _apply_workers_per_source(env: dict[str, str], workers_per_source: Optional[int]) -> None:
     if workers_per_source is None:
         return
     env["SIGNALS_LIVE_WORKERS_PER_SOURCE"] = str(max(1, int(workers_per_source)))
@@ -101,7 +102,7 @@ def _source_health_note(
     attempts: int,
     success_rate_pct: float,
     evidence_rate_pct: float,
-    approved_rate: float | None,
+    approved_rate: Optional[float],
     approved_sample_size: int,
     reliability: float,
 ) -> str:
@@ -139,10 +140,10 @@ def _run_watch(
     live_max_accounts: int,
     stage_timeout_seconds: int,
     poll_interval_seconds: int,
-    workers_per_source: int | None,
+    workers_per_source: Optional[int],
     live: bool,
     fast_fail_network: bool,
-    extra_env: dict[str, str] | None = None,
+    extra_env: Optional[dict[str, str]] = None,
 ) -> int:
     if not MONITOR_SCRIPT.exists():
         raise typer.BadParameter(f"Missing monitor script: {MONITOR_SCRIPT}")
@@ -177,7 +178,7 @@ def _run_watch(
 def start(
     run_date: str = typer.Option(None, "--date", help="Run date in YYYY-MM-DD. Defaults to today."),
     live_max_accounts: int = typer.Option(1000, "--live-max-accounts", help="Max accounts for live crawl."),
-    workers_per_source: int | None = typer.Option(
+    workers_per_source: Optional[int] = typer.Option(
         None,
         "--workers-per-source",
         min=1,
@@ -210,7 +211,7 @@ def watch(
     run_date: str = typer.Option(None, "--date", help="Run date in YYYY-MM-DD. Defaults to today."),
     live: bool = typer.Option(True, "--live/--no-live", help="Enable/disable live crawl during monitored run."),
     live_max_accounts: int = typer.Option(1000, "--live-max-accounts", help="Max accounts for live crawl."),
-    workers_per_source: int | None = typer.Option(
+    workers_per_source: Optional[int] = typer.Option(
         None,
         "--workers-per-source",
         min=1,
@@ -242,14 +243,16 @@ def watch(
 def run_daily(
     run_date: str = typer.Option(None, "--date", help="Run date in YYYY-MM-DD. Defaults to today."),
     live: bool = typer.Option(False, "--live/--no-live", help="Enable/disable live crawl."),
-    live_max_accounts: int | None = typer.Option(None, "--live-max-accounts", help="Override max live-crawl accounts."),
-    workers_per_source: int | None = typer.Option(
+    live_max_accounts: Optional[int] = typer.Option(
+        None, "--live-max-accounts", help="Override max live-crawl accounts."
+    ),
+    workers_per_source: Optional[int] = typer.Option(
         None,
         "--workers-per-source",
         min=1,
         help="Parallel live-crawl workers per source. Omit to use adaptive auto sizing.",
     ),
-    stage_timeout_seconds: int | None = typer.Option(
+    stage_timeout_seconds: Optional[int] = typer.Option(
         None, "--stage-timeout-seconds", help="Override per-stage timeout."
     ),
     fast_fail_network: bool = typer.Option(
@@ -287,7 +290,7 @@ def company(
     domain: str = typer.Argument(..., help="Company domain (example: example.com)."),
     run_date: str = typer.Option(None, "--date", help="Run date in YYYY-MM-DD. Defaults to today."),
     watch: bool = typer.Option(True, "--watch/--no-watch", help="Stream real-time progress in terminal."),
-    workers_per_source: int | None = typer.Option(
+    workers_per_source: Optional[int] = typer.Option(
         None,
         "--workers-per-source",
         min=1,
@@ -667,7 +670,7 @@ def sources(
 
         quality = quality_by_source.get(source, {})
         approved_sample_size = int(quality.get("sample_size", 0) or 0)
-        approved_rate: float | None = None
+        approved_rate: Optional[float] = None
         approved_rate_str = "n/a"
         if approved_sample_size > 0:
             approved_rate = float(quality.get("approved_rate", 0.0) or 0.0)
@@ -806,7 +809,7 @@ def hunt(
     domain: str = typer.Argument(..., help="Company domain (example: example.com)."),
     run_date: str = typer.Option(None, "--date", help="Run date in YYYY-MM-DD. Defaults to today."),
     top: int = typer.Option(5, "--top", help="How many score rows to show for the target company."),
-    workers_per_source: int | None = typer.Option(
+    workers_per_source: Optional[int] = typer.Option(
         None,
         "--workers-per-source",
         min=1,

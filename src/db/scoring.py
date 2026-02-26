@@ -89,11 +89,12 @@ def replace_run_scores(
                 product,
                 score,
                 tier,
+                tier_v2,
                 top_reasons_json,
                 delta_7d,
                 dimension_scores_json
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 score.run_id,
@@ -101,6 +102,7 @@ def replace_run_scores(
                 score.product,
                 score.score,
                 score.tier,
+                score.tier_v2,
                 score.top_reasons_json,
                 score.delta_7d,
                 score.dimension_scores_json,
@@ -177,6 +179,7 @@ def fetch_scores_for_run(conn: Any, run_id: str) -> list[dict[str, Any]]:
             s.product,
             s.score,
             s.tier,
+            s.tier_v2,
             s.delta_7d,
             s.top_reasons_json
         FROM account_scores s
