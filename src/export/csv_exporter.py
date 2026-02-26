@@ -54,7 +54,13 @@ def export_daily_scores(conn, run_id: str, output_path: Path) -> int:
                 "score": row["score"],
                 "tier": row["tier"],
                 "delta_7d": row["delta_7d"],
+                "velocity_7d": row.get("velocity_7d", 0.0),
+                "velocity_14d": row.get("velocity_14d", 0.0),
+                "velocity_30d": row.get("velocity_30d", 0.0),
+                "velocity_category": row.get("velocity_category", "stable"),
                 "top_reasons_json": row["top_reasons_json"],
+                "confidence_band": row.get("confidence_band", "low"),
+                "dimension_confidence_json": row.get("dimension_confidence_json", "{}"),
             }
         )
 
@@ -70,7 +76,13 @@ def export_daily_scores(conn, run_id: str, output_path: Path) -> int:
             "score",
             "tier",
             "delta_7d",
+            "velocity_7d",
+            "velocity_14d",
+            "velocity_30d",
+            "velocity_category",
             "top_reasons_json",
+            "confidence_band",
+            "dimension_confidence_json",
         ],
     )
     return len(export_rows)
@@ -125,6 +137,9 @@ def export_review_queue(
             if url:
                 links.append(url)
 
+        conf_band = str(row.get("confidence_band", "low") or "low")
+        needs_validation = conf_band == "low" and str(row["tier"]) in {"high", "medium"}
+
         queue_rows.append(
             {
                 "run_date": row["run_date"],
@@ -134,6 +149,12 @@ def export_review_queue(
                 "product": row["product"],
                 "score": row["score"],
                 "tier": row["tier"],
+                "velocity_7d": row.get("velocity_7d", 0.0),
+                "velocity_14d": row.get("velocity_14d", 0.0),
+                "velocity_30d": row.get("velocity_30d", 0.0),
+                "velocity_category": row.get("velocity_category", "stable"),
+                "confidence_band": conf_band,
+                "needs_validation": "yes" if needs_validation else "",
                 "top_reason_1": reason_1,
                 "top_reason_2": reason_2,
                 "top_reason_3": reason_3,
@@ -152,6 +173,12 @@ def export_review_queue(
             "product",
             "score",
             "tier",
+            "velocity_7d",
+            "velocity_14d",
+            "velocity_30d",
+            "velocity_category",
+            "confidence_band",
+            "needs_validation",
             "top_reason_1",
             "top_reason_2",
             "top_reason_3",
@@ -235,7 +262,12 @@ _SALES_READY_COLUMNS = [
     "company_linkedin_url",
     "signal_score",
     "signal_tier",
+    "confidence_band",
     "delta_7d",
+    "velocity_7d",
+    "velocity_14d",
+    "velocity_30d",
+    "velocity_category",
     "top_signals",
     "evidence_links",
     "top_reason_1",
@@ -431,6 +463,10 @@ def export_sales_ready(
                 "signal_score": str(row.get("score", "") or ""),
                 "signal_tier": str(row.get("tier", "") or ""),
                 "delta_7d": _format_delta(row.get("delta_7d")),
+                "velocity_7d": _format_delta(row.get("velocity_7d")),
+                "velocity_14d": _format_delta(row.get("velocity_14d")),
+                "velocity_30d": _format_delta(row.get("velocity_30d")),
+                "velocity_category": str(row.get("velocity_category", "stable") or "stable"),
                 "top_signals": "|".join(top_signals),
                 "evidence_links": "|".join(evidence_urls),
                 "top_reason_1": _reason_str(0),

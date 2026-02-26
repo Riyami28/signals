@@ -101,6 +101,12 @@ CREATE TABLE IF NOT EXISTS account_scores (
   tier TEXT NOT NULL CHECK (tier IN ('high', 'medium', 'low')),
   top_reasons_json TEXT NOT NULL,
   delta_7d REAL NOT NULL,
+  velocity_7d REAL NOT NULL DEFAULT 0.0,
+  velocity_14d REAL NOT NULL DEFAULT 0.0,
+  velocity_30d REAL NOT NULL DEFAULT 0.0,
+  velocity_category TEXT NOT NULL DEFAULT 'stable' CHECK (velocity_category IN ('surging', 'accelerating', 'stable', 'decelerating')),
+  confidence_band TEXT NOT NULL DEFAULT 'low' CHECK (confidence_band IN ('high', 'medium', 'low')),
+  dimension_confidence_json TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (run_id, account_id, product),
   FOREIGN KEY(run_id) REFERENCES score_runs(run_id),
   FOREIGN KEY(account_id) REFERENCES accounts(account_id)
@@ -640,6 +646,14 @@ def _run_column_migrations(conn) -> None:
     _ensure_column(conn, "signal_observations", "evidence_quality", "REAL NOT NULL DEFAULT 0.0")
     _ensure_column(conn, "signal_observations", "relevance_score", "REAL NOT NULL DEFAULT 0.0")
 
+    _ensure_column(conn, "account_scores", "confidence_band", "TEXT NOT NULL DEFAULT 'low'")
+    _ensure_column(conn, "account_scores", "dimension_confidence_json", "TEXT NOT NULL DEFAULT '{}'")
+
+    _ensure_column(conn, "account_scores", "velocity_7d", "REAL NOT NULL DEFAULT 0.0")
+    _ensure_column(conn, "account_scores", "velocity_14d", "REAL NOT NULL DEFAULT 0.0")
+    _ensure_column(conn, "account_scores", "velocity_30d", "REAL NOT NULL DEFAULT 0.0")
+    _ensure_column(conn, "account_scores", "velocity_category", "TEXT NOT NULL DEFAULT 'stable'")
+
     _ensure_column(conn, "external_discovery_events", "entry_url", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "external_discovery_events", "url_type", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "external_discovery_events", "language_hint", "TEXT NOT NULL DEFAULT ''")
@@ -889,9 +903,15 @@ def replace_run_scores(
                 score,
                 tier,
                 top_reasons_json,
-                delta_7d
+                delta_7d,
+                velocity_7d,
+                velocity_14d,
+                velocity_30d,
+                velocity_category,
+                confidence_band,
+                dimension_confidence_json
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 score.run_id,
@@ -901,9 +921,40 @@ def replace_run_scores(
                 score.tier,
                 score.top_reasons_json,
                 score.delta_7d,
+                score.velocity_7d,
+                score.velocity_14d,
+                score.velocity_30d,
+                score.velocity_category,
+                score.confidence_band,
+                score.dimension_confidence_json,
             ),
         )
     conn.commit()
+
+
+def _get_score_at_offset(conn: Any, account_id: str, product: str, run_date: str, days_back: int) -> float | None:
+    """Get the most recent score from *days_back* or more days ago.
+
+    Uses ORDER BY r.started_at DESC to pick the latest run when multiple
+    runs exist on the same date.
+    """
+    cur = conn.execute(
+        """
+        SELECT s.score
+        FROM account_scores s
+        JOIN score_runs r ON s.run_id = r.run_id
+        WHERE s.account_id = %s
+          AND s.product = %s
+          AND r.run_date::date <= (%s::date - INTERVAL '%s days')
+        ORDER BY r.run_date::date DESC, r.started_at DESC
+        LIMIT 1
+        """,
+        (account_id, product, run_date, days_back),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return float(row["score"])
 
 
 def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) -> float:
@@ -915,7 +966,7 @@ def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) 
         WHERE s.account_id = %s
           AND s.product = %s
           AND r.run_date::date <= (%s::date - INTERVAL '7 days')
-        ORDER BY r.run_date::date DESC
+        ORDER BY r.run_date::date DESC, r.started_at DESC
         LIMIT 1
         """,
         (account_id, product, run_date),
@@ -941,6 +992,24 @@ def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) 
     if not current_row:
         return 0.0
     return round(float(current_row["score"]) - float(row["score"]), 2)
+
+
+def get_score_velocity(
+    conn: Any, account_id: str, product: str, current_score: float, run_date: str
+) -> tuple[float, float, float]:
+    """Return (velocity_7d, velocity_14d, velocity_30d) for an account-product pair.
+
+    Each velocity = current_score - score_N_days_ago.
+    Returns 0.0 for any window that has no historical data.
+    """
+    results: list[float] = []
+    for days in (7, 14, 30):
+        past = _get_score_at_offset(conn, account_id, product, run_date, days)
+        if past is None:
+            results.append(0.0)
+        else:
+            results.append(round(current_score - past, 2))
+    return (results[0], results[1], results[2])
 
 
 def get_latest_run_id_for_date(conn: Any, run_date: str) -> str | None:
@@ -975,7 +1044,13 @@ def fetch_scores_for_run(conn: Any, run_id: str) -> list[dict[str, Any]]:
             s.score,
             s.tier,
             s.delta_7d,
-            s.top_reasons_json
+            s.velocity_7d,
+            s.velocity_14d,
+            s.velocity_30d,
+            s.velocity_category,
+            s.top_reasons_json,
+            s.confidence_band,
+            s.dimension_confidence_json
         FROM account_scores s
         JOIN accounts a ON a.account_id = s.account_id
         JOIN score_runs r ON r.run_id = s.run_id
@@ -2973,7 +3048,9 @@ def get_account_detail(conn, account_id: str) -> dict | None:
     result = dict(account)
 
     scores = conn.execute(
-        "SELECT product, score, tier FROM account_scores WHERE account_id = %s ORDER BY score DESC",
+        """SELECT product, score, tier, delta_7d,
+                  velocity_7d, velocity_14d, velocity_30d, velocity_category
+           FROM account_scores WHERE account_id = %s ORDER BY score DESC""",
         (account_id,),
     ).fetchall()
     result["scores"] = [dict(r) for r in scores]

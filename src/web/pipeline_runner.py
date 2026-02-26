@@ -201,6 +201,15 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                             )
                         )
 
+                # Compute velocity (7d/14d/30d) for each account-product
+                for score in result.account_scores:
+                    v7, v14, v30 = db.get_score_velocity(conn, score.account_id, score.product, score.score, run_date)
+                    score.velocity_7d = v7
+                    score.velocity_14d = v14
+                    score.velocity_30d = v30
+                    score.velocity_category = classify_velocity(v7)
+                    score.delta_7d = v7
+
                 db.replace_run_scores(conn, score_run_id, result.component_scores, result.account_scores)
                 db.finish_score_run(conn, score_run_id, status="completed", error_summary=None)
 

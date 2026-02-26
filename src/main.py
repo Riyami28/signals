@@ -316,6 +316,25 @@ def _baseline_score_7d(conn, account_id: str, product: str, run_date: str) -> fl
     return None if row is None else float(row["score"])
 
 
+def _baseline_score_at_offset(conn, account_id: str, product: str, run_date: str, days: int) -> float | None:
+    """Get the most recent score from *days* or more days ago."""
+    cur = conn.execute(
+        """
+        SELECT s.score
+        FROM account_scores s
+        JOIN score_runs r ON r.run_id = s.run_id
+        WHERE s.account_id = %s
+          AND s.product = %s
+          AND r.run_date::date <= (%s::date - INTERVAL '%s days')
+        ORDER BY r.run_date::date DESC, r.started_at DESC
+        LIMIT 1
+        """,
+        (account_id, product, run_date, days),
+    )
+    row = cur.fetchone()
+    return None if row is None else float(row["score"])
+
+
 def _run_scoring(conn, settings: Settings, run_date: date) -> str:
     run_date_str = run_date.isoformat()
     run_id = db.create_score_run(conn, run_date_str)
@@ -368,6 +387,13 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
         for score in result.account_scores:
             baseline = _baseline_score_7d(conn, score.account_id, score.product, run_date_str)
             score.delta_7d = round(score.score - baseline, 2) if baseline is not None else 0.0
+
+            # Compute velocity across 7d/14d/30d windows
+            for days, attr in ((7, "velocity_7d"), (14, "velocity_14d"), (30, "velocity_30d")):
+                past = _baseline_score_at_offset(conn, score.account_id, score.product, run_date_str, days)
+                setattr(score, attr, round(score.score - past, 2) if past is not None else 0.0)
+            score.velocity_category = classify_velocity(score.velocity_7d)
+
             has_primary = any(
                 classify_signal(signal_code, signal_classes) == "primary"
                 for signal_code in signals_by_account_product.get((score.account_id, score.product), set())

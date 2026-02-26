@@ -51,6 +51,45 @@ def classify_tier(score: float, thresholds: Thresholds) -> str:
     return "low"
 
 
+def classify_velocity(velocity_7d: float) -> VelocityCategory:
+    """Classify velocity based on 7-day score change.
+
+    Surging:       velocity_7d > +20
+    Accelerating:  velocity_7d > +10
+    Decelerating:  velocity_7d < -5
+    Stable:        -5 <= velocity_7d <= +10
+    """
+    if velocity_7d > 20:
+        return "surging"
+    if velocity_7d > 10:
+        return "accelerating"
+    if velocity_7d < -5:
+        return "decelerating"
+    return "stable"
+
+
+def classify_confidence_band(distinct_source_count: int) -> str:
+    """Classify confidence band based on source diversity.
+
+    3+ distinct sources → high, 2 → medium, 1 → low.
+    """
+    if distinct_source_count >= 3:
+        return "high"
+    if distinct_source_count == 2:
+        return "medium"
+    return "low"
+
+
+_BAND_RANK = {"high": 2, "medium": 1, "low": 0}
+
+
+def overall_confidence_band(dimension_bands: dict[str, str]) -> str:
+    """Overall confidence = lowest band across all non-zero dimensions."""
+    if not dimension_bands:
+        return "low"
+    return min(dimension_bands.values(), key=lambda b: _BAND_RANK.get(b, 0))
+
+
 def _resolve_products(observation_product: str, rule_scope: str) -> tuple[str, ...]:
     if observation_product == "shared":
         observed_products = set(PRODUCTS)
@@ -106,11 +145,14 @@ def run_scoring(
     source_reliability_defaults: dict[str, float],
     dimension_weights: dict[str, DimensionWeight] | None = None,
     delta_lookup: Callable[[str, str], float] | None = None,
+    velocity_lookup: Callable[[str, str, float], tuple[float, float, float]] | None = None,
 ) -> EngineOutput:
     resolved_dimension_weights = _resolve_dimension_weights(dimension_weights)
     component_totals: dict[tuple[str, str, str], float] = {}
     reason_candidates: dict[tuple[str, str, str], dict] = {}
     component_contributions: dict[tuple[str, str, str], list[dict[str, float | str]]] = defaultdict(list)
+    # Track distinct sources per (account_id, product, dimension/category)
+    dimension_sources: dict[tuple[str, str, str], set[str]] = defaultdict(set)
 
     skipped_count = 0
     for observation in observations:
@@ -157,6 +199,7 @@ def run_scoring(
                 * source_reliability
                 * recency_decay(days_since_observed=days_since, half_life_days=rule.half_life_days)
             )
+            dimension_sources[(account_id, product, dimension)].add(source)
 
             if component <= 0:
                 continue
@@ -287,6 +330,25 @@ def run_scoring(
                 delta = round(delta_lookup(account_id, product), 2)
             except Exception as e:
                 logger.warning("delta_lookup_failed account=%s product=%s error=%s", account_id, product, e)
+
+        if velocity_lookup:
+            v7, v14, v30 = velocity_lookup(account_id, product, total_score)
+            vel_7d = round(v7, 2)
+            vel_14d = round(v14, 2)
+            vel_30d = round(v30, 2)
+        else:
+            vel_7d = delta
+            vel_14d = 0.0
+            vel_30d = 0.0
+
+        vel_cat = classify_velocity(vel_7d)
+
+        # Compute per-dimension confidence bands
+        dim_bands: dict[str, str] = {}
+        for (a_id, prod, dim), sources in dimension_sources.items():
+            if a_id == account_id and prod == product:
+                dim_bands[dim] = classify_confidence_band(len(sources))
+        conf_band = overall_confidence_band(dim_bands)
 
         account_models.append(
             AccountScore(
