@@ -150,6 +150,11 @@ class Settings(BaseSettings):
     g2_competitor_product_ids: tuple[str, ...] = Field(default_factory=tuple)
     g2_review_lookback_days: int = Field(default=30, ge=1)
 
+    # --- email verification ---
+    email_verify_provider: str = Field(default="neverbounce")  # "neverbounce" or "zerobounce"
+    neverbounce_api_key: str = Field(default="")
+    zerobounce_api_key: str = Field(default="")
+
     @model_validator(mode="after")
     def _derive_paths_and_dsn(self) -> "Settings":
         root = self.project_root

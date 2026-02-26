@@ -2937,8 +2937,9 @@ def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
             """
             INSERT INTO contact_research
                 (contact_id, account_id, first_name, last_name, title,
-                 email, linkedin_url, management_level, year_joined, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                 email, linkedin_url, management_level, year_joined,
+                 email_verified, verification_status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (contact_id) DO NOTHING
             """,
             (
@@ -2951,6 +2952,8 @@ def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
                 contact.get("linkedin_url"),
                 contact.get("management_level"),
                 contact.get("year_joined"),
+                contact.get("email_verified", False),
+                contact.get("verification_status", ""),
             ),
         )
     conn.commit()
