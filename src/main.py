@@ -50,6 +50,7 @@ def _app_callback() -> None:
 
 
 
+
 _RUN_DAILY_LOCK_NAME = "signals:run-daily"
 _AUTONOMOUS_LOCK_NAME = "signals:run-autonomous-loop"
 _RETRY_BACKOFF_SECONDS = [60, 300, 900]

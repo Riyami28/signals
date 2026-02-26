@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -7,10 +8,10 @@ from typing import Optional
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.utils import normalize_domain
+logger = logging.getLogger(__name__)
 
 
-def _auto_live_workers(min_domain_request_interval_ms: int) -> int:
+def _auto_live_workers(min_domain_request_interval_ms: int, max_workers: int = 64) -> int:
     cpu_count = max(1, int(os.cpu_count() or 1))
     # Live crawl is network-bound; scale above CPU while respecting request pacing.
     base = max(4, cpu_count * 4)
@@ -20,7 +21,16 @@ def _auto_live_workers(min_domain_request_interval_ms: int) -> int:
         multiplier = 2
     else:
         multiplier = 3
-    return max(4, min(128, base * multiplier))
+    computed = max(4, min(max_workers, base * multiplier))
+    logger.info(
+        "auto_live_workers cpu_count=%d base=%d multiplier=%d max_workers=%d result=%d",
+        cpu_count,
+        base,
+        multiplier,
+        max_workers,
+        computed,
+    )
+    return computed
 
 
 class Settings(BaseSettings):
@@ -75,6 +85,7 @@ class Settings(BaseSettings):
     min_domain_request_interval_ms: int = Field(default=2000, ge=0)
     live_max_accounts: int = Field(default=1000, ge=1)
     live_workers_per_source: int = Field(default=0, ge=0)
+    max_workers: int = Field(default=64, ge=1)
     live_target_domains: tuple[str, ...] = Field(default_factory=tuple)
     auto_discover_job_handles: bool = Field(default=False)
     live_max_jobs_per_source: int = Field(default=60, ge=1)
@@ -127,7 +138,7 @@ class Settings(BaseSettings):
 
         # Derive live_workers_per_source if not explicitly set (0 means auto).
         if self.live_workers_per_source == 0:
-            self.live_workers_per_source = _auto_live_workers(self.min_domain_request_interval_ms)
+            self.live_workers_per_source = _auto_live_workers(self.min_domain_request_interval_ms, self.max_workers)
 
         # Derive directory paths from project_root.
         config_dir = root / "config"
