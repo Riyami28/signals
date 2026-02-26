@@ -82,6 +82,17 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
         account_id = account["account_id"]
         attempted += 1
 
+        # Skip enrichment for accounts already in CRM.
+        crm_status = db.get_crm_status(conn, account_id)
+        if crm_status in ("existing_lead", "existing_customer", "excluded"):
+            logger.info(
+                "research: skipping %s (crm_status=%s)",
+                account.get("domain", account_id),
+                crm_status,
+            )
+            skipped += 1
+            continue
+
         try:
             # Step a: mark in-progress BEFORE any API call.
             db.mark_research_in_progress(conn, account_id)

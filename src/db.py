@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   company_name TEXT NOT NULL,
   domain TEXT NOT NULL UNIQUE,
   source_type TEXT NOT NULL CHECK (source_type IN ('seed', 'discovered')),
+  crm_status TEXT NOT NULL DEFAULT 'new' CHECK (crm_status IN ('new', 'existing_lead', 'existing_customer', 'excluded')),
   created_at TEXT NOT NULL
 );
 
@@ -801,6 +802,51 @@ def seed_accounts(conn: Any, seed_accounts_csv: Path) -> int:
         )
         inserted += 1
     return inserted
+
+
+# ---------------------------------------------------------------------------
+# CRM dedup status
+# ---------------------------------------------------------------------------
+
+
+def update_crm_status(
+    conn: Any,
+    account_id: str,
+    crm_status: str,
+    commit: bool = True,
+) -> None:
+    """Update the crm_status field for an account."""
+    conn.execute(
+        "UPDATE accounts SET crm_status = %s WHERE account_id = %s",
+        (crm_status, account_id),
+    )
+    if commit:
+        conn.commit()
+
+
+def get_crm_status(conn: Any, account_id: str) -> str:
+    """Return the crm_status for an account, defaulting to 'new'."""
+    cur = conn.execute(
+        "SELECT crm_status FROM accounts WHERE account_id = %s",
+        (account_id,),
+    )
+    row = cur.fetchone()
+    return str(row["crm_status"]) if row else "new"
+
+
+def get_accounts_without_crm_check(conn: Any, limit: int = 500) -> list[dict[str, Any]]:
+    """Return accounts that have never been checked against CRM (crm_status = 'new')."""
+    cur = conn.execute(
+        """
+        SELECT account_id, company_name, domain, crm_status
+        FROM accounts
+        WHERE crm_status = 'new'
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (limit,),
+    )
+    return [dict(row) for row in cur.fetchall()]
 
 
 def insert_signal_observation(conn: Any, observation: SignalObservation, commit: bool = True) -> bool:
@@ -3348,6 +3394,7 @@ def was_account_pushed_to_crm(conn, account_id: str, push_type: str = "account")
 def get_accounts_eligible_for_crm_push(conn, run_id: str) -> list[dict]:
     """Fetch scored accounts eligible for CRM push based on tier and confidence.
 
+    Excludes accounts already in CRM (existing_lead, existing_customer, excluded).
     Returns accounts with their best product score, enrichment data, and contacts.
     """
     cur = conn.execute(
@@ -3361,6 +3408,7 @@ def get_accounts_eligible_for_crm_push(conn, run_id: str) -> list[dict]:
         LEFT JOIN company_research cr ON cr.account_id = a.account_id
         WHERE s.run_id = %s
           AND s.tier IN ('high', 'medium')
+          AND a.crm_status = 'new'
         ORDER BY s.score DESC
         """,
         (run_id,),

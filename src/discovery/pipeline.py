@@ -22,6 +22,7 @@ from src.discovery.config import (
     load_signal_classes,
     resolve_account_profile,
 )
+from src.integrations.zoho_dedup import check_crm_dedup
 from src.models import SignalObservation
 from src.promotion_policy import PromotionPolicy, load_promotion_policy
 from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry
@@ -186,6 +187,21 @@ def ingest_external_events(conn, settings: Settings, run_date: date) -> dict[str
             source_type="discovered",
             commit=False,
         )
+
+        # CRM dedup: check if this account already exists in Zoho CRM.
+        if settings.zoho_dedup_enabled:
+            crm_status = check_crm_dedup(domain, company_name, settings)
+            if crm_status != "new":
+                db.update_crm_status(conn, account_id, crm_status, commit=False)
+                db.mark_external_discovery_event_processed(
+                    conn,
+                    event_id=event_id,
+                    processed_run_id=marker,
+                    commit=False,
+                )
+                processed += 1
+                continue
+
         matches = classify_text(text, flattened_lexicon)
         if not matches:
             db.mark_external_discovery_event_processed(

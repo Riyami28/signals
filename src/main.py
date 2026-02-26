@@ -23,6 +23,7 @@ from src.discovery import hunt as hunt_pipeline
 from src.discovery import pipeline as discovery_pipeline
 from src.discovery import watchlist_builder
 from src.export import csv_exporter
+from src.integrations.zoho_dedup import ZohoCRMDedupClient, check_crm_dedup
 from src.logging_config import configure_logging
 from src.models import AccountScore
 from src.notifier import send_alert
@@ -1198,6 +1199,25 @@ def run_daily(
             f"stage=ingest status=completed duration_seconds={round(collect_elapsed, 2)} inserted={collect_inserted}"
         )
 
+        # CRM dedup — non-blocking. Flag existing CRM records before scoring.
+        dedup_result = {"checked": 0, "existing": 0, "new": 0, "errors": 0}
+        dedup_error = ""
+        try:
+            typer.echo("stage=zoho-crm-dedup status=started")
+            dedup_result, dedup_elapsed = _run_with_watchdog(
+                "zoho-crm-dedup",
+                settings.stage_timeout_seconds,
+                lambda: _run_crm_dedup_check(conn, settings),
+            )
+            typer.echo(
+                f"stage=zoho-crm-dedup status=completed duration_seconds={round(dedup_elapsed, 2)} "
+                f"checked={dedup_result['checked']} existing={dedup_result['existing']} "
+                f"new={dedup_result['new']} errors={dedup_result['errors']}"
+            )
+        except Exception as exc:
+            dedup_error = str(exc)
+            typer.echo(f"stage=zoho-crm-dedup status=failed error={dedup_error[:220]}")
+
         typer.echo("stage=score status=started")
         run_id, score_elapsed = _run_with_watchdog(
             "score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date)
@@ -1366,6 +1386,9 @@ def run_daily(
                     f"zoho_failed={zoho_push_result['failed']}",
                     f"zoho_deals={zoho_push_result['deals']}",
                     f"zoho_push_error={zoho_push_error}",
+                    f"zoho_dedup_checked={dedup_result['checked']}",
+                    f"zoho_dedup_existing={dedup_result['existing']}",
+                    f"zoho_dedup_error={dedup_error}",
                 ]
             )
         )
