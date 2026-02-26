@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 
 import anthropic
+import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
@@ -71,60 +72,69 @@ class ResearchClient:
 
 
 class MiniMaxClient:
-    """MiniMax client using OpenAI-compatible API."""
+    """MiniMax client using direct HTTP calls."""
 
     def __init__(self, api_key: str, model: str, timeout_seconds: int, max_retries: int = 3):
-        import openai
-
-        self._client = openai.OpenAI(
-            api_key=api_key,
+        self._client = httpx.Client(
             base_url="https://api.minimax.io/v1",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
         )
         self.model = model
         self.timeout = timeout_seconds
         self.max_retries = max_retries
-        self._openai = openai
 
     def research_company(self, system_prompt: str, user_prompt: str) -> ResearchResponse:
         """Make one research API call via MiniMax. Raises on hard failure after retries."""
         start = time.monotonic()
-        openai = self._openai
 
         @retry(
             stop=stop_after_attempt(self.max_retries),
             wait=wait_exponential(multiplier=1, min=4, max=30),
-            retry=retry_if_exception_type((openai.RateLimitError, openai.APIConnectionError)),
+            retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError)),
             before_sleep=lambda state: logger.warning("retrying minimax api call attempt=%d", state.attempt_number),
         )
-        def _call():
-            return self._client.chat.completions.create(
-                model=self.model,
-                max_tokens=4096,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+        def _call() -> dict:
+            response = self._client.post(
+                "/chat/completions",
+                json={
+                    "model": self.model,
+                    "max_tokens": 4096,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                },
                 timeout=self.timeout,
             )
+            response.raise_for_status()
+            return response.json()
 
         response = _call()
         duration = time.monotonic() - start
-        raw_text = response.choices[0].message.content or "" if response.choices else ""
-        usage = response.usage
+        choices = response.get("choices") or []
+        first_choice = choices[0] if choices else {}
+        message = first_choice.get("message") if isinstance(first_choice, dict) else {}
+        raw_text = (message or {}).get("content") or ""
+        usage = response.get("usage") if isinstance(response, dict) else {}
+        prompt_tokens = int((usage or {}).get("prompt_tokens") or 0)
+        completion_tokens = int((usage or {}).get("completion_tokens") or 0)
 
         logger.info(
             "minimax_api model=%s input_tokens=%d output_tokens=%d duration_s=%.1f",
             self.model,
-            usage.prompt_tokens if usage else 0,
-            usage.completion_tokens if usage else 0,
+            prompt_tokens,
+            completion_tokens,
             duration,
         )
 
         return ResearchResponse(
             raw_text=raw_text,
             model=self.model,
-            input_tokens=usage.prompt_tokens if usage else 0,
-            output_tokens=usage.completion_tokens if usage else 0,
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
             duration_seconds=duration,
         )
 

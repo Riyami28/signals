@@ -92,7 +92,7 @@ def test_run_live_sets_env_and_args(monkeypatch):
     assert env["SIGNALS_RESPECT_ROBOTS_TXT"] == "0"
 
 
-def test_ui_runs_main_serve_local_ui(monkeypatch):
+def test_ui_runs_main_serve_web(monkeypatch):
     captured: dict[str, object] = {}
 
     def fake_run_subprocess(cmd: list[str], env: dict[str, str]) -> int:
@@ -111,7 +111,7 @@ def test_ui_runs_main_serve_local_ui(monkeypatch):
         "python-test",
         "-m",
         "src.main",
-        "serve-local-ui",
+        "serve-web",
         "--host",
         "0.0.0.0",
         "--port",

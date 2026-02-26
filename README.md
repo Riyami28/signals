@@ -92,7 +92,7 @@ Useful variants:
 # source depth + quality report
 ./signals sources --date 2026-02-22
 
-# run local UI
+# run web UI
 ./signals ui
 ```
 
@@ -244,7 +244,7 @@ Primary commands (recommended):
 # source depth + quality report (attempts, success/error mix, evidence coverage)
 ./signals sources --date 2026-02-22
 
-# local UI
+# web UI
 ./signals ui --port 8788
 ```
 
@@ -282,6 +282,17 @@ Configure via `.env` (see `.env.example`):
 - `SIGNALS_OPS_METRICS_LOOKBACK_DAYS`
 - `SIGNALS_WATCHLIST_QUERY_WORKERS`
 - `SIGNALS_WATCHLIST_COUNTRY_TIMEOUT_SECONDS`
+
+## Optional ML Dependencies (`hunt_ml`)
+
+`hunt_ml` is optional and not required for normal ingest/score/export runs.
+
+```bash
+pip install -e ".[hunt_ml]"
+```
+
+This extra installs heavyweight packages (`transformers`, `torch`, `spacy`, `sentencepiece`) and can add ~1GB+ to environment size.
+Only install it if you are enabling multilingual discovery enrichment that depends on Hugging Face pipelines.
 - `GOOGLE_SHEETS_SPREADSHEET_ID`
 - `GOOGLE_SERVICE_ACCOUNT_FILE`
 

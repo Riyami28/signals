@@ -63,7 +63,6 @@ def _clear_all_tables(conn) -> None:
 def postgres_test_isolation(monkeypatch: pytest.MonkeyPatch):
     pg_dsn = _default_test_dsn()
     monkeypatch.setenv("SIGNALS_PG_DSN", pg_dsn)
-    monkeypatch.delenv("SIGNALS_DB_PATH", raising=False)
 
     try:
         _ensure_test_database_exists(pg_dsn)

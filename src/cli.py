@@ -878,12 +878,12 @@ def ui(
     port: int = typer.Option(8788, "--port", help="UI bind port."),
     log_level: str = typer.Option("info", "--log-level", help="Uvicorn log level."),
 ) -> None:
-    """Start local web UI."""
+    """Start web UI."""
     cmd = [
         _python_bin(),
         "-m",
         "src.main",
-        "serve-local-ui",
+        "serve-web",
         "--host",
         host,
         "--port",
