@@ -138,6 +138,10 @@ class Settings(BaseSettings):
     clearbit_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")
 
+    # --- Crunchbase firmographic enrichment ---
+    crunchbase_api_key: str = Field(default="")
+    crunchbase_rate_limit: int = Field(default=50, ge=1)
+
     @model_validator(mode="after")
     def _derive_paths_and_dsn(self) -> "Settings":
         root = self.project_root
