@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+import re
+
+from fastapi import APIRouter, HTTPException, Query
 
 from src import db
 from src.settings import load_settings
 
 router = APIRouter(tags=["accounts"])
+
+_ALLOWED_SORT_FIELDS = {"score", "company_name", "domain", "tier"}
+_ALLOWED_SORT_DIRS = {"asc", "desc"}
+_ALLOWED_TIERS = {"", "high", "medium", "low", "explore"}
+_MAX_SEARCH_LENGTH = 200
 
 
 def _get_conn():
@@ -15,6 +22,12 @@ def _get_conn():
     conn = db.get_connection(settings.pg_dsn)
     db.init_db(conn)
     return conn
+
+
+def _sanitize_search(q: str) -> str:
+    """Strip control characters and truncate to max length."""
+    cleaned = re.sub(r"[\x00-\x1f\x7f]", "", q).strip()
+    return cleaned[:_MAX_SEARCH_LENGTH]
 
 
 @router.get("/accounts")
@@ -27,6 +40,16 @@ def list_accounts(
     label: str = Query(""),
     q: str = Query(""),
 ):
+    if sort not in _ALLOWED_SORT_FIELDS:
+        raise HTTPException(status_code=400, detail=f"invalid sort field, allowed: {sorted(_ALLOWED_SORT_FIELDS)}")
+    if dir.lower() not in _ALLOWED_SORT_DIRS:
+        raise HTTPException(status_code=400, detail="invalid sort direction, allowed: asc, desc")
+    if tier and tier.lower() not in _ALLOWED_TIERS:
+        raise HTTPException(status_code=400, detail=f"invalid tier filter, allowed: {sorted(_ALLOWED_TIERS - {''})}")
+
+    safe_search = _sanitize_search(q)
+    safe_label = label.strip()[:100]
+
     conn = _get_conn()
     try:
         rows, total = db.get_accounts_paginated(
@@ -36,8 +59,8 @@ def list_accounts(
             sort_by=sort,
             sort_dir=dir,
             tier_filter=tier,
-            label_filter=label,
-            search=q,
+            label_filter=safe_label,
+            search=safe_search,
         )
         # Serialize datetimes
         for r in rows:

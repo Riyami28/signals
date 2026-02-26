@@ -128,6 +128,11 @@ class Settings(BaseSettings):
     db_pool_min_size: int = Field(default=4, ge=1)
     db_pool_max_size: int = Field(default=32, ge=1)
 
+    # --- security ---
+    cors_origins: str = Field(default="http://localhost:8788")
+    api_key: str = Field(default="")
+    env: str = Field(default="production")
+
     # --- waterfall enrichment ---
     clearbit_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")

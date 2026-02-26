@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
+from collections import defaultdict
+from threading import Lock
 from typing import Any
 from urllib.parse import urlparse
 
@@ -12,11 +16,34 @@ from src.settings import load_settings
 from src.utils import normalize_domain, utc_now_iso
 
 try:
-    from fastapi import FastAPI, Header, HTTPException
+    from fastapi import FastAPI, Header, HTTPException, Request
 except Exception:  # pragma: no cover - dependency may be absent in lightweight envs.
     FastAPI = None  # type: ignore
     Header = None  # type: ignore
     HTTPException = Exception  # type: ignore
+    Request = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
+# --- Simple in-memory rate limiter ---
+_RATE_LIMIT_MAX_REQUESTS = 60  # per window
+_RATE_LIMIT_WINDOW_SECONDS = 60
+
+_rate_lock = Lock()
+_rate_buckets: dict[str, list[float]] = defaultdict(list)
+
+
+def _is_rate_limited(client_ip: str) -> bool:
+    now = time.monotonic()
+    cutoff = now - _RATE_LIMIT_WINDOW_SECONDS
+    with _rate_lock:
+        bucket = _rate_buckets[client_ip]
+        # Prune expired entries.
+        _rate_buckets[client_ip] = [t for t in bucket if t > cutoff]
+        if len(_rate_buckets[client_ip]) >= _RATE_LIMIT_MAX_REQUESTS:
+            return True
+        _rate_buckets[client_ip].append(now)
+        return False
 
 
 class DiscoveryEventPayload(BaseModel):
@@ -75,7 +102,9 @@ def _insert_event(payload: DiscoveryEventPayload) -> bool:
             company_name_hint=payload.company_name_hint,
             domain_hint=domain_hint,
             raw_payload_json=json.dumps(
-                raw_payload if raw_payload is not None else {}, ensure_ascii=True, sort_keys=True
+                raw_payload if raw_payload is not None else {},
+                ensure_ascii=True,
+                sort_keys=True,
             ),
         )
         return inserted
@@ -91,9 +120,16 @@ def create_app():
 
     @app.post("/v1/discovery/events")
     def receive_discovery_event(
+        request: Request,
         payload: DiscoveryEventPayload,
         x_discovery_token: str | None = Header(default=None, alias="X-Discovery-Token"),
     ):
+        # Rate limiting.
+        client_ip = request.client.host if request.client else "unknown"
+        if _is_rate_limited(client_ip):
+            logger.warning("rate_limited client_ip=%s", client_ip)
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+
         settings = load_settings()
         expected = settings.discovery_webhook_token
         if expected and (x_discovery_token or "").strip() != expected:
