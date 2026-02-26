@@ -420,6 +420,24 @@ CREATE TABLE IF NOT EXISTS contact_research (
 CREATE INDEX IF NOT EXISTS idx_contact_research_account
     ON contact_research(account_id);
 
+CREATE TABLE IF NOT EXISTS contacts (
+    contact_id          TEXT PRIMARY KEY,
+    account_id          TEXT NOT NULL,
+    first_name          TEXT NOT NULL DEFAULT '',
+    last_name           TEXT NOT NULL DEFAULT '',
+    title               TEXT NOT NULL DEFAULT '',
+    email               TEXT NOT NULL DEFAULT '',
+    email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
+    phone               TEXT NOT NULL DEFAULT '',
+    linkedin_url        TEXT NOT NULL DEFAULT '',
+    enrichment_source   TEXT NOT NULL DEFAULT '',
+    enriched_at         TEXT NOT NULL DEFAULT '',
+    confidence          REAL NOT NULL DEFAULT 0.0,
+    FOREIGN KEY(account_id) REFERENCES accounts(account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_contacts_account ON contacts(account_id);
+
 CREATE TABLE IF NOT EXISTS research_runs (
     research_run_id     TEXT PRIMARY KEY,
     run_date            TEXT NOT NULL,

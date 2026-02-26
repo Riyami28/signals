@@ -137,6 +137,8 @@ class Settings(BaseSettings):
     # --- waterfall enrichment ---
     clearbit_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")
+    apollo_api_key: str = Field(default="")
+    apollo_rate_limit: int = Field(default=50, ge=1)
 
     # --- Crunchbase firmographic enrichment ---
     crunchbase_api_key: str = Field(default="")

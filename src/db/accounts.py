@@ -271,6 +271,60 @@ def get_contacts_for_account(conn, account_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def insert_contact(conn, contact: dict) -> str:
+    """Insert a contact into the contacts table. Returns contact_id."""
+    identifier = contact.get("linkedin_url") or (contact.get("first_name", "") + contact.get("last_name", ""))
+    contact_id = stable_hash(
+        {"account_id": contact.get("account_id", ""), "identifier": identifier},
+        prefix="ctc",
+        length=16,
+    )
+    conn.execute(
+        """
+        INSERT INTO contacts
+            (contact_id, account_id, first_name, last_name, title,
+             email, email_verified, phone, linkedin_url,
+             enrichment_source, enriched_at, confidence)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (contact_id) DO NOTHING
+        """,
+        (
+            contact_id,
+            contact.get("account_id", ""),
+            contact.get("first_name", ""),
+            contact.get("last_name", ""),
+            contact.get("title", ""),
+            contact.get("email", ""),
+            contact.get("email_verified", False),
+            contact.get("phone", ""),
+            contact.get("linkedin_url", ""),
+            contact.get("enrichment_source", ""),
+            contact.get("enriched_at", ""),
+            contact.get("confidence", 0.0),
+        ),
+    )
+    conn.commit()
+    return contact_id
+
+
+def get_enrichment_contacts(conn, account_id: str) -> list[dict]:
+    """Return all contacts from the contacts table for an account."""
+    rows = conn.execute(
+        "SELECT * FROM contacts WHERE account_id = %s ORDER BY confidence DESC",
+        (account_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_account_domain(conn, account_id: str) -> str:
+    """Return the domain for an account, or empty string if not found."""
+    row = conn.execute(
+        "SELECT domain FROM accounts WHERE account_id = %s",
+        (account_id,),
+    ).fetchone()
+    return row["domain"] if row else ""
+
+
 def create_research_run(conn, run_date: str, score_run_id: str) -> str:
     """Insert a new research_runs row with status='running'. Returns research_run_id."""
     research_run_id = f"rr_{uuid.uuid4().hex[:12]}"
