@@ -42,6 +42,20 @@ SIGNALS_CLAUDE_MODEL=claude-sonnet-4-6
 | `ImportError` on `src.*` | Activate venv: `source .venv/bin/activate` |
 | Schema mismatch errors | Run `make migrate` to apply pending migrations |
 
+## Account Watchlist
+
+A **1,000-company starter watchlist** is committed at `config/watchlist_accounts.csv` and seeds automatically on the first pipeline run.
+
+For a full **~143K company watchlist** (production), regenerate from Wikidata once after setup:
+
+```bash
+./signals build-cpg-watchlist --limit 143000
+# Then run the pipeline — watchlist is seeded on first run
+./signals start
+```
+
+> The full watchlist is not committed to git (too large). Each developer generates it locally. The 1K starter set is sufficient for development and testing.
+
 ## Quick Start (One Command)
 
 After `make setup`, run the full pipeline:
