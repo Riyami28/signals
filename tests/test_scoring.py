@@ -51,14 +51,15 @@ def test_scoring_high_intent_signal_alone_does_not_reach_high_tier():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"news_csv": 0.8},
     )
 
     assert len(output.account_scores) == 1
     score = output.account_scores[0]
     assert score.product == "zopnight"
-    assert score.tier == "low"
+    # Dimension-weighted scoring: single trigger_intent signal capped at 35% max → "medium" legacy tier
+    assert score.tier == "medium"
     assert score.score < 45
 
 
@@ -93,7 +94,7 @@ def test_single_weak_signal_does_not_reach_high():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"technographics_csv": 0.8},
     )
 
@@ -133,7 +134,7 @@ def test_disabled_source_from_registry_does_not_contribute():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"website_scan": 0.0},
     )
 
@@ -171,7 +172,7 @@ def test_registry_reliability_caps_observation_reliability():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"website_scan": 0.3},
     )
     uncapped = run_scoring(
@@ -179,7 +180,7 @@ def test_registry_reliability_caps_observation_reliability():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"website_scan": 1.0},
     )
 
@@ -294,7 +295,7 @@ def test_dimension_weighted_composite_and_persisted_dimension_scores():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"news_csv": 1.0},
         dimension_weights=weights,
     )
@@ -305,7 +306,8 @@ def test_dimension_weighted_composite_and_persisted_dimension_scores():
     assert dimensions["trigger_intent"] == 100.0
     assert dimensions["tech_fit"] == 50.0
     assert round(score.score, 2) == 45.0
-    assert score.tier == "medium"
+    # tier_2 (score=45 >= threshold 45) → legacy "high"
+    assert score.tier == "high"
 
 
 def test_dimension_ceiling_caps_inflation():
@@ -340,7 +342,7 @@ def test_dimension_ceiling_caps_inflation():
         run_date=date(2026, 2, 16),
         observations=observations,
         rules=rules,
-        thresholds=Thresholds(high=70, medium=45, low=0),
+        thresholds=Thresholds(tier_1=70, tier_2=45, tier_3=20, tier_4=0),
         source_reliability_defaults={"news_csv": 1.0},
     )
 
@@ -372,16 +374,11 @@ def test_load_thresholds_supports_new_4_tier_format(tmp_path: Path):
     assert thresholds.tier_2 == 60.0
     assert thresholds.tier_3 == 40.0
     assert thresholds.tier_4 == 0.0
-    assert thresholds.high == 80.0
-    assert thresholds.medium == 40.0
     assert len(thresholds.upgrade_rules) == 1
 
 
 def test_classify_tier_applies_upgrade_rules():
     thresholds = Thresholds(
-        high=80.0,
-        medium=40.0,
-        low=0.0,
         tier_1=80.0,
         tier_2=60.0,
         tier_3=40.0,

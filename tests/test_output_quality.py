@@ -81,7 +81,7 @@ def test_evaluate_run_output_quality_passes_when_metrics_clear_bar(tmp_path: Pat
         conn=conn,
         run_id=run_id,
         reference_csv_path=reference_csv,
-        thresholds=Thresholds(high=12.0, medium=8.0, low=0.0),
+        thresholds=Thresholds(tier_1=12.0, tier_2=8.0, tier_3=4.0, tier_4=0.0),
         quality_bar=OutputQualityBar(),
     )
 
@@ -120,7 +120,7 @@ def test_evaluate_run_output_quality_reports_failed_checks(tmp_path: Path):
         conn=conn,
         run_id=run_id,
         reference_csv_path=reference_csv,
-        thresholds=Thresholds(high=13.0, medium=12.0, low=0.0),
+        thresholds=Thresholds(tier_1=13.0, tier_2=12.0, tier_3=6.0, tier_4=0.0),
         quality_bar=OutputQualityBar(),
     )
 
@@ -156,12 +156,12 @@ def test_threshold_self_improvement_loop_converges_to_passing_profile(tmp_path: 
         conn=conn,
         run_id=run_id,
         reference_csv_path=reference_csv,
-        current_thresholds=Thresholds(high=70.0, medium=45.0, low=0.0),
+        current_thresholds=Thresholds(tier_1=70.0, tier_2=45.0, tier_3=20.0, tier_4=0.0),
         quality_bar=OutputQualityBar(),
         max_iterations=4,
     )
 
     assert result.passed is True
     assert len(result.iterations) >= 2
-    assert result.final_thresholds.high < 70.0
-    assert result.final_thresholds.medium < 45.0
+    assert result.final_thresholds.tier_1 < 70.0
+    assert result.final_thresholds.tier_2 < 45.0

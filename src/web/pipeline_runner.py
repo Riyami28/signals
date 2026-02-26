@@ -165,7 +165,7 @@ def _run_pipeline_sync(
             t0 = time.monotonic()
             try:
                 from src.models import AccountScore
-                from src.scoring.engine import run_scoring
+                from src.scoring.engine import classify_velocity, run_scoring
                 from src.scoring.rules import (
                     load_dimension_weights,
                     load_signal_rules,

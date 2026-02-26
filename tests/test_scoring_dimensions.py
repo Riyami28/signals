@@ -65,11 +65,11 @@ DIMENSION_CEILINGS = {
 RUN_DATE = date(2026, 2, 20)
 RUN_ID = "test_run"
 
-# Default 3-tier thresholds (current system)
-THRESHOLDS_3TIER = Thresholds(high=20, medium=10, low=0)
+# Default 3-tier thresholds (current system) — mapped to 4-tier fields
+THRESHOLDS_3TIER = Thresholds(tier_1=20, tier_2=10, tier_3=5, tier_4=0)
 
 # New 4-tier thresholds (Issue #21)
-THRESHOLDS_4TIER = Thresholds(high=80, medium=60, low=40)
+THRESHOLDS_4TIER = Thresholds(tier_1=80, tier_2=60, tier_3=40, tier_4=0)
 
 DEFAULT_SOURCE_RELIABILITY = {"news_csv": 0.75, "technographics_csv": 0.8}
 
@@ -191,28 +191,28 @@ class TestRecencyDecay:
 
 
 class TestClassifyTier:
-    """Tests for classify_tier() — current 3-tier thresholds."""
+    """Tests for classify_tier() — current 3-tier thresholds mapped to 4-tier names."""
 
     def test_high_tier_at_boundary(self):
-        assert classify_tier(20.0, THRESHOLDS_3TIER) == "high"
+        assert classify_tier(20.0, THRESHOLDS_3TIER) == "tier_1"
 
     def test_high_tier_above_boundary(self):
-        assert classify_tier(50.0, THRESHOLDS_3TIER) == "high"
+        assert classify_tier(50.0, THRESHOLDS_3TIER) == "tier_1"
 
     def test_medium_tier_at_boundary(self):
-        assert classify_tier(10.0, THRESHOLDS_3TIER) == "medium"
+        assert classify_tier(10.0, THRESHOLDS_3TIER) == "tier_2"
 
     def test_medium_tier_between_boundaries(self):
-        assert classify_tier(15.0, THRESHOLDS_3TIER) == "medium"
+        assert classify_tier(15.0, THRESHOLDS_3TIER) == "tier_2"
 
     def test_low_tier_below_medium(self):
-        assert classify_tier(9.99, THRESHOLDS_3TIER) == "low"
+        assert classify_tier(9.99, THRESHOLDS_3TIER) == "tier_3"
 
     def test_low_tier_at_zero(self):
-        assert classify_tier(0.0, THRESHOLDS_3TIER) == "low"
+        assert classify_tier(0.0, THRESHOLDS_3TIER) == "tier_4"
 
     def test_score_exactly_at_100(self):
-        assert classify_tier(100.0, THRESHOLDS_3TIER) == "high"
+        assert classify_tier(100.0, THRESHOLDS_3TIER) == "tier_1"
 
 
 # ===================================================================
@@ -229,27 +229,23 @@ class TestClassifyTier4Tier:
     """
 
     def test_tier1_at_boundary_80(self):
-        """Score exactly 80 → tier 1 (high)."""
-        assert classify_tier(80.0, THRESHOLDS_4TIER) == "high"
+        """Score exactly 80 → tier_1."""
+        assert classify_tier(80.0, THRESHOLDS_4TIER) == "tier_1"
 
     def test_tier2_at_boundary_60(self):
-        """Score exactly 60 → tier 2 (medium)."""
-        assert classify_tier(60.0, THRESHOLDS_4TIER) == "medium"
+        """Score exactly 60 → tier_2."""
+        assert classify_tier(60.0, THRESHOLDS_4TIER) == "tier_2"
 
     def test_tier3_at_boundary_40(self):
-        """Score exactly 40 → tier 3 (low in current system).
-
-        In the new system this should be 'tier_3'. The current engine
-        only supports 3 tiers so 40 < 60 returns 'low'.
-        """
-        assert classify_tier(40.0, THRESHOLDS_4TIER) == "low"
+        """Score exactly 40 → tier_3."""
+        assert classify_tier(40.0, THRESHOLDS_4TIER) == "tier_3"
 
     def test_tier4_below_40(self):
-        """Score below 40 → tier 4 (low)."""
-        assert classify_tier(0.0, THRESHOLDS_4TIER) == "low"
+        """Score below 40 → tier_4."""
+        assert classify_tier(0.0, THRESHOLDS_4TIER) == "tier_4"
 
     def test_max_score_100(self):
-        assert classify_tier(100.0, THRESHOLDS_4TIER) == "high"
+        assert classify_tier(100.0, THRESHOLDS_4TIER) == "tier_1"
 
 
 # ===================================================================
@@ -363,7 +359,8 @@ class TestScoreCalculation:
     def test_score_formula_correctness(self):
         """Verify manual calculation matches engine output.
 
-        Engine rounds component_score to 4 places, then account score to 2 places.
+        Engine rounds component_score to 4 places, then applies dimension-weighted
+        scoring: normalize by ceiling, multiply by dimension weight.
         """
         base_weight = 15.0
         confidence = 0.9
@@ -375,7 +372,9 @@ class TestScoreCalculation:
             base_weight * confidence * source_rel * recency_decay(days_since, half_life),
             4,
         )
-        expected_score = min(100.0, round(expected_component, 2))
+        # Dimension-weighted scoring: normalize by ceiling (60.0), then weight (0.35)
+        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
 
         rules = {
             "sig_a": _make_rule(
@@ -589,7 +588,8 @@ class TestSourceReliability:
         output = _score(obs, rules, source_defaults={"capped_source": 0.3})
 
         expected_component = round(10 * 1.0 * 0.3 * recency_decay(1, 30), 4)
-        expected_score = min(100.0, round(expected_component, 2))
+        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
         assert output.account_scores[0].score == expected_score
 
     def test_zero_registry_reliability_blocks_source(self):
@@ -624,7 +624,8 @@ class TestSourceReliability:
 
         # Defaults to 0.6 when both registry and observation are missing
         expected_component = round(10 * 0.9 * 0.6 * recency_decay(1, 30), 4)
-        expected_score = min(100.0, round(expected_component, 2))
+        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
         assert output.account_scores[0].score == expected_score
 
 
@@ -986,7 +987,8 @@ class TestDimensionCeiling:
 
         zopdev_scores = [s for s in output.account_scores if s.product == "zopdev"]
         assert len(zopdev_scores) == 1
-        assert zopdev_scores[0].score == 100.0
+        # All signals in trigger_intent (weight=0.35), dimension capped at 100 → 35.0
+        assert zopdev_scores[0].score == 35.0
 
     def test_dimension_ceiling_normalization(self):
         """Reference test for dimension ceiling normalization.
@@ -1376,7 +1378,9 @@ class TestEdgeCases:
         ]
         output = _score(obs, rules)
 
-        expected = 10 * 0.9 * 0.75 * 1.0  # source capped by registry
+        raw_component = 10 * 0.9 * 0.75 * 1.0  # source capped by registry
+        dim_normalized = min(100.0, round((raw_component / 60.0) * 100.0, 2))
+        expected = round(dim_normalized * 0.35, 2)
         assert round(output.account_scores[0].score, 4) == round(expected, 4)
 
     def test_none_source_reliability_uses_default(self):
@@ -1397,7 +1401,8 @@ class TestEdgeCases:
 
         # Registry has news_csv=0.75, that's used as both value and cap
         expected_component = round(10 * 0.9 * 0.75 * recency_decay(1, 30), 4)
-        expected_score = min(100.0, round(expected_component, 2))
+        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
         assert output.account_scores[0].score == expected_score
 
     def test_zero_confidence_observation_filtered(self):

@@ -5,7 +5,7 @@ import logging
 import time
 from collections import defaultdict
 from threading import Lock
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field

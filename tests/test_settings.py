@@ -68,7 +68,8 @@ class TestSettingsDefaults:
         s = Settings(project_root=tmp_path, live_workers_per_source=16)
         assert s.live_workers_per_source == 16
 
-    def test_default_http_settings(self, tmp_path):
+    def test_default_http_settings(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("SIGNALS_HTTP_TIMEOUT_SECONDS", raising=False)
         s = Settings(project_root=tmp_path)
         assert s.http_timeout_seconds == 10
         assert s.http_user_agent == "zopdev-signals/0.1"
@@ -123,7 +124,8 @@ class TestSettingsValidation:
         with pytest.raises(Exception):
             Settings(project_root=tmp_path, live_max_accounts=0)
 
-    def test_enable_live_crawl_default_false(self, tmp_path):
+    def test_enable_live_crawl_default_false(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("SIGNALS_ENABLE_LIVE_CRAWL", raising=False)
         s = Settings(project_root=tmp_path)
         assert s.enable_live_crawl is False
 

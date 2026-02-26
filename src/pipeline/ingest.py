@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 from src import db
@@ -12,7 +13,7 @@ from src.settings import Settings
 from src.source_policy import load_source_execution_policy
 
 
-def collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
+async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, int]]:
     lexicon = load_keyword_lexicon(settings.keyword_lexicon_path)
     source_reliability = load_source_registry(settings.source_registry_path)
     execution_policy = load_source_execution_policy(settings.source_execution_policy_path)
@@ -23,22 +24,22 @@ def collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
 
     results: dict[str, dict[str, int]] = {}
     results["jobs"] = (
-        jobs.collect(conn, settings, lexicon, source_reliability)
+        await jobs.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("jobs_pages")
         else {"inserted": 0, "seen": 0}
     )
     results["news"] = (
-        news.collect(conn, settings, lexicon, source_reliability)
+        await news.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("news_rss")
         else {"inserted": 0, "seen": 0}
     )
     results["technographics"] = (
-        technographics.collect(conn, settings, lexicon, source_reliability)
+        await technographics.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("technographics")
         else {"inserted": 0, "seen": 0}
     )
     results["community"] = (
-        community.collect(conn, settings, lexicon, source_reliability)
+        await community.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("reddit_api")
         else {"inserted": 0, "seen": 0}
     )
@@ -48,6 +49,10 @@ def collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
         else {"inserted": 0, "seen": 0}
     )
     return results
+
+
+def collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
+    return asyncio.run(_collect_all_async(conn, settings))
 
 
 def run_ingest_cycle(run_date: date) -> dict[str, int | str]:

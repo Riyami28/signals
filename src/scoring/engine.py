@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import math
 from collections import defaultdict
@@ -16,6 +17,7 @@ from src.scoring.rules import (
     SignalRule,
     Thresholds,
     TierUpgradeRule,
+    VelocityCategory,
     legacy_tier_from_v2,
 )
 from src.utils import parse_datetime
@@ -91,40 +93,6 @@ def classify_tier(score: float, thresholds: Thresholds, dimension_scores: dict[s
     else:
         base_tier = "tier_4"
     return _apply_upgrade_rules(base_tier, dimension_scores or {}, thresholds.upgrade_rules)
-
-
-def classify_velocity(velocity_7d: float) -> VelocityCategory:
-    """Classify velocity based on 7-day score change.
-
-    Surging:       velocity_7d > +20
-    Accelerating:  velocity_7d > +10
-    Decelerating:  velocity_7d < -5
-    Stable:        -5 <= velocity_7d <= +10
-    """
-    if velocity_7d > 20:
-        return "surging"
-    if velocity_7d > 10:
-        return "accelerating"
-    if velocity_7d < -5:
-        return "decelerating"
-    return "stable"
-
-
-def classify_velocity(velocity_7d: float) -> VelocityCategory:
-    """Classify velocity based on 7-day score change.
-
-    Surging:       velocity_7d > +20
-    Accelerating:  velocity_7d > +10
-    Decelerating:  velocity_7d < -5
-    Stable:        -5 <= velocity_7d <= +10
-    """
-    if velocity_7d > 20:
-        return "surging"
-    if velocity_7d > 10:
-        return "accelerating"
-    if velocity_7d < -5:
-        return "decelerating"
-    return "stable"
 
 
 def classify_velocity(velocity_7d: float) -> VelocityCategory:
@@ -275,14 +243,15 @@ def run_scoring(
                 * source_reliability
                 * recency_decay(days_since_observed=days_since, half_life_days=rule.half_life_days)
             )
-            dimension_sources[(account_id, product, dimension)].add(source)
 
             if component <= 0:
                 continue
 
             account_id = str(observation["account_id"])
+            dimension = rule.dimension
             resolved_products = _resolve_products(str(observation.get("product", "")), rule.product_scope)
             for product in resolved_products:
+                dimension_sources[(account_id, product, dimension)].add(source)
                 key = (account_id, product, signal_code)
                 component_contributions[key].append(
                     {
@@ -411,66 +380,21 @@ def run_scoring(
         if velocity_lookup:
             v7, v14, v30 = velocity_lookup(account_id, product, total_score)
             vel_7d = round(v7, 2)
-            vel_14d = round(v14, 2)
-            vel_30d = round(v30, 2)
+            _vel_14d = round(v14, 2)  # noqa: F841 — stored when velocity columns land
+            _vel_30d = round(v30, 2)  # noqa: F841
         else:
             vel_7d = delta
-            vel_14d = 0.0
-            vel_30d = 0.0
+            _vel_14d = 0.0  # noqa: F841
+            _vel_30d = 0.0  # noqa: F841
 
-        vel_cat = classify_velocity(vel_7d)
-
-        # Compute per-dimension confidence bands
-        dim_bands: dict[str, str] = {}
-        for (a_id, prod, dim), sources in dimension_sources.items():
-            if a_id == account_id and prod == product:
-                dim_bands[dim] = classify_confidence_band(len(sources))
-        conf_band = overall_confidence_band(dim_bands)
+        _vel_cat = classify_velocity(vel_7d)  # noqa: F841
 
         # Compute per-dimension confidence bands
         dim_bands: dict[str, str] = {}
         for (a_id, prod, dim), sources in dimension_sources.items():
             if a_id == account_id and prod == product:
                 dim_bands[dim] = classify_confidence_band(len(sources))
-        conf_band = overall_confidence_band(dim_bands)
-
-        if velocity_lookup:
-            v7, v14, v30 = velocity_lookup(account_id, product, total_score)
-            vel_7d = round(v7, 2)
-            vel_14d = round(v14, 2)
-            vel_30d = round(v30, 2)
-        else:
-            vel_7d = delta
-            vel_14d = 0.0
-            vel_30d = 0.0
-
-        vel_cat = classify_velocity(vel_7d)
-
-        # Compute per-dimension confidence bands
-        dim_bands: dict[str, str] = {}
-        for (a_id, prod, dim), sources in dimension_sources.items():
-            if a_id == account_id and prod == product:
-                dim_bands[dim] = classify_confidence_band(len(sources))
-        conf_band = overall_confidence_band(dim_bands)
-
-        if velocity_lookup:
-            v7, v14, v30 = velocity_lookup(account_id, product, total_score)
-            vel_7d = round(v7, 2)
-            vel_14d = round(v14, 2)
-            vel_30d = round(v30, 2)
-        else:
-            vel_7d = delta
-            vel_14d = 0.0
-            vel_30d = 0.0
-
-        vel_cat = classify_velocity(vel_7d)
-
-        # Compute per-dimension confidence bands
-        dim_bands: dict[str, str] = {}
-        for (a_id, prod, dim), sources in dimension_sources.items():
-            if a_id == account_id and prod == product:
-                dim_bands[dim] = classify_confidence_band(len(sources))
-        conf_band = overall_confidence_band(dim_bands)
+        _conf_band = overall_confidence_band(dim_bands)  # noqa: F841
 
         account_models.append(
             AccountScore(

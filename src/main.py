@@ -1091,8 +1091,8 @@ def eval_output(
             scenarios=scenarios,
         )
         typer.echo(
-            f"run_id={run_id} threshold_high={result.thresholds.high} threshold_medium={result.thresholds.medium} "
-            f"threshold_low={result.thresholds.low} icp_accounts={result.icp_accounts} non_icp_accounts={result.non_icp_accounts} "
+            f"run_id={run_id} threshold_high={result.thresholds.tier_1} threshold_medium={result.thresholds.tier_2} "
+            f"threshold_low={result.thresholds.tier_4} icp_accounts={result.icp_accounts} non_icp_accounts={result.non_icp_accounts} "
             f"icp_high_coverage={result.icp_high_coverage} icp_medium_coverage={result.icp_medium_coverage} "
             f"non_icp_high_hit_rate={result.non_icp_high_hit_rate} non_icp_medium_hit_rate={result.non_icp_medium_hit_rate} "
             f"scenario_pass_rate={result.scenario_pass_rate} quality_passed={int(result.passed)} "
@@ -1145,9 +1145,10 @@ def self_improve_output(
         )
         latest_run_id = run_id
         thresholds_changed = (
-            round(result.final_thresholds.high, 4) != round(current_thresholds.high, 4)
-            or round(result.final_thresholds.medium, 4) != round(current_thresholds.medium, 4)
-            or round(result.final_thresholds.low, 4) != round(current_thresholds.low, 4)
+            round(result.final_thresholds.tier_1, 4) != round(current_thresholds.tier_1, 4)
+            or round(result.final_thresholds.tier_2, 4) != round(current_thresholds.tier_2, 4)
+            or round(result.final_thresholds.tier_3, 4) != round(current_thresholds.tier_3, 4)
+            or round(result.final_thresholds.tier_4, 4) != round(current_thresholds.tier_4, 4)
         )
         if write and thresholds_changed:
             calibration.write_thresholds(
@@ -1174,9 +1175,9 @@ def self_improve_output(
             )
         )
         typer.echo(
-            f"run_id={latest_run_id} iterations={len(result.iterations)} initial_high={current_thresholds.high} "
-            f"initial_medium={current_thresholds.medium} final_high={result.final_thresholds.high} "
-            f"final_medium={result.final_thresholds.medium} quality_passed={int(result.passed)} converged={int(result.converged)} "
+            f"run_id={latest_run_id} iterations={len(result.iterations)} initial_high={current_thresholds.tier_1} "
+            f"initial_medium={current_thresholds.tier_2} final_high={result.final_thresholds.tier_1} "
+            f"final_medium={result.final_thresholds.tier_2} quality_passed={int(result.passed)} converged={int(result.converged)} "
             f"failed_checks={'|'.join(final_eval.failed_checks) if final_eval.failed_checks else 'none'} "
             f"written={int(write and thresholds_changed)}"
         )

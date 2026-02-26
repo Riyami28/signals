@@ -30,9 +30,10 @@ class ThresholdSelfImprovementResult:
 
 def _same_thresholds(left: Thresholds, right: Thresholds) -> bool:
     return (
-        round(float(left.high), 4) == round(float(right.high), 4)
-        and round(float(left.medium), 4) == round(float(right.medium), 4)
-        and round(float(left.low), 4) == round(float(right.low), 4)
+        round(float(left.tier_1), 4) == round(float(right.tier_1), 4)
+        and round(float(left.tier_2), 4) == round(float(right.tier_2), 4)
+        and round(float(left.tier_3), 4) == round(float(right.tier_3), 4)
+        and round(float(left.tier_4), 4) == round(float(right.tier_4), 4)
     )
 
 
@@ -50,10 +51,10 @@ def run_threshold_self_improvement(
 
     selected_scenarios = scenarios if scenarios is not None else calibration.load_scenarios(None)
     thresholds = Thresholds(
-        tier_1=float(current_thresholds.high),
-        tier_2=float(current_thresholds.medium),
-        tier_3=float(getattr(current_thresholds, "tier_3", current_thresholds.medium)),
-        tier_4=float(current_thresholds.low),
+        tier_1=float(current_thresholds.tier_1),
+        tier_2=float(current_thresholds.tier_2),
+        tier_3=float(current_thresholds.tier_3),
+        tier_4=float(current_thresholds.tier_4),
     )
     iterations: list[ImprovementIteration] = []
     converged = False
@@ -109,7 +110,7 @@ def run_threshold_self_improvement(
         next_thresholds = Thresholds(
             tier_1=next_high,
             tier_2=next_medium,
-            tier_3=float(getattr(thresholds, "tier_3", next_medium)),
+            tier_3=float(thresholds.tier_3),
             tier_4=float(suggestion.low),
         )
         if _same_thresholds(next_thresholds, thresholds):

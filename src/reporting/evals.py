@@ -41,9 +41,9 @@ def _threshold_rate(scores: list[float], threshold: float) -> float:
 
 
 def _classify_tier(score: float, thresholds: Thresholds) -> str:
-    if score >= thresholds.high:
+    if score >= thresholds.tier_1:
         return "high"
-    if score >= thresholds.medium:
+    if score >= thresholds.tier_2:
         return "medium"
     return "low"
 
@@ -109,10 +109,10 @@ def evaluate_run_output_quality(
     selected_scenarios = scenarios if scenarios is not None else load_scenarios(None)
     icp_scores, non_icp_scores = _load_score_segments(conn, run_id, reference_csv_path)
 
-    icp_high_coverage = _threshold_rate(icp_scores, thresholds.high)
-    icp_medium_coverage = _threshold_rate(icp_scores, thresholds.medium)
-    non_icp_high_hit_rate = _threshold_rate(non_icp_scores, thresholds.high)
-    non_icp_medium_hit_rate = _threshold_rate(non_icp_scores, thresholds.medium)
+    icp_high_coverage = _threshold_rate(icp_scores, thresholds.tier_1)
+    icp_medium_coverage = _threshold_rate(icp_scores, thresholds.tier_2)
+    non_icp_high_hit_rate = _threshold_rate(non_icp_scores, thresholds.tier_1)
+    non_icp_medium_hit_rate = _threshold_rate(non_icp_scores, thresholds.tier_2)
     scenario_pass_rate = _scenario_pass_rate(selected_scenarios, thresholds)
 
     failed_checks: list[str] = []

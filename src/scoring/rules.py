@@ -60,19 +60,6 @@ class Thresholds:
     tier_4: float = 0.0
     upgrade_rules: tuple[TierUpgradeRule, ...] = field(default_factory=tuple)
 
-    # Backward-compat aliases for legacy 3-tier code (calibration, evals, improvement).
-    @property
-    def high(self) -> float:
-        return self.tier_1
-
-    @property
-    def medium(self) -> float:
-        return self.tier_2
-
-    @property
-    def low(self) -> float:
-        return self.tier_4
-
 
 def _to_bool(value: str | None) -> bool:
     if value is None:

@@ -178,15 +178,15 @@ def suggest_thresholds_for_run(
 
     if not icp_scores:
         return ThresholdSuggestion(
-            high=current_thresholds.high,
-            medium=current_thresholds.medium,
-            low=current_thresholds.low,
+            high=current_thresholds.tier_1,
+            medium=current_thresholds.tier_2,
+            low=current_thresholds.tier_4,
             icp_accounts=0,
             non_icp_accounts=len(non_icp_scores),
             icp_high_coverage=0.0,
             icp_medium_coverage=0.0,
-            non_icp_high_hit_rate=_rate(non_icp_scores, current_thresholds.high),
-            non_icp_medium_hit_rate=_rate(non_icp_scores, current_thresholds.medium),
+            non_icp_high_hit_rate=_rate(non_icp_scores, current_thresholds.tier_1),
+            non_icp_medium_hit_rate=_rate(non_icp_scores, current_thresholds.tier_2),
         )
 
     high = _threshold_for_target_coverage(icp_scores, high_target_coverage)
@@ -194,7 +194,7 @@ def suggest_thresholds_for_run(
     if high < medium:
         high = medium
 
-    low = float(current_thresholds.low)
+    low = float(current_thresholds.tier_4)
     return ThresholdSuggestion(
         high=high,
         medium=medium,
@@ -233,9 +233,9 @@ def suggest_profile_for_run(
 
     if not candidate_scores:
         return ProfileSuggestion(
-            high=baseline.high,
-            medium=baseline.medium,
-            low=baseline.low,
+            high=baseline.tier_1,
+            medium=baseline.tier_2,
+            low=baseline.tier_4,
             icp_accounts=0,
             non_icp_accounts=0,
             icp_high_coverage=0.0,
@@ -272,7 +272,7 @@ def suggest_profile_for_run(
             suggestion = ProfileSuggestion(
                 high=round(high, 2),
                 medium=round(medium, 2),
-                low=float(baseline.low),
+                low=float(baseline.tier_4),
                 icp_accounts=len(icp_scores),
                 non_icp_accounts=len(non_icp_scores),
                 icp_high_coverage=icp_high,

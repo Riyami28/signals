@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime, timezone
@@ -247,66 +248,42 @@ async def _collect_live_technographics_async(
 
     concurrency = min(max(1, int(settings.live_workers_per_source)), len(accounts))
     semaphore = asyncio.Semaphore(concurrency)
+    inserted_total = 0
+    seen_total = 0
+    failed_workers = 0
 
     async with httpx.AsyncClient(
         headers={"User-Agent": settings.http_user_agent},
         follow_redirects=True,
         timeout=settings.http_timeout_seconds,
     ) as client:
-        inserted_total = 0
-        seen_total = 0
 
-    conn.commit()
-    indexed_accounts = list(enumerate(accounts, start=1))
-    batches = [indexed_accounts[i::workers] for i in range(workers)]
-
-    def _worker(batch: list[tuple[int, dict[str, Any]]]) -> tuple[int, int]:
-        if db_pool is not None:
-            worker_conn = db_pool.getconn()
-        else:
-            worker_conn = db.get_connection(settings.pg_dsn)
-        worker_inserted = 0
-        worker_seen = 0
-        processed = 0
-        try:
-            for account_index, account in batch:
-                inserted_delta, seen_delta, processed_delta = _collect_live_technographics_account(
-                    conn=worker_conn,
+        async def _run_account(account_index: int, account: dict) -> tuple[int, int, int]:
+            async with semaphore:
+                return await _collect_live_technographics_account(
+                    conn=conn,
                     settings=settings,
                     lexicon_rows=lexicon_rows,
                     account=account,
-                    account_index=idx,
+                    account_index=account_index,
                     scan_source=scan_source,
                     scan_reliability=scan_reliability,
                     client=client,
                 )
-                worker_inserted += inserted_delta
-                worker_seen += seen_delta
-                processed += processed_delta
-                if processed and processed % _LIVE_PROGRESS_COMMIT_EVERY == 0:
-                    worker_conn.commit()
-            worker_conn.commit()
-            return worker_inserted, worker_seen
-        finally:
-            if db_pool is not None:
-                db_pool.putconn(worker_conn)
-            else:
-                worker_conn.close()
 
-    inserted_total = 0
-    seen_total = 0
-    failed_workers = 0
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(_worker, batch) for batch in batches if batch]
-        for future in as_completed(futures):
-            try:
-                batch_inserted, batch_seen = future.result(timeout=settings.stage_timeout_seconds)
-            except Exception as e:
-                logger.error("collector_worker_failed source=technographics error=%s", e, exc_info=True)
-                batch_inserted, batch_seen = 0, 0
-                failed_workers += 1
-            inserted_total += batch_inserted
-            seen_total += batch_seen
+        tasks = [_run_account(i, acct) for i, acct in enumerate(accounts, start=1)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    conn.commit()
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error("collector_worker_failed source=technographics error=%s", result, exc_info=True)
+            failed_workers += 1
+            continue
+        inserted_delta, seen_delta, _ = result
+        inserted_total += inserted_delta
+        seen_total += seen_delta
+
     logger.info(
         "collection_complete source=technographics inserted=%d seen=%d failed_workers=%d",
         inserted_total,
