@@ -239,6 +239,7 @@ def _collect_live_technographics_parallel(
     accounts: list[dict[str, Any]],
     scan_source: str,
     scan_reliability: float,
+    db_pool=None,
 ) -> tuple[int, int]:
     if not accounts:
         return 0, 0
@@ -274,7 +275,10 @@ def _collect_live_technographics_parallel(
     batches = [indexed_accounts[i::workers] for i in range(workers)]
 
     def _worker(batch: list[tuple[int, dict[str, Any]]]) -> tuple[int, int]:
-        worker_conn = db.get_connection(settings.pg_dsn)
+        if db_pool is not None:
+            worker_conn = db_pool.getconn()
+        else:
+            worker_conn = db.get_connection(settings.pg_dsn)
         worker_inserted = 0
         worker_seen = 0
         processed = 0
@@ -297,12 +301,15 @@ def _collect_live_technographics_parallel(
             worker_conn.commit()
             return worker_inserted, worker_seen
         finally:
-            worker_conn.close()
+            if db_pool is not None:
+                db_pool.putconn(worker_conn)
+            else:
+                worker_conn.close()
 
     inserted_total = 0
     seen_total = 0
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(_worker, batch) for batch in batches if batch]
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_worker, batch) for batch in batches if batch]
         for future in as_completed(futures):
             batch_inserted, batch_seen = future.result()
             inserted_total += batch_inserted
@@ -315,6 +322,7 @@ def collect(
     settings: Settings,
     lexicon_by_source: dict[str, list[dict[str, str]]],
     source_reliability: dict[str, float],
+    db_pool=None,
 ) -> dict[str, int]:
     inserted = 0
     seen = 0
@@ -387,6 +395,7 @@ def collect(
             accounts=accounts,
             scan_source=scan_source,
             scan_reliability=scan_reliability,
+            db_pool=db_pool,
         )
         inserted += live_inserted
         seen += live_seen

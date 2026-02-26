@@ -124,6 +124,10 @@ class Settings(BaseSettings):
     minimax_model: str = Field(default="MiniMax-M2.5")
     llm_provider: str = Field(default="minimax")  # "minimax" or "claude"
 
+    # --- connection pooling ---
+    db_pool_min_size: int = Field(default=4, ge=1)
+    db_pool_max_size: int = Field(default=32, ge=1)
+
     # --- waterfall enrichment ---
     clearbit_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")

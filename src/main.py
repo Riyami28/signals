@@ -51,6 +51,7 @@ def _app_callback() -> None:
 
 
 
+
 _RUN_DAILY_LOCK_NAME = "signals:run-daily"
 _AUTONOMOUS_LOCK_NAME = "signals:run-autonomous-loop"
 _RETRY_BACKOFF_SECONDS = [60, 300, 900]
@@ -247,33 +248,44 @@ def _collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
         policy = execution_policy.get(policy_key.strip().lower())
         return bool(policy.enabled) if policy is not None else True
 
-    results: dict[str, dict[str, int]] = {}
-    results["jobs"] = (
-        jobs.collect(conn, settings, lexicon, source_reliability)
-        if _collector_enabled("jobs_pages")
-        else {"inserted": 0, "seen": 0}
-    )
-    results["news"] = (
-        news.collect(conn, settings, lexicon, source_reliability)
-        if _collector_enabled("news_rss")
-        else {"inserted": 0, "seen": 0}
-    )
-    results["technographics"] = (
-        technographics.collect(conn, settings, lexicon, source_reliability)
-        if _collector_enabled("technographics")
-        else {"inserted": 0, "seen": 0}
-    )
-    results["community"] = (
-        community.collect(conn, settings, lexicon, source_reliability)
-        if _collector_enabled("reddit_api")
-        else {"inserted": 0, "seen": 0}
-    )
-    results["first_party"] = (
-        first_party.collect(conn, settings, lexicon, source_reliability)
-        if _collector_enabled("first_party_csv")
-        else {"inserted": 0, "seen": 0}
-    )
-    return results
+    pool = None
+    if settings.enable_live_crawl:
+        from src.db_pool import create_pool
+
+        pool = create_pool(settings.pg_dsn, min_size=settings.db_pool_min_size, max_size=settings.db_pool_max_size)
+
+    try:
+        results: dict[str, dict[str, int]] = {}
+        results["jobs"] = (
+            jobs.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            if _collector_enabled("jobs_pages")
+            else {"inserted": 0, "seen": 0}
+        )
+        results["news"] = (
+            news.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            if _collector_enabled("news_rss")
+            else {"inserted": 0, "seen": 0}
+        )
+        results["technographics"] = (
+            technographics.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            if _collector_enabled("technographics")
+            else {"inserted": 0, "seen": 0}
+        )
+        results["community"] = (
+            community.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            if _collector_enabled("reddit_api")
+            else {"inserted": 0, "seen": 0}
+        )
+        results["first_party"] = (
+            first_party.collect(conn, settings, lexicon, source_reliability)
+            if _collector_enabled("first_party_csv")
+            else {"inserted": 0, "seen": 0}
+        )
+        return results
+    finally:
+        if pool is not None:
+            pool.close()
+            logger.info("db_pool_closed")
 
 
 def _baseline_score_7d(conn, account_id: str, product: str, run_date: str) -> float | None:
