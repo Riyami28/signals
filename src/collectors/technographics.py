@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -15,6 +16,8 @@ from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_csv_rows, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 DISCOVERY_LINK_TOKENS = (
     "digital",
@@ -308,12 +311,24 @@ def _collect_live_technographics_parallel(
 
     inserted_total = 0
     seen_total = 0
+    failed_workers = 0
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(_worker, batch) for batch in batches if batch]
         for future in as_completed(futures):
-            batch_inserted, batch_seen = future.result()
+            try:
+                batch_inserted, batch_seen = future.result(timeout=settings.stage_timeout_seconds)
+            except Exception as e:
+                logger.error("collector_worker_failed source=technographics error=%s", e, exc_info=True)
+                batch_inserted, batch_seen = 0, 0
+                failed_workers += 1
             inserted_total += batch_inserted
             seen_total += batch_seen
+    logger.info(
+        "collection_complete source=technographics inserted=%d seen=%d failed_workers=%d",
+        inserted_total,
+        seen_total,
+        failed_workers,
+    )
     return inserted_total, seen_total
 
 
