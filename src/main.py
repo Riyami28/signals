@@ -46,6 +46,7 @@ from src.scoring.rules import load_signal_rules, load_source_registry, load_thre
 from src.server import serve_discovery_webhook_impl, serve_local_ui_impl, serve_web_impl
 from src.settings import load_settings
 from src.sync.google_sheets import sync_outputs
+from src.sync.zoho_push import run_zoho_push
 from src.utils import ensure_project_directories, load_csv_rows, normalize_domain, parse_date, write_csv_rows
 
 logger = logging.getLogger(__name__)
@@ -1258,6 +1259,25 @@ def run_daily(
             sync_error = str(exc)
             typer.echo(f"stage=sync-sheet status=failed error={sync_error[:220]}")
 
+        # Zoho CRM push — non-blocking. If it fails, pipeline continues.
+        zoho_push_result = {"pushed": 0, "skipped": 0, "failed": 0, "deals": 0, "contacts": 0}
+        zoho_push_error = ""
+        try:
+            typer.echo("stage=zoho-crm-push status=started")
+            zoho_push_result, zoho_elapsed = _run_with_watchdog(
+                "zoho-crm-push",
+                settings.stage_timeout_seconds,
+                lambda: run_zoho_push(conn, settings, run_id),
+            )
+            typer.echo(
+                f"stage=zoho-crm-push status=completed duration_seconds={round(zoho_elapsed, 2)} "
+                f"pushed={zoho_push_result['pushed']} skipped={zoho_push_result['skipped']} "
+                f"failed={zoho_push_result['failed']} deals={zoho_push_result['deals']}"
+            )
+        except Exception as exc:
+            zoho_push_error = str(exc)
+            typer.echo(f"stage=zoho-crm-push status=failed error={zoho_push_error[:220]}")
+
         typer.echo("stage=import-reviews status=started")
         imported, _ = _run_with_watchdog(
             "import-reviews",
@@ -1341,6 +1361,11 @@ def run_daily(
                     f"research_completed={research_result['completed']}",
                     f"sales_ready_rows={sales_ready_rows}",
                     f"sync_error={sync_error}",
+                    f"zoho_pushed={zoho_push_result['pushed']}",
+                    f"zoho_skipped={zoho_push_result['skipped']}",
+                    f"zoho_failed={zoho_push_result['failed']}",
+                    f"zoho_deals={zoho_push_result['deals']}",
+                    f"zoho_push_error={zoho_push_error}",
                 ]
             )
         )

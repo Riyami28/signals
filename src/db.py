@@ -490,6 +490,47 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     stages_json         TEXT NOT NULL DEFAULT '[]',
     result_json         TEXT NOT NULL DEFAULT '{}'
 );
+
+CREATE TABLE IF NOT EXISTS upload_batches (
+    batch_id            TEXT PRIMARY KEY,
+    uploaded_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    filename            TEXT NOT NULL DEFAULT '',
+    row_count           INT NOT NULL DEFAULT 0,
+    status              TEXT NOT NULL DEFAULT 'pending',
+    metadata            TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS batch_companies (
+    id                  SERIAL PRIMARY KEY,
+    batch_id            TEXT NOT NULL REFERENCES upload_batches(batch_id),
+    company_name        TEXT NOT NULL DEFAULT '',
+    domain              TEXT NOT NULL DEFAULT '',
+    industry            TEXT NOT NULL DEFAULT '',
+    employee_count      INT,
+    metadata            TEXT NOT NULL DEFAULT '{}',
+    account_id          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_companies_batch ON batch_companies(batch_id);
+
+CREATE TABLE IF NOT EXISTS crm_push_log (
+    push_id         TEXT PRIMARY KEY,
+    account_id      TEXT NOT NULL REFERENCES accounts(account_id),
+    run_id          TEXT NOT NULL,
+    push_type       TEXT NOT NULL CHECK (push_type IN ('account', 'contact', 'deal')),
+    crm_record_id   TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL CHECK (status IN ('pending', 'pushed', 'updated', 'failed', 'skipped')),
+    tier            TEXT NOT NULL DEFAULT '',
+    confidence_band TEXT NOT NULL DEFAULT '',
+    error_summary   TEXT NOT NULL DEFAULT '',
+    payload_json    TEXT NOT NULL DEFAULT '{}',
+    pushed_at       TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_crm_push_log_account ON crm_push_log(account_id);
+CREATE INDEX IF NOT EXISTS idx_crm_push_log_status ON crm_push_log(status);
+CREATE INDEX IF NOT EXISTS idx_crm_push_log_run ON crm_push_log(run_id);
 """
 
 
@@ -3096,3 +3137,232 @@ def finish_ui_pipeline_run(conn, pipeline_run_id: str, status: str, result: dict
         (status, _json.dumps(result), pipeline_run_id),
     )
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Upload Batches
+# ---------------------------------------------------------------------------
+
+
+def create_upload_batch(conn, batch_id: str, filename: str, row_count: int, metadata: dict | None = None) -> str:
+    import json as _json
+
+    conn.execute(
+        """INSERT INTO upload_batches (batch_id, filename, row_count, status, metadata)
+           VALUES (%s, %s, %s, %s, %s)""",
+        (batch_id, filename, row_count, "pending", _json.dumps(metadata or {})),
+    )
+    conn.commit()
+    return batch_id
+
+
+def update_batch_status(conn, batch_id: str, status: str) -> None:
+    conn.execute(
+        "UPDATE upload_batches SET status = %s WHERE batch_id = %s",
+        (status, batch_id),
+    )
+    conn.commit()
+
+
+def get_upload_batch(conn, batch_id: str) -> dict | None:
+    cur = conn.execute(
+        "SELECT batch_id, uploaded_at, filename, row_count, status, metadata FROM upload_batches WHERE batch_id = %s",
+        (batch_id,),
+    )
+    return cur.fetchone()
+
+
+def insert_batch_company(
+    conn,
+    batch_id: str,
+    company_name: str,
+    domain: str,
+    industry: str = "",
+    employee_count: int | None = None,
+    metadata: dict | None = None,
+    commit: bool = False,
+) -> int:
+    import json as _json
+
+    cur = conn.execute(
+        """INSERT INTO batch_companies (batch_id, company_name, domain, industry, employee_count, metadata)
+           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+        (batch_id, company_name, domain, industry, employee_count, _json.dumps(metadata or {})),
+    )
+    row_id = cur.fetchone()["id"]
+    if commit:
+        conn.commit()
+    return row_id
+
+
+def link_batch_company_account(conn, batch_company_id: int, account_id: str) -> None:
+    conn.execute(
+        "UPDATE batch_companies SET account_id = %s WHERE id = %s",
+        (account_id, batch_company_id),
+    )
+
+
+def get_batch_companies(conn, batch_id: str) -> list[dict]:
+    cur = conn.execute(
+        "SELECT id, batch_id, company_name, domain, industry, employee_count, metadata, account_id "
+        "FROM batch_companies WHERE batch_id = %s ORDER BY id",
+        (batch_id,),
+    )
+    return [dict(row) for row in cur.fetchall()]
+
+
+def get_batch_results(conn, batch_id: str, score_run_id: str | None = None) -> list[dict]:
+    """Return scored accounts for a batch, joining batch_companies with latest scores."""
+    if score_run_id:
+        query = """
+            SELECT bc.company_name, bc.domain, bc.industry, bc.employee_count,
+                   bc.account_id,
+                   COALESCE(s.score, 0) AS score,
+                   COALESCE(s.tier, 'low') AS tier,
+                   COALESCE(s.product, 'zopdev') AS product,
+                   COALESCE(s.top_reasons_json, '[]') AS top_reasons_json,
+                   COALESCE(s.delta_7d, 0) AS delta_7d
+            FROM batch_companies bc
+            LEFT JOIN LATERAL (
+                SELECT a_s.score, a_s.tier, a_s.product, a_s.top_reasons_json, a_s.delta_7d
+                FROM account_scores a_s
+                WHERE a_s.account_id = bc.account_id AND a_s.run_id = %s
+                ORDER BY a_s.score DESC LIMIT 1
+            ) s ON TRUE
+            WHERE bc.batch_id = %s
+            ORDER BY COALESCE(s.score, 0) DESC
+        """
+        params = [score_run_id, batch_id]
+    else:
+        query = """
+            SELECT bc.company_name, bc.domain, bc.industry, bc.employee_count,
+                   bc.account_id,
+                   COALESCE(s.score, 0) AS score,
+                   COALESCE(s.tier, 'low') AS tier,
+                   COALESCE(s.product, 'zopdev') AS product,
+                   COALESCE(s.top_reasons_json, '[]') AS top_reasons_json,
+                   COALESCE(s.delta_7d, 0) AS delta_7d
+            FROM batch_companies bc
+            LEFT JOIN LATERAL (
+                SELECT a_s.score, a_s.tier, a_s.product, a_s.top_reasons_json, a_s.delta_7d
+                FROM account_scores a_s
+                WHERE a_s.account_id = bc.account_id
+                ORDER BY a_s.score DESC LIMIT 1
+            ) s ON TRUE
+            WHERE bc.batch_id = %s
+            ORDER BY COALESCE(s.score, 0) DESC
+        """
+        params = [batch_id]
+    cur = conn.execute(query, params)
+    return [dict(row) for row in cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# CRM push log helpers
+# ---------------------------------------------------------------------------
+
+
+def insert_crm_push_log(
+    conn,
+    push_id: str,
+    account_id: str,
+    run_id: str,
+    push_type: str,
+    status: str,
+    tier: str = "",
+    confidence_band: str = "",
+    crm_record_id: str = "",
+    error_summary: str = "",
+    payload_json: str = "{}",
+    pushed_at: str = "",
+    commit: bool = True,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO crm_push_log
+            (push_id, account_id, run_id, push_type, crm_record_id,
+             status, tier, confidence_band, error_summary, payload_json, pushed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (push_id) DO NOTHING
+        """,
+        (
+            push_id,
+            account_id,
+            run_id,
+            push_type,
+            crm_record_id,
+            status,
+            tier,
+            confidence_band,
+            error_summary[:500],
+            payload_json,
+            pushed_at,
+        ),
+    )
+    if commit:
+        conn.commit()
+
+
+def update_crm_push_status(
+    conn,
+    push_id: str,
+    status: str,
+    crm_record_id: str = "",
+    error_summary: str = "",
+    pushed_at: str = "",
+    commit: bool = True,
+) -> None:
+    conn.execute(
+        """
+        UPDATE crm_push_log
+        SET status = %s, crm_record_id = %s, error_summary = %s, pushed_at = %s
+        WHERE push_id = %s
+        """,
+        (status, crm_record_id, error_summary[:500], pushed_at, push_id),
+    )
+    if commit:
+        conn.commit()
+
+
+def get_crm_push_log_for_account(conn, account_id: str) -> list[dict]:
+    cur = conn.execute(
+        "SELECT * FROM crm_push_log WHERE account_id = %s ORDER BY created_at DESC",
+        (account_id,),
+    )
+    return [dict(row) for row in cur.fetchall()]
+
+
+def was_account_pushed_to_crm(conn, account_id: str, push_type: str = "account") -> bool:
+    """Check if account has been successfully pushed to CRM."""
+    cur = conn.execute(
+        """
+        SELECT 1 FROM crm_push_log
+        WHERE account_id = %s AND push_type = %s AND status IN ('pushed', 'updated')
+        LIMIT 1
+        """,
+        (account_id, push_type),
+    )
+    return cur.fetchone() is not None
+
+
+def get_accounts_eligible_for_crm_push(conn, run_id: str) -> list[dict]:
+    """Fetch scored accounts eligible for CRM push based on tier and confidence.
+
+    Returns accounts with their best product score, enrichment data, and contacts.
+    """
+    cur = conn.execute(
+        """
+        SELECT a.account_id, a.company_name, a.domain,
+               s.product, s.score, s.tier, s.top_reasons_json, s.delta_7d,
+               COALESCE(cr.enrichment_json, '{}') AS enrichment_json,
+               COALESCE(cr.research_brief, '') AS research_brief
+        FROM account_scores s
+        JOIN accounts a ON a.account_id = s.account_id
+        LEFT JOIN company_research cr ON cr.account_id = a.account_id
+        WHERE s.run_id = %s
+          AND s.tier IN ('high', 'medium')
+        ORDER BY s.score DESC
+        """,
+        (run_id,),
+    )
+    return [dict(row) for row in cur.fetchall()]

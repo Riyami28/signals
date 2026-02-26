@@ -19,21 +19,23 @@ logger = logging.getLogger(__name__)
 ACTIVE_QUEUES: dict[str, asyncio.Queue] = {}
 
 
-async def run_pipeline_async(account_ids: list[str], stages: list[str]) -> str:
+async def run_pipeline_async(account_ids: list[str], stages: list[str], batch_id: str = "") -> str:
     """Start pipeline in background thread, return run_id immediately."""
     run_id = f"prun_{uuid.uuid4().hex[:12]}"
     queue: asyncio.Queue = asyncio.Queue()
     ACTIVE_QUEUES[run_id] = queue
 
     loop = asyncio.get_event_loop()
-    loop.create_task(_run_in_thread(run_id, account_ids, stages, queue))
+    loop.create_task(_run_in_thread(run_id, account_ids, stages, queue, batch_id))
     return run_id
 
 
-async def _run_in_thread(run_id: str, account_ids: list[str], stages: list[str], queue: asyncio.Queue):
+async def _run_in_thread(
+    run_id: str, account_ids: list[str], stages: list[str], queue: asyncio.Queue, batch_id: str = ""
+):
     """Run pipeline stages in a thread and emit events to the queue."""
     try:
-        await asyncio.to_thread(_run_pipeline_sync, run_id, account_ids, stages, queue)
+        await asyncio.to_thread(_run_pipeline_sync, run_id, account_ids, stages, queue, batch_id)
     except Exception as exc:
         await queue.put({"type": "error", "message": str(exc)})
     finally:
@@ -48,7 +50,9 @@ def _emit(queue: asyncio.Queue, event: dict):
         pass
 
 
-def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], queue: asyncio.Queue):
+def _run_pipeline_sync(
+    run_id: str, account_ids: list[str], stages: list[str], queue: asyncio.Queue, batch_id: str = ""
+):
     """Synchronous pipeline execution — runs in a thread."""
     settings = load_settings()
     conn = db.get_connection(settings.pg_dsn)
@@ -61,6 +65,16 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
     try:
         # Record pipeline run
         db.create_ui_pipeline_run(conn, account_ids, stages)
+
+        if batch_id:
+            _emit(
+                queue,
+                {
+                    "type": "log",
+                    "stage": "setup",
+                    "message": f"Processing batch {batch_id} with {len(account_ids)} accounts",
+                },
+            )
 
         # --- INGEST ---
         if "ingest" in stages:
@@ -167,6 +181,12 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                 score_run_id = db.create_score_run(conn, run_date)
                 observations = db.fetch_observations_for_scoring(conn, run_date)
                 obs_list = [dict(row) for row in observations]
+
+                # For batch runs, filter observations to batch accounts only
+                if batch_id and account_ids:
+                    batch_account_set = set(account_ids)
+                    obs_list = [o for o in obs_list if o.get("account_id") in batch_account_set]
+
                 _emit(queue, {"type": "log", "stage": "score", "message": f"Scoring {len(obs_list)} observations..."})
 
                 result = run_scoring(
@@ -180,18 +200,25 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                     delta_lookup=None,
                 )
 
-                # Ensure all accounts have scores (including silent ones)
+                # Ensure all target accounts have scores
                 existing_scores = {(s.account_id, s.product) for s in result.account_scores}
-                account_rows = conn.execute("SELECT account_id FROM accounts").fetchall()
-                for row in account_rows:
-                    account_id = str(row["account_id"])
+
+                if batch_id and account_ids:
+                    # Batch-scoped: only backfill batch accounts
+                    target_account_ids = account_ids
+                else:
+                    # Full run: backfill all accounts
+                    account_rows = conn.execute("SELECT account_id FROM accounts").fetchall()
+                    target_account_ids = [str(row["account_id"]) for row in account_rows]
+
+                for acct_id in target_account_ids:
                     for product in ("zopdev", "zopday", "zopnight"):
-                        if (account_id, product) in existing_scores:
+                        if (acct_id, product) in existing_scores:
                             continue
                         result.account_scores.append(
                             AccountScore(
                                 run_id=score_run_id,
-                                account_id=account_id,
+                                account_id=acct_id,
                                 product=product,
                                 score=0.0,
                                 tier="low",
@@ -319,12 +346,18 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                 )
 
         # Finalize
-        db.finish_ui_pipeline_run(conn, run_id, "completed", {"score_run_id": score_run_id})
+        result_meta = {"score_run_id": score_run_id}
+        if batch_id:
+            result_meta["batch_id"] = batch_id
+            db.update_batch_status(conn, batch_id, "scored")
+        db.finish_ui_pipeline_run(conn, run_id, "completed", result_meta)
 
     except Exception as exc:
         logger.error("pipeline run %s failed: %s", run_id, exc, exc_info=True)
         try:
             db.finish_ui_pipeline_run(conn, run_id, "failed", {"error": str(exc)})
+            if batch_id:
+                db.update_batch_status(conn, batch_id, "failed")
         except Exception:
             pass
     finally:
