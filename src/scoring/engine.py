@@ -350,6 +350,13 @@ def run_scoring(
                 dim_bands[dim] = classify_confidence_band(len(sources))
         conf_band = overall_confidence_band(dim_bands)
 
+        # Compute per-dimension confidence bands
+        dim_bands: dict[str, str] = {}
+        for (a_id, prod, dim), sources in dimension_sources.items():
+            if a_id == account_id and prod == product:
+                dim_bands[dim] = classify_confidence_band(len(sources))
+        conf_band = overall_confidence_band(dim_bands)
+
         account_models.append(
             AccountScore(
                 run_id=run_id,
