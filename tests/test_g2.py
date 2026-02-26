@@ -240,10 +240,12 @@ def test_collect_creates_dissatisfaction_signals(mock_db, mock_fetch_intent, moc
     mock_db.insert_signal_observation.return_value = True
     mock_db.mark_crawled.return_value = None
 
-    conn = _mock_conn([
-        {"account_id": "acc_1", "domain": "example.com"},
-        {"account_id": "acc_2", "domain": "acme.io"},
-    ])
+    conn = _mock_conn(
+        [
+            {"account_id": "acc_1", "domain": "example.com"},
+            {"account_id": "acc_2", "domain": "acme.io"},
+        ]
+    )
     settings = _mock_settings()
     collect(conn, settings, {}, {"g2_api": 0.78})
 
@@ -263,10 +265,12 @@ def test_collect_creates_review_activity_signals(mock_db, mock_fetch_intent, moc
     mock_db.insert_signal_observation.return_value = True
     mock_db.mark_crawled.return_value = None
 
-    conn = _mock_conn([
-        {"account_id": "acc_1", "domain": "example.com"},
-        {"account_id": "acc_2", "domain": "acme.io"},
-    ])
+    conn = _mock_conn(
+        [
+            {"account_id": "acc_1", "domain": "example.com"},
+            {"account_id": "acc_2", "domain": "acme.io"},
+        ]
+    )
     settings = _mock_settings()
     collect(conn, settings, {}, {"g2_api": 0.78})
 

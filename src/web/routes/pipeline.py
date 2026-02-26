@@ -10,6 +10,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from src import db
+from src.settings import load_settings
 from src.web.pipeline_runner import ACTIVE_QUEUES, run_pipeline_async
 
 logger = logging.getLogger(__name__)

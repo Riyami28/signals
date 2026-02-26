@@ -62,15 +62,6 @@ def _app_callback() -> None:
     configure_logging(os.environ.get("SIGNALS_LOG_LEVEL", "INFO"))
 
 
-
-
-
-
-
-
-
-
-
 class StageExecutionError(RuntimeError):
     def __init__(self, stage: str, duration_seconds: float, timed_out: bool, message: str):
         super().__init__(message)

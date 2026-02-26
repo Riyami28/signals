@@ -302,7 +302,7 @@ def _process_competitor_reviews(
         if _is_dissatisfied_review(review):
             evidence = (
                 f"G2 review: {product_name} rated {star_rating}/5 "
-                f"by {reviewer_domain} — \"{review_title}\" (category={category})"
+                f'by {reviewer_domain} — "{review_title}" (category={category})'
             )
             obs = _build_observation(
                 account_id=account_id,
@@ -323,8 +323,7 @@ def _process_competitor_reviews(
         else:
             # Non-dissatisfied review still counts as competitor activity.
             evidence = (
-                f"G2 review: {product_name} reviewed by {reviewer_domain} "
-                f"(rating={star_rating}/5, category={category})"
+                f"G2 review: {product_name} reviewed by {reviewer_domain} (rating={star_rating}/5, category={category})"
             )
             obs = _build_observation(
                 account_id=account_id,
@@ -402,9 +401,7 @@ def collect(
         except requests.RequestException as exc:
             logger.warning("g2: intent API error for %s: %s", domain, exc)
             errors += 1
-            db.record_crawl_attempt(
-                conn, "g2_api", account_id, "intent", "error", str(exc), commit=False
-            )
+            db.record_crawl_attempt(conn, "g2_api", account_id, "intent", "error", str(exc), commit=False)
             continue
 
         db.mark_crawled(conn, "g2_api", account_id, "intent", commit=False)
@@ -417,9 +414,7 @@ def collect(
     if product_ids:
         if not db.was_crawled_today(conn, "g2_api", "__global__", "reviews"):
             try:
-                reviews = _fetch_competitor_reviews(
-                    product_ids, api_key, base_url, since_days=review_lookback_days
-                )
+                reviews = _fetch_competitor_reviews(product_ids, api_key, base_url, since_days=review_lookback_days)
                 db.mark_crawled(conn, "g2_api", "__global__", "reviews", commit=False)
 
                 ins, seen = _process_competitor_reviews(conn, reviews, account_lookup, reliability)
@@ -428,9 +423,7 @@ def collect(
             except requests.RequestException as exc:
                 logger.warning("g2: reviews API error: %s", exc)
                 errors += 1
-                db.record_crawl_attempt(
-                    conn, "g2_api", "__global__", "reviews", "error", str(exc), commit=False
-                )
+                db.record_crawl_attempt(conn, "g2_api", "__global__", "reviews", "error", str(exc), commit=False)
     else:
         logger.info("g2: no competitor product IDs configured — skipping review phase")
 

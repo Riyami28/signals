@@ -211,9 +211,7 @@ def collect(
         except requests.RequestException as exc:
             logger.warning("bombora: API error for %s: %s", domain, exc)
             errors += 1
-            db.record_crawl_attempt(
-                conn, "bombora_api", account_id, "surge", "error", str(exc), commit=False
-            )
+            db.record_crawl_attempt(conn, "bombora_api", account_id, "surge", "error", str(exc), commit=False)
             continue
 
         db.mark_crawled(conn, "bombora_api", account_id, "surge", commit=False)

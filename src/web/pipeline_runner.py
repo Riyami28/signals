@@ -360,5 +360,10 @@ def _run_pipeline_sync(
                 db.update_batch_status(conn, batch_id, "failed")
         except Exception:
             pass
+        if batch_id:
+            try:
+                db.update_batch_status(conn, batch_id, "failed")
+            except Exception:
+                pass
     finally:
         conn.close()
