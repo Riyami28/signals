@@ -46,7 +46,11 @@ def fetch_observations_for_scoring(
 ) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT obs_id, account_id, signal_code, product, source, observed_at,
+               evidence_url, evidence_text, document_id, mention_id,
+               evidence_sentence, evidence_sentence_en, matched_phrase, language,
+               speaker_name, speaker_role, evidence_quality, relevance_score,
+               confidence, source_reliability, raw_payload_hash
         FROM signal_observations
         WHERE observed_at::date <= %s::date
           AND observed_at::date >= (%s::date + %s::interval)
@@ -164,7 +168,9 @@ def get_latest_run_id_for_date(conn: Any, run_date: str) -> str | None:
 
 
 def list_runs(conn: Any) -> list[dict[str, Any]]:
-    cur = conn.execute("SELECT * FROM score_runs ORDER BY started_at DESC")
+    cur = conn.execute(
+        "SELECT run_id, run_date, status, started_at, finished_at, error_summary FROM score_runs ORDER BY started_at DESC"
+    )
     return list(cur.fetchall())
 
 
@@ -218,7 +224,8 @@ def insert_review_label(conn: Any, label: ReviewLabel) -> bool:
 def fetch_review_rows_for_date(conn: Any, run_date: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT rl.*, r.run_date
+        SELECT rl.review_id, rl.run_id, rl.account_id, rl.decision, rl.reviewer,
+               rl.notes, rl.created_at, r.run_date
         FROM review_labels rl
         JOIN score_runs r ON r.run_id = rl.run_id
         WHERE r.run_date::date = %s::date
@@ -325,7 +332,8 @@ def fetch_source_metrics(conn: Any, run_date: str) -> list[dict[str, Any]]:
 def fetch_recent_reviews(conn: Any, run_date: str, days: int) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT rl.*, r.run_date
+        SELECT rl.review_id, rl.run_id, rl.account_id, rl.decision, rl.reviewer,
+               rl.notes, rl.created_at, r.run_date
         FROM review_labels rl
         JOIN score_runs r ON r.run_id = rl.run_id
         WHERE r.run_date::date <= %s::date

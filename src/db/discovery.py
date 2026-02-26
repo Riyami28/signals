@@ -100,7 +100,11 @@ def fetch_pending_external_discovery_events(
 ) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT event_id, source, source_event_id, dedupe_key, observed_at,
+               title, text, url, entry_url, url_type, language_hint,
+               author_hint, published_at_hint, company_name_hint, domain_hint,
+               raw_payload_json, ingested_at, processing_status,
+               processed_run_id, processed_at, error_summary
         FROM external_discovery_events
         WHERE processing_status = 'pending'
           AND observed_at::date <= %s::date
@@ -332,7 +336,12 @@ def get_latest_discovery_run_id_for_date(conn: Any, run_date: str) -> str | None
 def fetch_discovery_candidates_for_run(conn: Any, discovery_run_id: str) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT discovery_run_id, score_run_id, run_date, account_id, company_name,
+               domain, best_product, score, tier, confidence_band,
+               cpg_like_group_count, primary_signal_count, source_count,
+               has_poc_progression_first_party, relationship_stage, vertical_tag,
+               is_self, exclude_from_crm, eligible_for_crm, novelty_score,
+               rank_score, reasons_json
         FROM discovery_candidates
         WHERE discovery_run_id = %s
         ORDER BY rank_score DESC, score DESC, company_name ASC
@@ -345,7 +354,9 @@ def fetch_discovery_candidates_for_run(conn: Any, discovery_run_id: str) -> list
 def fetch_discovery_run(conn: Any, discovery_run_id: str) -> dict[str, Any] | None:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT discovery_run_id, run_date, score_run_id, created_at, status,
+               source_events_processed, observations_inserted, total_candidates,
+               crm_eligible_candidates, error_summary
         FROM discovery_runs
         WHERE discovery_run_id = %s
         LIMIT 1

@@ -12,7 +12,11 @@ from .connection import _is_integrity_error
 def get_document_by_frontier_id(conn: Any, frontier_id: str) -> dict[str, Any] | None:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT document_id, frontier_id, account_id, domain, source,
+               source_event_id, url, canonical_url, content_sha256, title,
+               author, published_at, section, language, body_text, body_text_en,
+               raw_html, parser_version, evidence_quality, relevance_score,
+               fetched_with, outbound_links_json, created_at, updated_at
         FROM documents
         WHERE frontier_id = %s
         LIMIT 1
@@ -165,7 +169,13 @@ def fetch_documents_for_run_by_frontier_status(
 ) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT d.*, f.url_type, f.depth, f.priority, f.payload_json, f.frontier_id, f.source_event_id, f.source
+        SELECT d.document_id, d.frontier_id, d.account_id, d.domain, d.source,
+               d.source_event_id, d.url, d.canonical_url, d.content_sha256,
+               d.title, d.author, d.published_at, d.section, d.language,
+               d.body_text, d.body_text_en, d.raw_html, d.parser_version,
+               d.evidence_quality, d.relevance_score, d.fetched_with,
+               d.outbound_links_json, d.created_at, d.updated_at,
+               f.url_type, f.depth, f.priority, f.payload_json, f.frontier_id, f.source_event_id, f.source
         FROM documents d
         JOIN crawl_frontier f ON f.frontier_id = d.frontier_id
         WHERE f.run_date = %s

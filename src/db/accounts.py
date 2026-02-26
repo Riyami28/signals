@@ -18,7 +18,10 @@ def get_account_by_domain(conn: Any, domain: str) -> dict[str, Any] | None:
     normalized = normalize_domain(domain)
     if not normalized:
         return None
-    cur = conn.execute("SELECT * FROM accounts WHERE domain = %s", (normalized,))
+    cur = conn.execute(
+        "SELECT account_id, company_name, domain, source_type, created_at FROM accounts WHERE domain = %s",
+        (normalized,),
+    )
     return cur.fetchone()
 
 
@@ -148,7 +151,10 @@ def upsert_company_research(
 def get_company_research(conn, account_id: str) -> dict | None:
     """Return the company_research row or None."""
     row = conn.execute(
-        "SELECT * FROM company_research WHERE account_id = %s",
+        """SELECT account_id, research_brief, research_profile, enrichment_json,
+                  research_status, researched_at, model_used, prompt_hash,
+                  created_at, updated_at
+           FROM company_research WHERE account_id = %s""",
         (account_id,),
     ).fetchone()
     return dict(row) if row else None
@@ -255,7 +261,9 @@ def get_contacts_for_account(conn, account_id: str) -> list[dict]:
     """Return all contacts for an account, ordered by management_level seniority."""
     rows = conn.execute(
         """
-        SELECT * FROM contact_research
+        SELECT contact_id, account_id, first_name, last_name, title,
+               email, linkedin_url, management_level, year_joined, created_at
+        FROM contact_research
         WHERE account_id = %s
         ORDER BY CASE management_level
             WHEN 'C-Level' THEN 1
@@ -394,7 +402,7 @@ def delete_account_label(conn, label_id: str) -> None:
 
 def get_labels_for_account(conn, account_id: str) -> list[dict]:
     rows = conn.execute(
-        "SELECT * FROM account_labels WHERE account_id = %s ORDER BY created_at DESC",
+        "SELECT label_id, account_id, label, reviewer, notes, created_at FROM account_labels WHERE account_id = %s ORDER BY created_at DESC",
         (account_id,),
     ).fetchall()
     return [dict(r) for r in rows]

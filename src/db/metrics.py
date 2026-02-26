@@ -136,7 +136,8 @@ def enqueue_retry_task(
 def fetch_due_retry_tasks(conn: Any, limit: int = 20, now_iso: str | None = None) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT task_id, task_type, payload_json, attempt_count, max_attempts,
+               status, due_at, last_error, created_at, updated_at
         FROM retry_queue
         WHERE status = 'pending'
           AND CAST(due_at AS TIMESTAMP) <= CAST(%s AS TIMESTAMP)
@@ -289,7 +290,8 @@ def fetch_quarantine_size(conn: Any) -> int:
 def fetch_pending_retry_tasks(conn: Any, limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT task_id, task_type, payload_json, attempt_count, max_attempts,
+               status, due_at, last_error, created_at, updated_at
         FROM retry_queue
         WHERE status IN ('pending', 'running')
         ORDER BY due_at ASC

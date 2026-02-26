@@ -89,7 +89,10 @@ def fetch_crawl_frontier_by_status(
 ) -> list[dict[str, Any]]:
     cur = conn.execute(
         """
-        SELECT *
+        SELECT frontier_id, run_date, source, source_event_id, account_id,
+               domain, url, canonical_url, url_type, depth, priority, status,
+               retry_count, max_retries, first_seen_at, last_attempt_at,
+               last_error, payload_json
         FROM crawl_frontier
         WHERE run_date = %s
           AND status = %s
