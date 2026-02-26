@@ -512,8 +512,31 @@ def init_db(conn) -> None:
 # ---------------------------------------------------------------------------
 
 def _migration_dir() -> Path:
-    """Return the migrations/ directory relative to this file's package root."""
-    return Path(__file__).parent.parent / "migrations"
+    """Return the migrations/ directory at the repo root.
+
+    Walks up from this file until it finds pyproject.toml (the repo root marker),
+    so the path stays correct whether db.py is a flat module or inside src/db/.
+    Falls back to SIGNALS_PROJECT_ROOT env var, then to two levels up from __file__.
+    """
+    # Prefer the explicit project root env var (set in .env / bootstrap).
+    env_root = os.getenv("SIGNALS_PROJECT_ROOT", "").strip()
+    if env_root:
+        candidate = Path(env_root) / "migrations"
+        if candidate.is_dir():
+            return candidate
+
+    # Walk upward from this file looking for pyproject.toml.
+    current = Path(__file__).resolve().parent
+    for _ in range(6):  # cap at 6 levels to avoid infinite loop on bad setups
+        if (current / "pyproject.toml").exists():
+            return current / "migrations"
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+    # Last-resort fallback: two levels up from this file (works for src/db.py).
+    return Path(__file__).resolve().parent.parent / "migrations"
 
 
 def _ensure_schema_version_table(conn) -> None:

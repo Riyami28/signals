@@ -9,7 +9,8 @@ if [ -d ".venv" ]; then
 fi
 
 echo "[check_migrations] forward-only static checks"
-if rg -n "DROP\s+TABLE|DROP\s+COLUMN" scripts/sql src/db.py >/dev/null 2>&1; then
+# Search scripts/sql and all of src/ (handles src/db.py today, src/db/* after #7 split)
+if rg -n "DROP\s+TABLE|DROP\s+COLUMN" scripts/sql src/ >/dev/null 2>&1; then
   echo "Found forbidden destructive migration pattern (DROP TABLE/DROP COLUMN)."
   exit 1
 fi
