@@ -54,10 +54,10 @@ def get_labels(account_id: str):
     conn = _get_conn()
     try:
         labels = db.get_labels_for_account(conn, account_id)
-        for l in labels:
-            for k, v in l.items():
+        for label in labels:
+            for k, v in label.items():
                 if hasattr(v, "isoformat"):
-                    l[k] = v.isoformat()
+                    label[k] = v.isoformat()
         return {"labels": labels}
     finally:
         conn.close()

@@ -63,9 +63,7 @@ def _append_tab(sheet: Any, tab_name: str, csv_path: Path) -> int:
         existing_header = header
 
     if existing_header != header:
-        raise RuntimeError(
-            f"Worksheet '{tab_name}' header mismatch. Expected {existing_header}, file has {header}."
-        )
+        raise RuntimeError(f"Worksheet '{tab_name}' header mismatch. Expected {existing_header}, file has {header}.")
 
     if rows:
         ws.append_rows(rows, value_input_option="RAW")
@@ -85,9 +83,7 @@ def _append_tab_dedup_by_run_date(sheet: Any, tab_name: str, csv_path: Path, run
 
     existing_header = [str(value) for value in existing_values[0]]
     if existing_header != header:
-        raise RuntimeError(
-            f"Worksheet '{tab_name}' header mismatch. Expected {existing_header}, file has {header}."
-        )
+        raise RuntimeError(f"Worksheet '{tab_name}' header mismatch. Expected {existing_header}, file has {header}.")
 
     run_date_idx = header.index("run_date") if "run_date" in header else -1
     merged_rows: list[list[str]] = []
@@ -106,8 +102,8 @@ def _append_tab_dedup_by_run_date(sheet: Any, tab_name: str, csv_path: Path, run
 def sync_outputs(settings: Settings, run_date) -> dict[str, int]:
     _require_google_config(settings)
 
-    from google.oauth2.service_account import Credentials
     import gspread
+    from google.oauth2.service_account import Credentials
 
     creds = Credentials.from_service_account_file(
         str(settings.google_service_account_file),

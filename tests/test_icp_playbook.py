@@ -104,10 +104,7 @@ def test_compute_icp_signal_gaps_surfaces_missing_priority_signals(tmp_path: Pat
         "accounts_with_full_coverage": 0,
     }
 
-    by_key = {
-        (str(row["domain"]), str(row["target_product"]), str(row["signal_code"])): row
-        for row in rows
-    }
+    by_key = {(str(row["domain"]), str(row["target_product"]), str(row["signal_code"])): row for row in rows}
     missing_customer_cost = by_key[("customer.example", "zopnight", "cost_reduction_mandate")]
     assert int(missing_customer_cost["present"]) == 0
     assert str(missing_customer_cost["recommended_source"]) == "first_party_csv"

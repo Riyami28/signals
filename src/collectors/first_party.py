@@ -28,7 +28,9 @@ def collect(
             continue
 
         company_name = row.get("company_name", "") or domain
-        account_id = db.upsert_account(conn, company_name=company_name, domain=domain, source_type="discovered", commit=False)
+        account_id = db.upsert_account(
+            conn, company_name=company_name, domain=domain, source_type="discovered", commit=False
+        )
 
         product = (row.get("product", "shared") or "shared").strip().lower()
         if product not in VALID_PRODUCTS:

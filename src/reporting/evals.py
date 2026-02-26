@@ -58,7 +58,11 @@ def _scenario_pass_rate(scenarios: list[ScenarioRule], thresholds: Thresholds) -
     passed_weight = 0.0
     for scenario in scenarios:
         predicted_tier = _classify_tier(float(scenario.max_score), thresholds)
-        if TIER_ORDER[scenario.expected_min_tier] <= TIER_ORDER[predicted_tier] <= TIER_ORDER[scenario.expected_max_tier]:
+        if (
+            TIER_ORDER[scenario.expected_min_tier]
+            <= TIER_ORDER[predicted_tier]
+            <= TIER_ORDER[scenario.expected_max_tier]
+        ):
             passed_weight += max(0.0, float(scenario.weight))
     return round(passed_weight / total_weight, 4)
 

@@ -105,8 +105,15 @@ def _parse_bullet_list(text: str) -> list[str]:
 _CONFIDENCE_THRESHOLD = 0.5
 
 _STRING_FIELDS = [
-    "website", "industry", "sub_industry", "employee_range", "revenue_range",
-    "company_linkedin_url", "city", "state", "country",
+    "website",
+    "industry",
+    "sub_industry",
+    "employee_range",
+    "revenue_range",
+    "company_linkedin_url",
+    "city",
+    "state",
+    "country",
 ]
 
 
@@ -224,15 +231,17 @@ def parse_scoring_response(raw_text: str) -> ParsedScoringResponse:
                             year = int(year)
                         except (ValueError, TypeError):
                             year = None
-                    contacts.append(Contact(
-                        first_name=first,
-                        last_name=last,
-                        title=str(item.get("title", "")).strip(),
-                        email=str(item.get("email", "")).strip(),
-                        linkedin_url=str(item.get("linkedin_url", "")).strip(),
-                        management_level=level,
-                        year_joined=year,
-                    ))
+                    contacts.append(
+                        Contact(
+                            first_name=first,
+                            last_name=last,
+                            title=str(item.get("title", "")).strip(),
+                            email=str(item.get("email", "")).strip(),
+                            linkedin_url=str(item.get("linkedin_url", "")).strip(),
+                            management_level=level,
+                            year_joined=year,
+                        )
+                    )
             else:
                 errors.append("contacts JSON is not an array")
         except (json.JSONDecodeError, ValueError) as exc:

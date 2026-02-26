@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin, urlparse
 

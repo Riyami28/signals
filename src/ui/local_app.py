@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
-from datetime import date, datetime
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query
@@ -1710,7 +1710,8 @@ def tracked_companies(
         filtered_rows = [
             row
             for row in filtered_rows
-            if needle in " ".join(
+            if needle
+            in " ".join(
                 [
                     str(row.get("company_name", "")).lower(),
                     str(row.get("domain", "")).lower(),

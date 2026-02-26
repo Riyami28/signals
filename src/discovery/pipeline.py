@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from datetime import date
-import json
 from typing import Any
 from urllib.parse import urlparse
 
@@ -395,9 +395,7 @@ def score_discovery_candidates(
             """,
             (score_run_id,),
         ).fetchall()
-        account_rows = conn.execute(
-            "SELECT account_id, company_name, domain, source_type FROM accounts"
-        ).fetchall()
+        account_rows = conn.execute("SELECT account_id, company_name, domain, source_type FROM accounts").fetchall()
         account_meta = {
             str(row["account_id"]): {
                 "company_name": str(row["company_name"] or ""),

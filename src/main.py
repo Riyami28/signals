@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from datetime import date
-from datetime import datetime, timedelta, timezone
 import json
 import logging
 import os
-from pathlib import Path
 import time
 import uuid
+from dataclasses import replace
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import typer
-
-from src.logging_config import configure_logging
 
 from src import db
 from src.collectors import community, first_party, jobs, news, technographics
@@ -26,12 +23,13 @@ from src.discovery.config import (
     load_signal_classes,
 )
 from src.export import csv_exporter
-from src.research.orchestrator import run_research_stage
+from src.logging_config import configure_logging
 from src.models import AccountScore
 from src.notifier import send_alert
 from src.reporting import calibration, icp_playbook, quality
 from src.reporting.evals import OutputQualityBar, evaluate_run_output_quality
 from src.reporting.improvement import run_threshold_self_improvement
+from src.research.orchestrator import run_research_stage
 from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
 from src.scoring.engine import run_scoring
 from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry, load_thresholds
@@ -49,6 +47,7 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 def _app_callback() -> None:
     """Signals pipeline — structured logging enabled at startup."""
     configure_logging(os.environ.get("LOG_LEVEL", "INFO"))
+
 
 _RUN_DAILY_LOCK_NAME = "signals:run-daily"
 _AUTONOMOUS_LOCK_NAME = "signals:run-autonomous-loop"
@@ -87,7 +86,11 @@ def _run_with_watchdog(stage: str, timeout_seconds: int, fn):
 
 
 def _retry_due_iso(backoff_seconds: int) -> str:
-    return (datetime.now(timezone.utc) + timedelta(seconds=max(1, int(backoff_seconds)))).replace(microsecond=0).isoformat()
+    return (
+        (datetime.now(timezone.utc) + timedelta(seconds=max(1, int(backoff_seconds))))
+        .replace(microsecond=0)
+        .isoformat()
+    )
 
 
 def _enqueue_retry_task(
@@ -174,7 +177,9 @@ def _persist_ops_metrics(conn, settings: Settings, run_date: date) -> dict[str, 
     ]
 
     db.replace_ops_metrics(conn, run_date_str, metric_rows)
-    ops_count = csv_exporter.export_ops_metrics(conn, run_date_str, settings.out_dir / f"ops_metrics_{run_date.strftime('%Y%m%d')}.csv")
+    ops_count = csv_exporter.export_ops_metrics(
+        conn, run_date_str, settings.out_dir / f"ops_metrics_{run_date.strftime('%Y%m%d')}.csv"
+    )
 
     if high_sample > 0 and high_precision < settings.alert_min_high_precision:
         send_alert(
@@ -628,11 +633,7 @@ def research(
         settings.research_max_accounts = max_accounts
     try:
         result = run_research_stage(conn, settings, run_date.isoformat(), score_run_id)
-        typer.echo(
-            " ".join(
-                f"{k}={v}" for k, v in result.items()
-            )
-        )
+        typer.echo(" ".join(f"{k}={v}" for k, v in result.items()))
     finally:
         conn.close()
 
@@ -803,7 +804,9 @@ def migrate_watchlist_from_db(
             existing = existing_by_domain.get(domain, {})
             if existing:
                 preserved_metadata_rows += 1
-            website_url = str(existing.get("website_url", "")).strip() or website_by_domain.get(domain, "") or f"https://{domain}"
+            website_url = (
+                str(existing.get("website_url", "")).strip() or website_by_domain.get(domain, "") or f"https://{domain}"
+            )
 
             migrated_rows.append(
                 {
@@ -1011,7 +1014,9 @@ def tune_profile(
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
 
         raw_scenario_path = Path(scenarios_path)
-        scenario_path = raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        scenario_path = (
+            raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        )
         scenarios = calibration.load_scenarios(scenario_path)
         current_thresholds = load_thresholds(settings.thresholds_path)
 
@@ -1082,7 +1087,9 @@ def eval_output(
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
 
         raw_scenario_path = Path(scenarios_path)
-        scenario_path = raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        scenario_path = (
+            raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        )
         scenarios = calibration.load_scenarios(scenario_path)
         thresholds = load_thresholds(settings.thresholds_path)
         quality_bar = OutputQualityBar(
@@ -1149,7 +1156,9 @@ def self_improve_output(
 
         current_thresholds = load_thresholds(settings.thresholds_path)
         raw_scenario_path = Path(scenarios_path)
-        scenario_path = raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        scenario_path = (
+            raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
+        )
         scenarios = calibration.load_scenarios(scenario_path)
         quality_bar = OutputQualityBar(
             min_icp_medium_coverage=min_icp_medium_coverage,
@@ -1186,13 +1195,17 @@ def self_improve_output(
             _run_exports(conn, settings, run_date, latest_run_id)
             _write_icp_coverage_report(conn, settings, latest_run_id, run_date)
 
-        final_eval = result.iterations[-1].evaluation if result.iterations else evaluate_run_output_quality(
-            conn=conn,
-            run_id=run_id,
-            reference_csv_path=settings.config_dir / "icp_reference_accounts.csv",
-            thresholds=current_thresholds,
-            quality_bar=quality_bar,
-            scenarios=scenarios,
+        final_eval = (
+            result.iterations[-1].evaluation
+            if result.iterations
+            else evaluate_run_output_quality(
+                conn=conn,
+                run_id=run_id,
+                reference_csv_path=settings.config_dir / "icp_reference_accounts.csv",
+                thresholds=current_thresholds,
+                quality_bar=quality_bar,
+                scenarios=scenarios,
+            )
         )
         typer.echo(
             " ".join(
@@ -1271,10 +1284,14 @@ def run_daily(
             lambda: _collect_all(conn, settings),
         )
         collect_inserted = sum(result["inserted"] for result in collect_results.values())
-        typer.echo(f"stage=ingest status=completed duration_seconds={round(collect_elapsed, 2)} inserted={collect_inserted}")
+        typer.echo(
+            f"stage=ingest status=completed duration_seconds={round(collect_elapsed, 2)} inserted={collect_inserted}"
+        )
 
         typer.echo("stage=score status=started")
-        run_id, score_elapsed = _run_with_watchdog("score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date))
+        run_id, score_elapsed = _run_with_watchdog(
+            "score", settings.stage_timeout_seconds, lambda: _run_scoring(conn, settings, run_date)
+        )
         typer.echo(f"stage=score status=completed duration_seconds={round(score_elapsed, 2)} run_id={run_id}")
 
         # Research stage — non-blocking. If it fails, export still happens.
@@ -1409,7 +1426,11 @@ def run_daily(
             )
         )
     except StageExecutionError as exc:
-        enqueue_retries = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", "").strip().lower() not in {"1", "true", "yes"}
+        enqueue_retries = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", "").strip().lower() not in {
+            "1",
+            "true",
+            "yes",
+        }
         retry_task_id = ""
         if enqueue_retries:
             retry_task_id = _enqueue_retry_task(
@@ -1442,7 +1463,11 @@ def run_daily(
         )
         raise typer.Exit(code=1)
     except Exception as exc:
-        enqueue_retries = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", "").strip().lower() not in {"1", "true", "yes"}
+        enqueue_retries = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", "").strip().lower() not in {
+            "1",
+            "true",
+            "yes",
+        }
         retry_task_id = ""
         if enqueue_retries:
             retry_task_id = _enqueue_retry_task(
@@ -1668,7 +1693,9 @@ def discover_extract(
 @app.command("discover-score")
 def discover_score(
     date_str: str = typer.Option(None, "--date", help="Discovery scoring date YYYY-MM-DD"),
-    quality_gates: bool = typer.Option(False, "--quality-gates/--no-quality-gates", help="Enforce evidence/relevance gates"),
+    quality_gates: bool = typer.Option(
+        False, "--quality-gates/--no-quality-gates", help="Enforce evidence/relevance gates"
+    ),
 ) -> None:
     settings, conn, seeded = _bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
@@ -2081,7 +2108,9 @@ def retry_failures(
                 completed += 1
             except Exception as exc:
                 attempt_count = int(task.get("attempt_count", 0) or 0) + 1
-                max_attempts = int(task.get("max_attempts", settings.retry_attempt_limit) or settings.retry_attempt_limit)
+                max_attempts = int(
+                    task.get("max_attempts", settings.retry_attempt_limit) or settings.retry_attempt_limit
+                )
                 if attempt_count >= max_attempts:
                     db.quarantine_retry_task(
                         conn,

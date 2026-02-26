@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-import os
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src import db
@@ -135,7 +135,9 @@ def _collect_live_technographics_account(
     domain = str(account["domain"])
     if domain.endswith(".example"):
         return 0, 0, 0
-    _emit_progress(f"collector=technographics_live status=account_started account_index={account_index} domain={domain}")
+    _emit_progress(
+        f"collector=technographics_live status=account_started account_index={account_index} domain={domain}"
+    )
 
     homepage_url = f"https://{domain}"
     urls_to_scan = [homepage_url]

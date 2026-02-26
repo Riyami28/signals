@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-import math
 from typing import Callable
 
 from src.models import AccountScore, ComponentScore

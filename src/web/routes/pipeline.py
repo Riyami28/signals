@@ -10,7 +10,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.web.pipeline_runner import run_pipeline_async, ACTIVE_QUEUES
+from src.web.pipeline_runner import ACTIVE_QUEUES, run_pipeline_async
 
 logger = logging.getLogger(__name__)
 

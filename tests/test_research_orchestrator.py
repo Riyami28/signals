@@ -5,8 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from src import db
-from src.research.orchestrator import run_research_stage
 from src.research.client import ResearchResponse
+from src.research.orchestrator import run_research_stage
 
 
 def _make_settings(**overrides) -> MagicMock:
@@ -53,9 +53,7 @@ class TestRunResearchStage:
         db.init_db(conn)
 
         # Create an account with a score so it qualifies for research.
-        account_id = db.upsert_account(
-            conn, "TestCorp", "testcorp.com", "seed", commit=False
-        )
+        account_id = db.upsert_account(conn, "TestCorp", "testcorp.com", "seed", commit=False)
         run_id = db.create_score_run(conn, "2026-02-23")
         db.finish_score_run(conn, run_id, status="completed")
         conn.execute(
@@ -113,10 +111,12 @@ class TestRunResearchStage:
             }
         ]
 
-        with patch("src.research.orchestrator.ResearchClient") as MockClient, \
-             patch("src.research.orchestrator.create_research_client") as mock_create, \
-             patch("src.research.orchestrator.run_enrichment_waterfall", return_value={}), \
-             patch("src.research.orchestrator.db.get_accounts_needing_research", return_value=fake_accounts):
+        with (
+            patch("src.research.orchestrator.ResearchClient") as MockClient,
+            patch("src.research.orchestrator.create_research_client") as mock_create,
+            patch("src.research.orchestrator.run_enrichment_waterfall", return_value={}),
+            patch("src.research.orchestrator.db.get_accounts_needing_research", return_value=fake_accounts),
+        ):
             mock_instance = MockClient.return_value
             mock_create.return_value = mock_instance
             mock_instance.research_company.side_effect = [

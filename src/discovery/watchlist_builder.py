@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
-from datetime import date
 import logging
 import math
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from datetime import date
 from typing import Any
 from urllib.parse import urlparse
 
@@ -207,7 +207,9 @@ def _industry_bonus(industry_label: str) -> float:
     return 1.0
 
 
-def _rank_candidate(country: CountrySpec, industry_label: str, sitelinks: int, revenue_usd: float, employees: int) -> float:
+def _rank_candidate(
+    country: CountrySpec, industry_label: str, sitelinks: int, revenue_usd: float, employees: int
+) -> float:
     score = 15.0 * float(country.priority)
     if country.region_group in CORE_REGIONS:
         score += 3.0

@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -193,19 +193,15 @@ def test_review_queue_is_account_level_and_excludes_internal_domain(tmp_path, mo
     _bootstrap_fixture(root)
     _write(
         root / "config" / "seed_accounts.csv",
-        "company_name,domain,source_type\n"
-        "Acme,acme.example,seed\n"
-        "Zopdev,zop.dev,seed\n",
+        "company_name,domain,source_type\nAcme,acme.example,seed\nZopdev,zop.dev,seed\n",
     )
     _write(
         root / "config" / "signal_classes.csv",
-        "signal_code,class,vertical_scope,promotion_critical\n"
-        "cloud_connected,primary,all,false\n",
+        "signal_code,class,vertical_scope,promotion_critical\ncloud_connected,primary,all,false\n",
     )
     _write(
         root / "config" / "account_profiles.csv",
-        "domain,relationship_stage,vertical_tag,is_self,exclude_from_crm\n"
-        "zop.dev,customer,internal,1,1\n",
+        "domain,relationship_stage,vertical_tag,is_self,exclude_from_crm\nzop.dev,customer,internal,1,1\n",
     )
     _write(root / "config" / "discovery_blocklist.csv", "domain,reason\nzop.dev,self\n")
     _write(
@@ -230,9 +226,7 @@ def test_daily_scores_include_zero_rows_for_unobserved_accounts(tmp_path, monkey
     _bootstrap_fixture(root)
     _write(
         root / "config" / "seed_accounts.csv",
-        "company_name,domain,source_type\n"
-        "Acme,acme.example,seed\n"
-        "Beta,beta.example,seed\n",
+        "company_name,domain,source_type\nAcme,acme.example,seed\nBeta,beta.example,seed\n",
     )
     _write(
         root / "data" / "raw" / "first_party_events.csv",

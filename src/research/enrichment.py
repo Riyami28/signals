@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EnrichmentResult:
     """Partial enrichment from one source. Merged with other sources by caller."""
+
     website: str = ""
     industry: str = ""
     sub_industry: str = ""
@@ -149,8 +150,15 @@ def run_enrichment_waterfall(domain: str, settings, llm_client=None) -> dict:
 
     merged: dict = {}
     _FIELDS = [
-        "website", "industry", "sub_industry", "employees", "employee_range",
-        "city", "state", "country", "company_linkedin_url",
+        "website",
+        "industry",
+        "sub_industry",
+        "employees",
+        "employee_range",
+        "city",
+        "state",
+        "country",
+        "company_linkedin_url",
     ]
 
     sources = []

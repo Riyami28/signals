@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-
+from dataclasses import dataclass
 
 ROLE_PATTERNS: list[tuple[re.Pattern[str], str, float]] = [
     (re.compile(r"\bchief information officer\b|\bcio\b", re.I), "CIO", 1.0),

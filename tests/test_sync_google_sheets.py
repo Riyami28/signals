@@ -44,8 +44,7 @@ def test_append_tab_dedup_by_run_date_replaces_matching_date_rows(tmp_path: Path
     csv_path = tmp_path / "daily_scores.csv"
     _write(
         csv_path,
-        "run_date,account_id,score\n"
-        "2026-02-16,acc_new,90\n",
+        "run_date,account_id,score\n2026-02-16,acc_new,90\n",
     )
     sheet = _FakeSheet(
         {

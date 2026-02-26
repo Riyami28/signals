@@ -84,7 +84,9 @@ class Settings(BaseSettings):
     stage_timeout_seconds: int = Field(default=1800, ge=10)
     retry_attempt_limit: int = Field(default=3, ge=1)
     watchlist_query_workers: int = Field(default=8, ge=1)
-    watchlist_country_query_timeout_seconds: int = Field(default=120, ge=15, alias="SIGNALS_WATCHLIST_COUNTRY_TIMEOUT_SECONDS")
+    watchlist_country_query_timeout_seconds: int = Field(
+        default=120, ge=15, alias="SIGNALS_WATCHLIST_COUNTRY_TIMEOUT_SECONDS"
+    )
 
     # --- alerting ---
     gchat_webhook_url: str = Field(default="")
@@ -121,10 +123,7 @@ class Settings(BaseSettings):
 
         # Derive pg_dsn from components if not explicitly set.
         if not self.pg_dsn:
-            self.pg_dsn = (
-                f"postgresql://{self.pg_user}:{self.pg_password}"
-                f"@{self.pg_host}:{self.pg_port}/{self.pg_db}"
-            )
+            self.pg_dsn = f"postgresql://{self.pg_user}:{self.pg_password}@{self.pg_host}:{self.pg_port}/{self.pg_db}"
 
         # Derive live_workers_per_source if not explicitly set (0 means auto).
         if self.live_workers_per_source == 0:

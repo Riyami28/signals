@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-import logging
 from threading import Lock
-import time
 from urllib import robotparser
 from urllib.parse import urlparse
 

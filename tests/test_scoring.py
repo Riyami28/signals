@@ -1,7 +1,8 @@
 from datetime import date
+from pathlib import Path
 
 from src.scoring.engine import recency_decay, run_scoring
-from src.scoring.rules import SignalRule, Thresholds
+from src.scoring.rules import VALID_DIMENSIONS, SignalRule, Thresholds, load_signal_rules
 
 
 def test_recency_decay_half_life():
@@ -175,3 +176,48 @@ def test_registry_reliability_caps_observation_reliability():
     assert len(capped.account_scores) == 1
     assert len(uncapped.account_scores) == 1
     assert capped.account_scores[0].score < uncapped.account_scores[0].score
+
+
+# --- Issue #17: dimension mapping tests ---
+
+
+def test_signal_rules_include_dimension():
+    """All rules loaded from the real CSV should have a dimension field."""
+    registry_path = Path("config/signal_registry.csv")
+    rules = load_signal_rules(registry_path)
+    # Issue #17 mapping table defines 35 signals (not 36).
+    assert len(rules) == 35
+    for signal_code, rule in rules.items():
+        assert hasattr(rule, "dimension"), f"{signal_code} missing dimension"
+        assert rule.dimension, f"{signal_code} has empty dimension"
+
+
+def test_all_signals_have_valid_dimension():
+    """Every signal in signal_registry.csv must map to one of the 5 valid dimensions."""
+    registry_path = Path("config/signal_registry.csv")
+    rules = load_signal_rules(registry_path)
+    invalid = {code: rule.dimension for code, rule in rules.items() if rule.dimension not in VALID_DIMENSIONS}
+    assert not invalid, f"Signals with invalid dimensions: {invalid}"
+
+
+def test_dimension_default_when_missing():
+    """When dimension column is absent from a row, load_signal_rules defaults to trigger_intent."""
+    from unittest.mock import patch
+
+    fake_rows = [
+        {
+            "signal_code": "test_signal",
+            "product_scope": "zopdev",
+            "category": "test",
+            "base_weight": "10",
+            "half_life_days": "30",
+            "min_confidence": "0.5",
+            "enabled": "true",
+            # dimension column intentionally absent
+        }
+    ]
+    with patch("src.scoring.rules.load_csv_rows", return_value=fake_rows):
+        rules = load_signal_rules(Path("config/signal_registry.csv"))
+
+    assert "test_signal" in rules
+    assert rules["test_signal"].dimension == "trigger_intent"

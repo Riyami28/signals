@@ -64,11 +64,13 @@ def build_extraction_prompt(
                 continue
             known_lines.append(f"- {key}: {value}")
         if known_lines:
-            user_parts.extend([
-                "",
-                "## Already Known (from structured data sources — do NOT contradict these, only fill gaps)",
-                "\n".join(known_lines),
-            ])
+            user_parts.extend(
+                [
+                    "",
+                    "## Already Known (from structured data sources — do NOT contradict these, only fill gaps)",
+                    "\n".join(known_lines),
+                ]
+            )
 
     user_prompt = "\n".join(user_parts)
     return system_prompt, user_prompt
@@ -81,13 +83,15 @@ def build_scoring_prompt(account: dict, research_brief: str) -> tuple[str, str]:
     """
     system_prompt = _load_template(_SCORING_TEMPLATE_PATH)
 
-    user_prompt = "\n".join([
-        f"## Company: {account.get('company_name', 'Unknown')}",
-        f"Domain: {account.get('domain', '')}",
-        "",
-        "## Research Brief",
-        research_brief,
-    ])
+    user_prompt = "\n".join(
+        [
+            f"## Company: {account.get('company_name', 'Unknown')}",
+            f"Domain: {account.get('domain', '')}",
+            "",
+            "## Research Brief",
+            research_brief,
+        ]
+    )
 
     return system_prompt, user_prompt
 

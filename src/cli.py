@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from datetime import date, timedelta
+from pathlib import Path
 
 import typer
 
@@ -14,7 +14,6 @@ from src.scoring.rules import load_source_registry
 from src.settings import load_settings
 from src.source_policy import load_source_execution_policy
 from src.utils import normalize_domain, write_csv_rows
-
 
 app = typer.Typer(
     add_completion=False,
@@ -250,7 +249,9 @@ def run_daily(
         min=1,
         help="Parallel live-crawl workers per source. Omit to use adaptive auto sizing.",
     ),
-    stage_timeout_seconds: int | None = typer.Option(None, "--stage-timeout-seconds", help="Override per-stage timeout."),
+    stage_timeout_seconds: int | None = typer.Option(
+        None, "--stage-timeout-seconds", help="Override per-stage timeout."
+    ),
     fast_fail_network: bool = typer.Option(
         False,
         "--fast-fail-network",
@@ -452,7 +453,9 @@ def conviction(
                     "signal_code": str(reason.get("signal_code", "") or ""),
                     "source": str(reason.get("source", "") or ""),
                     "evidence_url": str(reason.get("evidence_url", "") or ""),
-                    "evidence_sentence": str(reason.get("evidence_sentence_en") or reason.get("evidence_sentence") or "")[:260],
+                    "evidence_sentence": str(
+                        reason.get("evidence_sentence_en") or reason.get("evidence_sentence") or ""
+                    )[:260],
                 }
             )
 
@@ -589,7 +592,9 @@ def sources(
         source = str(row["source"] or "").strip().lower() or "unknown"
         status = str(row["status"] or "").strip().lower() or "unknown"
         count = int(row["attempt_count"] or 0)
-        source_counts = attempts_by_source.setdefault(source, {"attempts": 0, "success": 0, "http_error": 0, "exception": 0, "skipped": 0})
+        source_counts = attempts_by_source.setdefault(
+            source, {"attempts": 0, "success": 0, "http_error": 0, "exception": 0, "skipped": 0}
+        )
         source_counts["attempts"] += count
         source_counts[status] = source_counts.get(status, 0) + count
 
@@ -620,7 +625,9 @@ def sources(
             if not isinstance(reason, dict):
                 continue
             source = str(reason.get("source", "") or "").strip().lower() or "unknown"
-            source_reason = reason_stats.setdefault(source, {"reason_mentions": 0, "reason_with_url": 0, "account_mentions": 0})
+            source_reason = reason_stats.setdefault(
+                source, {"reason_mentions": 0, "reason_with_url": 0, "account_mentions": 0}
+            )
             source_reason["reason_mentions"] += 1
             evidence_url = str(reason.get("evidence_url", "") or "").strip()
             if evidence_url:
@@ -675,7 +682,7 @@ def sources(
             (reliability * 40.0)
             + ((success_rate_pct / 100.0) * 35.0)
             + ((evidence_rate_pct / 100.0) * 15.0)
-            + (((approved_rate if approved_rate is not None else 0.6) * 10.0)),
+            + ((approved_rate if approved_rate is not None else 0.6) * 10.0),
             1,
         )
 
@@ -759,10 +766,7 @@ def sources(
     if weak_rows:
         typer.echo("improvement_candidates:")
         for row in weak_rows[:5]:
-            typer.echo(
-                f"- source={row['source']} quality_score={row['quality_score']} "
-                f"recommendation={row['note']}"
-            )
+            typer.echo(f"- source={row['source']} quality_score={row['quality_score']} recommendation={row['note']}")
 
     if write_csv:
         suffix = normalized_date.replace("-", "")

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -19,7 +19,9 @@ from src.utils import classify_text, load_account_source_handles, load_csv_rows,
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REDDIT_TERMS = "(devops OR platform engineering OR cloud cost OR finops OR kubernetes OR terraform OR soc2 OR audit)"
+DEFAULT_REDDIT_TERMS = (
+    "(devops OR platform engineering OR cloud cost OR finops OR kubernetes OR terraform OR soc2 OR audit)"
+)
 _LIVE_PROGRESS_COMMIT_EVERY = 25
 _VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {"1", "true", "yes", "on"}
 

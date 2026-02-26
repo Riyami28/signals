@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from src.research.parser import (
-    parse_extraction_response,
-    parse_scoring_response,
     CompanyEnrichment,
     ParsedExtractionResponse,
     ParsedScoringResponse,
+    parse_extraction_response,
+    parse_scoring_response,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers to build realistic Claude responses
 # ---------------------------------------------------------------------------
+
 
 def _make_extraction_response(
     enrichment_json: str = "",
@@ -238,7 +238,9 @@ class TestParseScoringResponse:
         assert any("parse" in e.lower() or "json" in e.lower() for e in result.parse_errors)
 
     def test_numbered_conversation_starters_are_parsed(self):
-        starters = "1. First starter about Kubernetes\n2. Second starter about Terraform\n3. Third starter about cloud costs\n"
+        starters = (
+            "1. First starter about Kubernetes\n2. Second starter about Terraform\n3. Third starter about cloud costs\n"
+        )
         raw = _make_scoring_response(contacts_json="[]", starters=starters)
         result = parse_scoring_response(raw)
 

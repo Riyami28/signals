@@ -74,7 +74,9 @@ def _insert_event(payload: DiscoveryEventPayload) -> bool:
             published_at_hint=payload.published_at_hint,
             company_name_hint=payload.company_name_hint,
             domain_hint=domain_hint,
-            raw_payload_json=json.dumps(raw_payload if raw_payload is not None else {}, ensure_ascii=True, sort_keys=True),
+            raw_payload_json=json.dumps(
+                raw_payload if raw_payload is not None else {}, ensure_ascii=True, sort_keys=True
+            ),
         )
         return inserted
     finally:

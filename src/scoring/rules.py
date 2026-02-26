@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from src.utils import load_csv_rows
+
+logger = logging.getLogger(__name__)
+
+VALID_DIMENSIONS = frozenset(
+    {
+        "trigger_intent",
+        "tech_fit",
+        "engagement_pql",
+        "firmographic",
+        "hiring_growth",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -15,6 +28,7 @@ class SignalRule:
     half_life_days: float
     min_confidence: float
     enabled: bool
+    dimension: str = "trigger_intent"
 
 
 @dataclass(frozen=True)
@@ -38,6 +52,14 @@ def load_signal_rules(path: Path) -> dict[str, SignalRule]:
         if not signal_code:
             continue
         try:
+            dimension = (row.get("dimension", "trigger_intent") or "trigger_intent").strip()
+            if dimension not in VALID_DIMENSIONS:
+                logger.warning(
+                    "invalid_dimension signal=%s dimension=%s, defaulting to trigger_intent",
+                    signal_code,
+                    dimension,
+                )
+                dimension = "trigger_intent"
             rule = SignalRule(
                 signal_code=signal_code,
                 product_scope=(row.get("product_scope", "shared") or "shared").strip(),
@@ -46,6 +68,7 @@ def load_signal_rules(path: Path) -> dict[str, SignalRule]:
                 half_life_days=max(1.0, float(row.get("half_life_days", "14") or 14)),
                 min_confidence=float(row.get("min_confidence", "0") or 0),
                 enabled=_to_bool(row.get("enabled", "true")),
+                dimension=dimension,
             )
         except ValueError:
             continue

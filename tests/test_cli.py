@@ -139,7 +139,9 @@ def test_company_watch_scopes_target_domain(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "_run_subprocess", fake_run_subprocess)
 
     runner = CliRunner()
-    result = runner.invoke(cli.app, ["company", "ConagraBrands.com", "--date", "2026-02-22", "--workers-per-source", "3"])
+    result = runner.invoke(
+        cli.app, ["company", "ConagraBrands.com", "--date", "2026-02-22", "--workers-per-source", "3"]
+    )
 
     assert result.exit_code == 0
     assert captured["cmd"] == [str(fake_monitor), "2026-02-22", "1", "900", "1", "3"]

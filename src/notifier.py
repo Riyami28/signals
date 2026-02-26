@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import smtplib
 from email.message import EmailMessage
 from pathlib import Path
-import smtplib
 
 import requests
 

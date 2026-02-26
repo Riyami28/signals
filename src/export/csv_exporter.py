@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import date
-import json
 from pathlib import Path
 from typing import Any
 
@@ -414,36 +414,38 @@ def export_sales_ready(
         starters = _extract_starters_from_profile(research_profile)
         research_status = (research or {}).get("research_status", "skipped") or "skipped"
 
-        export_rows.append({
-            "company_name": str(row.get("company_name", "") or ""),
-            "domain": str(row.get("domain", "") or ""),
-            "website": _enrichment_field(enrichment, "website"),
-            "industry": _enrichment_field(enrichment, "industry"),
-            "sub_industry": _enrichment_field(enrichment, "sub_industry"),
-            "country": _enrichment_field(enrichment, "country"),
-            "city": _enrichment_field(enrichment, "city"),
-            "state": _enrichment_field(enrichment, "state"),
-            "employees": _enrichment_field(enrichment, "employees"),
-            "employee_range": _enrichment_field(enrichment, "employee_range"),
-            "revenue_range": _enrichment_field(enrichment, "revenue_range"),
-            "company_linkedin_url": _enrichment_field(enrichment, "company_linkedin_url"),
-            "signal_score": str(row.get("score", "") or ""),
-            "signal_tier": str(row.get("tier", "") or ""),
-            "delta_7d": _format_delta(row.get("delta_7d")),
-            "top_signals": "|".join(top_signals),
-            "evidence_links": "|".join(evidence_urls),
-            "top_reason_1": _reason_str(0),
-            "top_reason_2": _reason_str(1),
-            "top_reason_3": _reason_str(2),
-            "research_brief": research_brief,
-            "research_summary": research_profile,
-            "key_contacts": "\n".join(contact_lines),
-            "conversation_starters": starters,
-            "research_status": research_status,
-            "source_type": str(row.get("source_type", "") or ""),
-            "first_seen_date": _iso_date(row.get("created_at", "")),
-            "last_signal_date": last_signal_dates.get(account_id, ""),
-        })
+        export_rows.append(
+            {
+                "company_name": str(row.get("company_name", "") or ""),
+                "domain": str(row.get("domain", "") or ""),
+                "website": _enrichment_field(enrichment, "website"),
+                "industry": _enrichment_field(enrichment, "industry"),
+                "sub_industry": _enrichment_field(enrichment, "sub_industry"),
+                "country": _enrichment_field(enrichment, "country"),
+                "city": _enrichment_field(enrichment, "city"),
+                "state": _enrichment_field(enrichment, "state"),
+                "employees": _enrichment_field(enrichment, "employees"),
+                "employee_range": _enrichment_field(enrichment, "employee_range"),
+                "revenue_range": _enrichment_field(enrichment, "revenue_range"),
+                "company_linkedin_url": _enrichment_field(enrichment, "company_linkedin_url"),
+                "signal_score": str(row.get("score", "") or ""),
+                "signal_tier": str(row.get("tier", "") or ""),
+                "delta_7d": _format_delta(row.get("delta_7d")),
+                "top_signals": "|".join(top_signals),
+                "evidence_links": "|".join(evidence_urls),
+                "top_reason_1": _reason_str(0),
+                "top_reason_2": _reason_str(1),
+                "top_reason_3": _reason_str(2),
+                "research_brief": research_brief,
+                "research_summary": research_profile,
+                "key_contacts": "\n".join(contact_lines),
+                "conversation_starters": starters,
+                "research_status": research_status,
+                "source_type": str(row.get("source_type", "") or ""),
+                "first_seen_date": _iso_date(row.get("created_at", "")),
+                "last_signal_date": last_signal_dates.get(account_id, ""),
+            }
+        )
 
     write_csv_rows(output_path, export_rows, fieldnames=_SALES_READY_COLUMNS)
     logger.info("export_sales_ready rows=%d path=%s", len(export_rows), output_path)

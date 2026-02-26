@@ -47,6 +47,7 @@ def _client_for_root(monkeypatch: pytest.MonkeyPatch, root: Path):
     _ = pytest.importorskip("fastapi")
     _ = pytest.importorskip("fastapi.testclient")
     from fastapi.testclient import TestClient
+
     from src.ui import local_app
 
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))

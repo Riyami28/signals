@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src import db
@@ -503,10 +503,12 @@ def _collect_careers_pages(
         )
 
     if website_url:
-        candidates.extend([
-            website_url.rstrip("/") + "/careers",
-            website_url.rstrip("/") + "/jobs",
-        ])
+        candidates.extend(
+            [
+                website_url.rstrip("/") + "/careers",
+                website_url.rstrip("/") + "/jobs",
+            ]
+        )
     candidates.extend([f"https://{domain}/careers", f"https://{domain}/jobs"])
 
     inserted_total = 0

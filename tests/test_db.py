@@ -1,6 +1,6 @@
-from pathlib import Path
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 from src import db
 from src.models import SignalObservation

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import csv
-from datetime import date
 import logging
+from datetime import date
 
 from src import db
 from src.models import ReviewLabel
@@ -97,8 +97,8 @@ def _read_rows_from_google_sheet(settings: Settings) -> list[dict[str, str]]:
     if not settings.google_service_account_file.exists():
         return []
 
-    from google.oauth2.service_account import Credentials
     import gspread
+    from google.oauth2.service_account import Credentials
 
     creds = Credentials.from_service_account_file(
         str(settings.google_service_account_file),

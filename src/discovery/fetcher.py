@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from hashlib import sha256
-import logging
 from typing import Any
 
 from src.http_client import get as http_get

@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 
 import anthropic
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,7 @@ class ResearchClient:
             stop=stop_after_attempt(self.max_retries),
             wait=wait_exponential(multiplier=1, min=4, max=30),
             retry=retry_if_exception_type((anthropic.RateLimitError, anthropic.APIConnectionError)),
-            before_sleep=lambda state: logger.warning(
-                "retrying claude api call attempt=%d", state.attempt_number
-            ),
+            before_sleep=lambda state: logger.warning("retrying claude api call attempt=%d", state.attempt_number),
         )
         def _call() -> anthropic.types.Message:
             return self._client.messages.create(
@@ -96,9 +94,7 @@ class MiniMaxClient:
             stop=stop_after_attempt(self.max_retries),
             wait=wait_exponential(multiplier=1, min=4, max=30),
             retry=retry_if_exception_type((openai.RateLimitError, openai.APIConnectionError)),
-            before_sleep=lambda state: logger.warning(
-                "retrying minimax api call attempt=%d", state.attempt_number
-            ),
+            before_sleep=lambda state: logger.warning("retrying minimax api call attempt=%d", state.attempt_number),
         )
         def _call():
             return self._client.chat.completions.create(

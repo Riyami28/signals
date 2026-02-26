@@ -36,8 +36,7 @@ def test_import_reviews_is_idempotent_when_created_at_missing(tmp_path: Path):
 
     _write(
         root / "data" / "raw" / "review_input.csv",
-        "run_date,account_id,decision,reviewer,notes,created_at\n"
-        f"{run_date},{account_id},approved,tester,ok,\n",
+        f"run_date,account_id,decision,reviewer,notes,created_at\n{run_date},{account_id},approved,tester,ok,\n",
     )
 
     first = import_reviews_for_date(conn, settings, date(2026, 2, 16))

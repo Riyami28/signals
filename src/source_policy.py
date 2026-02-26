@@ -60,4 +60,3 @@ def load_source_execution_policy(path: Path) -> dict[str, SourceExecutionPolicy]
         policies[source] = policy
 
     return policies
-

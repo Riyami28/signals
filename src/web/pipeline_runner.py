@@ -67,8 +67,8 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
             _emit(queue, {"type": "stage", "stage": "ingest", "status": "running", "message": "Collecting signals..."})
             t0 = time.monotonic()
             try:
-                from src.collectors import first_party, jobs, news, community, technographics
-                from src.scoring.rules import load_source_registry, load_keyword_lexicon
+                from src.collectors import community, first_party, jobs, news, technographics
+                from src.scoring.rules import load_keyword_lexicon, load_source_registry
                 from src.source_policy import load_source_execution_policy
 
                 source_registry = load_source_registry(settings.source_registry_path)
@@ -86,43 +86,73 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                 if _collector_enabled("first_party_csv"):
                     fp_result = first_party.collect(conn, settings, keyword_lexicon, source_registry)
                     total_inserted += fp_result.get("inserted", 0)
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": f"First-party: {fp_result.get('inserted', 0)} signals"})
+                    _emit(
+                        queue,
+                        {
+                            "type": "log",
+                            "stage": "ingest",
+                            "message": f"First-party: {fp_result.get('inserted', 0)} signals",
+                        },
+                    )
 
                 # Jobs
                 if _collector_enabled("jobs_pages"):
                     _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting job signals..."})
                     j_result = jobs.collect(conn, settings, keyword_lexicon, source_registry)
                     total_inserted += j_result.get("inserted", 0)
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": f"Jobs: {j_result.get('inserted', 0)} signals"})
+                    _emit(
+                        queue,
+                        {"type": "log", "stage": "ingest", "message": f"Jobs: {j_result.get('inserted', 0)} signals"},
+                    )
 
                 # News
                 if _collector_enabled("news_rss"):
                     _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting news signals..."})
                     n_result = news.collect(conn, settings, keyword_lexicon, source_registry)
                     total_inserted += n_result.get("inserted", 0)
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": f"News: {n_result.get('inserted', 0)} signals"})
+                    _emit(
+                        queue,
+                        {"type": "log", "stage": "ingest", "message": f"News: {n_result.get('inserted', 0)} signals"},
+                    )
 
                 # Technographics
                 if _collector_enabled("technographics"):
                     _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting technographics signals..."})
                     t_result = technographics.collect(conn, settings, keyword_lexicon, source_registry)
                     total_inserted += t_result.get("inserted", 0)
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": f"Technographics: {t_result.get('inserted', 0)} signals"})
+                    _emit(
+                        queue,
+                        {
+                            "type": "log",
+                            "stage": "ingest",
+                            "message": f"Technographics: {t_result.get('inserted', 0)} signals",
+                        },
+                    )
 
                 dt = time.monotonic() - t0
-                _emit(queue, {"type": "stage", "stage": "ingest", "status": "completed", "message": f"Ingested {total_inserted} signals in {dt:.1f}s"})
+                _emit(
+                    queue,
+                    {
+                        "type": "stage",
+                        "stage": "ingest",
+                        "status": "completed",
+                        "message": f"Ingested {total_inserted} signals in {dt:.1f}s",
+                    },
+                )
             except Exception as exc:
                 _emit(queue, {"type": "stage", "stage": "ingest", "status": "failed", "message": str(exc)})
                 logger.warning("ingest stage failed: %s", exc, exc_info=True)
 
         # --- SCORE ---
         if "score" in stages:
-            _emit(queue, {"type": "stage", "stage": "score", "status": "running", "message": "Running scoring engine..."})
+            _emit(
+                queue, {"type": "stage", "stage": "score", "status": "running", "message": "Running scoring engine..."}
+            )
             t0 = time.monotonic()
             try:
+                from src.models import AccountScore
                 from src.scoring.engine import run_scoring
                 from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
-                from src.models import AccountScore
 
                 signal_rules = load_signal_rules(settings.signal_registry_path)
                 source_registry = load_source_registry(settings.source_registry_path)
@@ -168,7 +198,16 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
 
                 high_count = sum(1 for s in result.account_scores if getattr(s, "tier", "") == "high")
                 dt = time.monotonic() - t0
-                _emit(queue, {"type": "stage", "stage": "score", "status": "completed", "message": f"Scored {len(result.account_scores)} rows, {high_count} high-tier in {dt:.1f}s", "score_run_id": score_run_id})
+                _emit(
+                    queue,
+                    {
+                        "type": "stage",
+                        "stage": "score",
+                        "status": "completed",
+                        "message": f"Scored {len(result.account_scores)} rows, {high_count} high-tier in {dt:.1f}s",
+                        "score_run_id": score_run_id,
+                    },
+                )
             except Exception as exc:
                 _emit(queue, {"type": "stage", "stage": "score", "status": "failed", "message": str(exc)})
                 logger.warning("score stage failed: %s", exc, exc_info=True)
@@ -176,7 +215,9 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
         # --- RESEARCH ---
         if "research" in stages:
             # Research can run even without score_run_id (it uses latest scores)
-            _emit(queue, {"type": "stage", "stage": "research", "status": "running", "message": "Running LLM research..."})
+            _emit(
+                queue, {"type": "stage", "stage": "research", "status": "running", "message": "Running LLM research..."}
+            )
             t0 = time.monotonic()
             try:
                 from src.research.orchestrator import run_research_stage
@@ -193,7 +234,9 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                         effective_score_run_id = row["run_id"]
 
                 if effective_score_run_id:
-                    result = run_research_stage(conn, settings, run_date, effective_score_run_id, account_ids=account_ids or None)
+                    result = run_research_stage(
+                        conn, settings, run_date, effective_score_run_id, account_ids=account_ids or None
+                    )
                     dt = time.monotonic() - t0
                     msg = f"Research: {result['completed']}/{result['attempted']} completed"
                     if result["failed"]:
@@ -203,7 +246,15 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                     msg += f" in {dt:.1f}s"
                     _emit(queue, {"type": "stage", "stage": "research", "status": "completed", "message": msg})
                 else:
-                    _emit(queue, {"type": "stage", "stage": "research", "status": "completed", "message": "Research skipped (no score run available)"})
+                    _emit(
+                        queue,
+                        {
+                            "type": "stage",
+                            "stage": "research",
+                            "status": "completed",
+                            "message": "Research skipped (no score run available)",
+                        },
+                    )
             except Exception as exc:
                 _emit(queue, {"type": "stage", "stage": "research", "status": "failed", "message": str(exc)})
                 logger.warning("research stage failed: %s", exc, exc_info=True)
@@ -217,7 +268,9 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                     effective_score_run_id = row["run_id"]
 
             if effective_score_run_id:
-                _emit(queue, {"type": "stage", "stage": "export", "status": "running", "message": "Exporting results..."})
+                _emit(
+                    queue, {"type": "stage", "stage": "export", "status": "running", "message": "Exporting results..."}
+                )
                 t0 = time.monotonic()
                 try:
                     from src.export import csv_exporter
@@ -225,12 +278,28 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                     out_path = settings.out_dir / f"sales_ready_{csv_exporter.date_suffix(run_date_obj)}.csv"
                     rows = csv_exporter.export_sales_ready(conn, effective_score_run_id, out_path)
                     dt = time.monotonic() - t0
-                    _emit(queue, {"type": "stage", "stage": "export", "status": "completed", "message": f"Sales-ready CSV: {rows} rows exported in {dt:.1f}s"})
+                    _emit(
+                        queue,
+                        {
+                            "type": "stage",
+                            "stage": "export",
+                            "status": "completed",
+                            "message": f"Sales-ready CSV: {rows} rows exported in {dt:.1f}s",
+                        },
+                    )
                 except Exception as exc:
                     _emit(queue, {"type": "stage", "stage": "export", "status": "failed", "message": str(exc)})
                     logger.warning("export stage failed: %s", exc, exc_info=True)
             else:
-                _emit(queue, {"type": "stage", "stage": "export", "status": "completed", "message": "Export skipped (no score run available)"})
+                _emit(
+                    queue,
+                    {
+                        "type": "stage",
+                        "stage": "export",
+                        "status": "completed",
+                        "message": "Export skipped (no score run available)",
+                    },
+                )
 
         # Finalize
         db.finish_ui_pipeline_run(conn, run_id, "completed", {"score_run_id": score_run_id})

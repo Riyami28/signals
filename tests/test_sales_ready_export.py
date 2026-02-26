@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from src import db
-from src.export.csv_exporter import export_sales_ready, _SALES_READY_COLUMNS
+from src.export.csv_exporter import _SALES_READY_COLUMNS, export_sales_ready
 
 
 class TestExportSalesReady:
@@ -54,9 +54,7 @@ class TestExportSalesReady:
         conn = db.get_connection()
         db.init_db(conn)
 
-        _, run_id = self._setup_scored_account(
-            conn, "acme.com", "Acme Corp", 85.0, "high"
-        )
+        _, run_id = self._setup_scored_account(conn, "acme.com", "Acme Corp", 85.0, "high")
 
         out = tmp_path / "sales_ready.csv"
         export_sales_ready(conn, run_id, out)
@@ -113,9 +111,7 @@ class TestExportSalesReady:
         conn = db.get_connection()
         db.init_db(conn)
 
-        _, run_id = self._setup_scored_account(
-            conn, "noresearch.com", "NoResearch Inc", 80.0, "high"
-        )
+        _, run_id = self._setup_scored_account(conn, "noresearch.com", "NoResearch Inc", 80.0, "high")
 
         out = tmp_path / "sales_ready.csv"
         export_sales_ready(conn, run_id, out)
@@ -129,9 +125,7 @@ class TestExportSalesReady:
         conn = db.get_connection()
         db.init_db(conn)
 
-        _, run_id = self._setup_scored_account(
-            conn, "clean.io", "CleanIO", 70.0, "medium"
-        )
+        _, run_id = self._setup_scored_account(conn, "clean.io", "CleanIO", 70.0, "medium")
 
         out = tmp_path / "sales_ready.csv"
         export_sales_ready(conn, run_id, out)
@@ -206,9 +200,7 @@ class TestExportSalesReady:
         conn = db.get_connection()
         db.init_db(conn)
 
-        _, run_id = self._setup_scored_account(
-            conn, "delta.com", "Delta Corp", 80.0, "high", delta_7d=5.2
-        )
+        _, run_id = self._setup_scored_account(conn, "delta.com", "Delta Corp", 80.0, "high", delta_7d=5.2)
 
         out = tmp_path / "sales_ready.csv"
         export_sales_ready(conn, run_id, out)
@@ -224,9 +216,7 @@ class TestExportSalesReady:
         conn = db.get_connection()
         db.init_db(conn)
 
-        _, run_id = self._setup_scored_account(
-            conn, "negdelta.com", "NegDelta Corp", 60.0, "medium", delta_7d=-3.7
-        )
+        _, run_id = self._setup_scored_account(conn, "negdelta.com", "NegDelta Corp", 60.0, "medium", delta_7d=-3.7)
 
         out = tmp_path / "sales_ready.csv"
         export_sales_ready(conn, run_id, out)

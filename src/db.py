@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-from datetime import date
 import json
 import logging
 import os
+import uuid
+from datetime import date
 from pathlib import Path
 from typing import Any
-import uuid
 
-from src.models import Account, AccountScore, ComponentScore, ReviewLabel, SignalObservation
+from src.models import (
+    Account,
+    AccountScore,
+    ComponentScore,
+    ReviewLabel,
+    SignalObservation,
+)
 from src.utils import load_csv_rows, normalize_domain, stable_hash, utc_now_iso
 
 logger = logging.getLogger(__name__)
@@ -23,6 +29,7 @@ except Exception:  # pragma: no cover - psycopg may be absent in lightweight env
 
 def _is_integrity_error(exc: Exception) -> bool:
     return bool(psycopg is not None and isinstance(exc, psycopg.IntegrityError))
+
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -510,6 +517,7 @@ def init_db(conn) -> None:
 # ---------------------------------------------------------------------------
 # Versioned migration system
 # ---------------------------------------------------------------------------
+
 
 def _migration_dir() -> Path:
     """Return the migrations/ directory at the repo root.
@@ -2645,8 +2653,7 @@ def upsert_company_research(
             prompt_hash      = EXCLUDED.prompt_hash,
             updated_at       = CURRENT_TIMESTAMP
         """,
-        (account_id, research_brief, research_profile, enrichment_json,
-         research_status, model_used, prompt_hash),
+        (account_id, research_brief, research_profile, enrichment_json, research_status, model_used, prompt_hash),
     )
     conn.commit()
 
@@ -2728,9 +2735,7 @@ def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
         (account_id,),
     )
     for contact in contacts:
-        identifier = contact.get("linkedin_url") or (
-            contact.get("first_name", "") + contact.get("last_name", "")
-        )
+        identifier = contact.get("linkedin_url") or (contact.get("first_name", "") + contact.get("last_name", ""))
         contact_id = stable_hash(
             {"account_id": account_id, "identifier": identifier},
             prefix="contact",
@@ -2815,8 +2820,7 @@ def finish_research_run(
             finished_at = CURRENT_TIMESTAMP
         WHERE research_run_id = %s
         """,
-        (status, accounts_attempted, accounts_completed, accounts_failed,
-         accounts_skipped, research_run_id),
+        (status, accounts_attempted, accounts_completed, accounts_failed, accounts_skipped, research_run_id),
     )
     conn.commit()
 
@@ -2825,8 +2829,10 @@ def finish_research_run(
 # Account Labels (Web UI)
 # ---------------------------------------------------------------------------
 
+
 def insert_account_label(conn, account_id: str, label: str, reviewer: str = "web_ui", notes: str = "") -> str:
     import uuid
+
     label_id = f"lbl_{uuid.uuid4().hex[:12]}"
     conn.execute(
         """
@@ -2876,7 +2882,9 @@ def get_accounts_paginated(
         params.append(tier_filter)
 
     if label_filter:
-        where_parts.append("EXISTS (SELECT 1 FROM account_labels al WHERE al.account_id = a.account_id AND al.label = %s)")
+        where_parts.append(
+            "EXISTS (SELECT 1 FROM account_labels al WHERE al.account_id = a.account_id AND al.label = %s)"
+        )
         params.append(label_filter)
 
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
@@ -2929,9 +2937,7 @@ def get_accounts_paginated(
 
 def get_account_detail(conn, account_id: str) -> dict | None:
     """Full account detail with scores, signals, research, contacts, labels."""
-    account = conn.execute(
-        "SELECT * FROM accounts WHERE account_id = %s", (account_id,)
-    ).fetchone()
+    account = conn.execute("SELECT * FROM accounts WHERE account_id = %s", (account_id,)).fetchone()
     if not account:
         return None
     result = dict(account)
@@ -2959,9 +2965,11 @@ def get_account_detail(conn, account_id: str) -> dict | None:
 # Pipeline Runs (Web UI)
 # ---------------------------------------------------------------------------
 
+
 def create_ui_pipeline_run(conn, account_ids: list[str], stages: list[str]) -> str:
-    import uuid
     import json as _json
+    import uuid
+
     run_id = f"prun_{uuid.uuid4().hex[:12]}"
     conn.execute(
         """INSERT INTO pipeline_runs (pipeline_run_id, account_ids_json, stages_json)
@@ -2974,6 +2982,7 @@ def create_ui_pipeline_run(conn, account_ids: list[str], stages: list[str]) -> s
 
 def finish_ui_pipeline_run(conn, pipeline_run_id: str, status: str, result: dict) -> None:
     import json as _json
+
     conn.execute(
         """UPDATE pipeline_runs SET status = %s, result_json = %s, finished_at = CURRENT_TIMESTAMP
            WHERE pipeline_run_id = %s""",

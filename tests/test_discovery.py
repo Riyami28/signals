@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -58,12 +58,26 @@ def _bootstrap_core_config(root: Path) -> None:
     _write(root / "config" / "discovery_blocklist.csv", "domain,reason\nzop.dev,self_domain\n")
     _write(root / "config" / "account_source_handles.csv", "domain,website_url\n")
     _write(root / "config" / "icp_reference_accounts.csv", "company_name,domain,relationship_stage,notes\n")
-    _write(root / "config" / "profile_scenarios.csv", "scenario_name,max_score,expected_min_tier,expected_max_tier,weight\n")
-    _write(root / "data" / "raw" / "first_party_events.csv", "company_name,domain,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at\n")
-    _write(root / "data" / "raw" / "jobs.csv", "company_name,domain,title,description,url,observed_at,signal_code,confidence\n")
-    _write(root / "data" / "raw" / "news.csv", "company_name,domain,title,content,url,observed_at,signal_code,confidence\n")
+    _write(
+        root / "config" / "profile_scenarios.csv",
+        "scenario_name,max_score,expected_min_tier,expected_max_tier,weight\n",
+    )
+    _write(
+        root / "data" / "raw" / "first_party_events.csv",
+        "company_name,domain,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at\n",
+    )
+    _write(
+        root / "data" / "raw" / "jobs.csv",
+        "company_name,domain,title,description,url,observed_at,signal_code,confidence\n",
+    )
+    _write(
+        root / "data" / "raw" / "news.csv", "company_name,domain,title,content,url,observed_at,signal_code,confidence\n"
+    )
     _write(root / "data" / "raw" / "community.csv", "company_name,domain,text,url,observed_at,signal_code,confidence\n")
-    _write(root / "data" / "raw" / "technographics.csv", "company_name,domain,text,url,observed_at,signal_code,confidence\n")
+    _write(
+        root / "data" / "raw" / "technographics.csv",
+        "company_name,domain,text,url,observed_at,signal_code,confidence\n",
+    )
     _write(root / "data" / "raw" / "news_feeds.csv", "company_name,domain,feed_url\n")
 
 
@@ -131,13 +145,10 @@ def test_run_discovery_outputs_and_excludes_self_domain(tmp_path: Path, monkeypa
         "<html><head><title>ConsumerCo launches control tower and cost office</title>"
         "<meta name='author' content='Asha Gupta'/>"
         "<meta property='article:published_time' content='2026-02-17T08:00:00Z'/>"
-        "</head><body><p>"
-        + long_signal_text
-        + "</p></body></html>"
+        "</head><body><p>" + long_signal_text + "</p></body></html>"
     )
     zop_html = (
-        "<html><head><title>Zop internal rollout</title></head>"
-        "<body><p>" + long_signal_text + "</p></body></html>"
+        "<html><head><title>Zop internal rollout</title></head><body><p>" + long_signal_text + "</p></body></html>"
     )
 
     inserted_primary = db.insert_external_discovery_event(
@@ -205,6 +216,7 @@ def test_webhook_auth_and_dedupe(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("SIGNALS_DISCOVERY_WEBHOOK_TOKEN", "secret-token")
 
     from fastapi.testclient import TestClient
+
     from src.discovery.webhook import create_app
 
     app_instance = create_app()
@@ -245,6 +257,7 @@ def test_webhook_rejects_placeholder_domain(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("SIGNALS_DISCOVERY_WEBHOOK_TOKEN", "secret-token")
 
     from fastapi.testclient import TestClient
+
     from src.discovery.webhook import create_app
 
     app_instance = create_app()
@@ -406,7 +419,9 @@ def test_discovery_policy_blocks_high_without_strict_evidence(tmp_path: Path, mo
 
     conn = db.get_connection()
     db.init_db(conn)
-    account_id = db.upsert_account(conn, company_name="Strict Fail Co", domain="strictfail.com", source_type="discovered")
+    account_id = db.upsert_account(
+        conn, company_name="Strict Fail Co", domain="strictfail.com", source_type="discovered"
+    )
     observations = [
         SignalObservation(
             obs_id=stable_hash({"obs": "s1"}, prefix="obs"),

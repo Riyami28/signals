@@ -154,8 +154,10 @@ def compute_icp_coverage(
         zopday_score, zopday_tier = by_domain_product.get(domain, {}).get("zopday", (0.0, "none"))
         zopnight_score, zopnight_tier = by_domain_product.get(domain, {}).get("zopnight", (0.0, "none"))
         max_score = max(zopdev_score, zopday_score, zopnight_score)
-        max_tier = "high" if "high" in {zopdev_tier, zopday_tier, zopnight_tier} else (
-            "medium" if "medium" in {zopdev_tier, zopday_tier, zopnight_tier} else "low"
+        max_tier = (
+            "high"
+            if "high" in {zopdev_tier, zopday_tier, zopnight_tier}
+            else ("medium" if "medium" in {zopdev_tier, zopday_tier, zopnight_tier} else "low")
         )
 
         if max_tier in {"high", "medium"}:

@@ -68,13 +68,30 @@ def _bootstrap_hunt_fixture(root: Path) -> None:
         "company_name,domain,relationship_stage,notes\nUnilever,unilever.com,customer,\nNoisyCo,noisyco.com,customer,\n",
     )
     _write(root / "config" / "account_source_handles.csv", "domain,website_url\n")
-    _write(root / "config" / "profile_scenarios.csv", "scenario_name,max_score,expected_min_tier,expected_max_tier,weight\n")
-    _write(root / "config" / "icp_signal_playbook.csv", "relationship_stage,product,signal_code,priority,recommended_source,action_hint\n")
-    _write(root / "data" / "raw" / "first_party_events.csv", "company_name,domain,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at\n")
-    _write(root / "data" / "raw" / "jobs.csv", "company_name,domain,title,description,url,observed_at,signal_code,confidence\n")
-    _write(root / "data" / "raw" / "news.csv", "company_name,domain,title,content,url,observed_at,signal_code,confidence\n")
+    _write(
+        root / "config" / "profile_scenarios.csv",
+        "scenario_name,max_score,expected_min_tier,expected_max_tier,weight\n",
+    )
+    _write(
+        root / "config" / "icp_signal_playbook.csv",
+        "relationship_stage,product,signal_code,priority,recommended_source,action_hint\n",
+    )
+    _write(
+        root / "data" / "raw" / "first_party_events.csv",
+        "company_name,domain,product,signal_code,source,evidence_url,evidence_text,confidence,observed_at\n",
+    )
+    _write(
+        root / "data" / "raw" / "jobs.csv",
+        "company_name,domain,title,description,url,observed_at,signal_code,confidence\n",
+    )
+    _write(
+        root / "data" / "raw" / "news.csv", "company_name,domain,title,content,url,observed_at,signal_code,confidence\n"
+    )
     _write(root / "data" / "raw" / "community.csv", "company_name,domain,text,url,observed_at,signal_code,confidence\n")
-    _write(root / "data" / "raw" / "technographics.csv", "company_name,domain,text,url,observed_at,signal_code,confidence\n")
+    _write(
+        root / "data" / "raw" / "technographics.csv",
+        "company_name,domain,text,url,observed_at,signal_code,confidence\n",
+    )
     _write(root / "data" / "raw" / "news_feeds.csv", "company_name,domain,feed_url\n")
 
 
@@ -147,9 +164,7 @@ def test_run_hunt_writes_lineage_and_applies_quality_gate(tmp_path: Path, monkey
         "<html><head><title>Unilever supply chain rollout</title>"
         "<meta name='author' content='Anita Rao'/>"
         "<meta property='article:published_time' content='2026-02-17T09:00:00Z'/>"
-        "</head><body><p>"
-        + long_body
-        + "</p></body></html>"
+        "</head><body><p>" + long_body + "</p></body></html>"
     )
     low_quality_html = (
         "<html><head><title>NoisyCo update</title></head><body>"
@@ -243,9 +258,7 @@ def test_hunt_respects_promotion_policy_config(tmp_path: Path, monkeypatch):
         "<html><head><title>Unilever supply chain rollout</title>"
         "<meta name='author' content='Anita Rao'/>"
         "<meta property='article:published_time' content='2026-02-17T09:00:00Z'/>"
-        "</head><body><p>"
-        + long_body
-        + "</p></body></html>"
+        "</head><body><p>" + long_body + "</p></body></html>"
     )
 
     conn = db.get_connection()

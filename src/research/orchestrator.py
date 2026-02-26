@@ -16,8 +16,12 @@ logger = logging.getLogger(__name__)
 
 def _empty_summary() -> dict:
     return {
-        "attempted": 0, "completed": 0, "failed": 0, "skipped": 0,
-        "total_input_tokens": 0, "total_output_tokens": 0,
+        "attempted": 0,
+        "completed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
     }
 
 
@@ -124,9 +128,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
                 )
 
             # Step j: store results.
-            conversation_starters = "\n".join(
-                f"- {s}" for s in score_parsed.conversation_starters
-            )
+            conversation_starters = "\n".join(f"- {s}" for s in score_parsed.conversation_starters)
             profile = research_brief
             if conversation_starters:
                 profile += "\n\n## Conversation Starters\n" + conversation_starters
@@ -166,9 +168,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
 
         except Exception as exc:
             failed += 1
-            logger.warning(
-                "research failed for account=%s: %s", account_id, exc, exc_info=True
-            )
+            logger.warning("research failed for account=%s: %s", account_id, exc, exc_info=True)
             # Store partial failure.
             try:
                 db.upsert_company_research(
@@ -220,8 +220,15 @@ def _enrichment_to_dict(enrichment, pre_enrichment: dict | None) -> dict:
     result = dict(pre_enrichment or {})
     # Overlay LLM results for fields that are still empty.
     for fld in [
-        "website", "industry", "sub_industry", "employee_range", "revenue_range",
-        "company_linkedin_url", "city", "state", "country",
+        "website",
+        "industry",
+        "sub_industry",
+        "employee_range",
+        "revenue_range",
+        "company_linkedin_url",
+        "city",
+        "state",
+        "country",
     ]:
         llm_val = getattr(enrichment, fld, "")
         if llm_val and fld not in result:

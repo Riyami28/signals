@@ -308,9 +308,7 @@ def compute_icp_signal_gaps(
         and account_present_counts.get(domain, 0) >= account_expected_counts.get(domain, 0)
     )
     high_priority_gaps = sum(
-        1
-        for row in output_rows
-        if int(row["present"]) == 0 and str(row["priority"]).lower() in {"p0", "p1"}
+        1 for row in output_rows if int(row["present"]) == 0 and str(row["priority"]).lower() in {"p0", "p1"}
     )
 
     summary = {
