@@ -322,6 +322,7 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
 
     rules = load_signal_rules(settings.signal_registry_path)
     thresholds = load_thresholds(settings.thresholds_path)
+    dimension_weights = load_dimension_weights(settings.dimension_weights_path)
     source_registry = load_source_registry(settings.source_registry_path)
     signal_classes = load_signal_classes(settings.signal_classes_path)
 
@@ -334,6 +335,7 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
             rules=rules,
             thresholds=thresholds,
             source_reliability_defaults=source_registry,
+            dimension_weights=dimension_weights,
             delta_lookup=None,
         )
 
@@ -354,6 +356,7 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
                         tier="low",
                         top_reasons_json="[]",
                         delta_7d=0.0,
+                        dimension_scores_json="{}",
                     )
                 )
 

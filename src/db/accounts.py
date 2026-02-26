@@ -1,0 +1,448 @@
+from __future__ import annotations
+
+import json
+import uuid
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from src.models import Account
+from src.utils import load_csv_rows, normalize_domain, stable_hash, utc_now_iso
+
+
+def _build_account_id(domain: str) -> str:
+    return stable_hash({"domain": normalize_domain(domain)}, prefix="acc", length=12)
+
+
+def get_account_by_domain(conn: Any, domain: str) -> dict[str, Any] | None:
+    normalized = normalize_domain(domain)
+    if not normalized:
+        return None
+    cur = conn.execute("SELECT * FROM accounts WHERE domain = %s", (normalized,))
+    return cur.fetchone()
+
+
+def upsert_account(
+    conn: Any,
+    company_name: str,
+    domain: str,
+    source_type: str = "discovered",
+    commit: bool = True,
+) -> str:
+    normalized_domain = normalize_domain(domain)
+    if not normalized_domain:
+        raise ValueError("domain is required")
+    existing = get_account_by_domain(conn, normalized_domain)
+    if existing:
+        return str(existing["account_id"])
+
+    account_id = _build_account_id(normalized_domain)
+    account = Account(
+        account_id=account_id,
+        company_name=(company_name or normalized_domain).strip(),
+        domain=normalized_domain,
+        source_type="seed" if source_type == "seed" else "discovered",
+    )
+    conn.execute(
+        """
+        INSERT INTO accounts (account_id, company_name, domain, source_type, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (
+            account.account_id,
+            account.company_name,
+            account.domain,
+            account.source_type,
+            account.created_at,
+        ),
+    )
+    if commit:
+        conn.commit()
+    return account.account_id
+
+
+def seed_accounts(conn: Any, seed_accounts_csv: Path) -> int:
+    rows = load_csv_rows(seed_accounts_csv)
+    inserted = 0
+    for row in rows:
+        domain = row.get("domain", "")
+        if not domain:
+            continue
+        existing = get_account_by_domain(conn, domain)
+        if existing:
+            continue
+        upsert_account(
+            conn,
+            company_name=row.get("company_name", domain),
+            domain=domain,
+            source_type=row.get("source_type", "seed") or "seed",
+        )
+        inserted += 1
+    return inserted
+
+
+def account_exists(conn: Any, account_id: str) -> bool:
+    cur = conn.execute("SELECT 1 FROM accounts WHERE account_id = %s LIMIT 1", (account_id,))
+    return cur.fetchone() is not None
+
+
+def dump_run_summary(conn: Any, run_id: str) -> dict[str, object]:
+    cur = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS score_rows,
+            COUNT(DISTINCT account_id) AS account_count
+        FROM account_scores
+        WHERE run_id = %s
+        """,
+        (run_id,),
+    )
+    row = cur.fetchone()
+    return {
+        "run_id": run_id,
+        "score_rows": int(row["score_rows"] if row else 0),
+        "account_count": int(row["account_count"] if row else 0),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Research CRUD
+# ---------------------------------------------------------------------------
+
+
+def upsert_company_research(
+    conn,
+    account_id: str,
+    *,
+    research_brief: str | None = None,
+    research_profile: str | None = None,
+    enrichment_json: str = "{}",
+    research_status: str,
+    model_used: str | None = None,
+    prompt_hash: str | None = None,
+) -> None:
+    """Insert or update a company research record."""
+    conn.execute(
+        """
+        INSERT INTO company_research
+            (account_id, research_brief, research_profile, enrichment_json,
+             research_status, researched_at, model_used, prompt_hash,
+             created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (account_id) DO UPDATE SET
+            research_brief   = EXCLUDED.research_brief,
+            research_profile = EXCLUDED.research_profile,
+            enrichment_json  = EXCLUDED.enrichment_json,
+            research_status  = EXCLUDED.research_status,
+            researched_at    = EXCLUDED.researched_at,
+            model_used       = EXCLUDED.model_used,
+            prompt_hash      = EXCLUDED.prompt_hash,
+            updated_at       = CURRENT_TIMESTAMP
+        """,
+        (account_id, research_brief, research_profile, enrichment_json, research_status, model_used, prompt_hash),
+    )
+    conn.commit()
+
+
+def get_company_research(conn, account_id: str) -> dict | None:
+    """Return the company_research row or None."""
+    row = conn.execute(
+        "SELECT * FROM company_research WHERE account_id = %s",
+        (account_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_accounts_needing_research(
+    conn,
+    run_date: str,
+    score_run_id: str,
+    max_accounts: int,
+    min_tier: str,
+    stale_days: int,
+    current_prompt_hash: str,
+) -> list[dict]:
+    """
+    Returns accounts that:
+    1. Have a current score at min_tier or above
+    2. Have no completed research, OR research older than stale_days,
+       OR a different prompt_hash than current_prompt_hash
+    3. Limited to max_accounts rows, ordered by signal_score DESC
+    """
+    tier_filter = ("high",) if min_tier == "high" else ("high", "medium")
+    rows = conn.execute(
+        """
+        SELECT
+            a.account_id,
+            a.company_name,
+            a.domain,
+            s.score AS signal_score,
+            s.tier AS signal_tier,
+            s.delta_7d,
+            s.top_reasons_json
+        FROM account_scores s
+        JOIN accounts a ON a.account_id = s.account_id
+        LEFT JOIN company_research cr ON cr.account_id = a.account_id
+        WHERE s.run_id = %s
+          AND s.tier = ANY(%s)
+          AND (
+              cr.account_id IS NULL
+              OR cr.research_status NOT IN ('completed', 'in_progress')
+              OR cr.researched_at::timestamp < (CURRENT_TIMESTAMP - make_interval(days => %s))
+              OR cr.prompt_hash IS DISTINCT FROM %s
+          )
+        ORDER BY s.score DESC
+        LIMIT %s
+        """,
+        (score_run_id, list(tier_filter), stale_days, current_prompt_hash, max_accounts),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_research_in_progress(conn, account_id: str) -> None:
+    """Set research_status='in_progress' before making the API call."""
+    conn.execute(
+        """
+        INSERT INTO company_research (account_id, research_status, created_at, updated_at)
+        VALUES (%s, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (account_id) DO UPDATE SET
+            research_status = 'in_progress',
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (account_id,),
+    )
+    conn.commit()
+
+
+def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
+    """Delete all existing contacts for account, then insert new ones."""
+    conn.execute(
+        "DELETE FROM contact_research WHERE account_id = %s",
+        (account_id,),
+    )
+    for contact in contacts:
+        identifier = contact.get("linkedin_url") or (contact.get("first_name", "") + contact.get("last_name", ""))
+        contact_id = stable_hash(
+            {"account_id": account_id, "identifier": identifier},
+            prefix="contact",
+            length=16,
+        )
+        conn.execute(
+            """
+            INSERT INTO contact_research
+                (contact_id, account_id, first_name, last_name, title,
+                 email, linkedin_url, management_level, year_joined, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (contact_id) DO NOTHING
+            """,
+            (
+                contact_id,
+                account_id,
+                contact.get("first_name", ""),
+                contact.get("last_name", ""),
+                contact.get("title"),
+                contact.get("email"),
+                contact.get("linkedin_url"),
+                contact.get("management_level"),
+                contact.get("year_joined"),
+            ),
+        )
+    conn.commit()
+
+
+def get_contacts_for_account(conn, account_id: str) -> list[dict]:
+    """Return all contacts for an account, ordered by management_level seniority."""
+    rows = conn.execute(
+        """
+        SELECT * FROM contact_research
+        WHERE account_id = %s
+        ORDER BY CASE management_level
+            WHEN 'C-Level' THEN 1
+            WHEN 'VP' THEN 2
+            WHEN 'Director' THEN 3
+            WHEN 'Manager' THEN 4
+            WHEN 'IC' THEN 5
+            ELSE 6
+        END
+        """,
+        (account_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_research_run(conn, run_date: str, score_run_id: str) -> str:
+    """Insert a new research_runs row with status='running'. Returns research_run_id."""
+    research_run_id = f"rr_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """
+        INSERT INTO research_runs
+            (research_run_id, run_date, score_run_id, started_at, status)
+        VALUES (%s, %s, %s, CURRENT_TIMESTAMP, 'running')
+        """,
+        (research_run_id, run_date, score_run_id),
+    )
+    conn.commit()
+    return research_run_id
+
+
+def finish_research_run(
+    conn,
+    research_run_id: str,
+    status: str,
+    accounts_attempted: int,
+    accounts_completed: int,
+    accounts_failed: int,
+    accounts_skipped: int,
+) -> None:
+    """Update research_run with final counts and finished_at timestamp."""
+    conn.execute(
+        """
+        UPDATE research_runs SET
+            status = %s,
+            accounts_attempted = %s,
+            accounts_completed = %s,
+            accounts_failed = %s,
+            accounts_skipped = %s,
+            finished_at = CURRENT_TIMESTAMP
+        WHERE research_run_id = %s
+        """,
+        (status, accounts_attempted, accounts_completed, accounts_failed, accounts_skipped, research_run_id),
+    )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Account Labels (Web UI)
+# ---------------------------------------------------------------------------
+
+
+def insert_account_label(conn, account_id: str, label: str, reviewer: str = "web_ui", notes: str = "") -> str:
+    import uuid
+
+    label_id = f"lbl_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """
+        INSERT INTO account_labels (label_id, account_id, label, reviewer, notes)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (label_id) DO NOTHING
+        """,
+        (label_id, account_id, label, reviewer, notes),
+    )
+    conn.commit()
+    return label_id
+
+
+def delete_account_label(conn, label_id: str) -> None:
+    conn.execute("DELETE FROM account_labels WHERE label_id = %s", (label_id,))
+    conn.commit()
+
+
+def get_labels_for_account(conn, account_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM account_labels WHERE account_id = %s ORDER BY created_at DESC",
+        (account_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_accounts_paginated(
+    conn,
+    page: int = 1,
+    per_page: int = 50,
+    sort_by: str = "score",
+    sort_dir: str = "desc",
+    tier_filter: str = "",
+    label_filter: str = "",
+    search: str = "",
+) -> tuple[list[dict], int]:
+    """Return paginated accounts joined with latest scores and labels."""
+    where_parts = []
+    params: list = []
+
+    if search:
+        where_parts.append("(a.company_name ILIKE %s OR a.domain ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
+    if tier_filter:
+        where_parts.append("best.tier = %s")
+        params.append(tier_filter)
+
+    if label_filter:
+        where_parts.append(
+            "EXISTS (SELECT 1 FROM account_labels al WHERE al.account_id = a.account_id AND al.label = %s)"
+        )
+        params.append(label_filter)
+
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    sort_map = {
+        "score": "COALESCE(best.score, 0)",
+        "company_name": "a.company_name",
+        "domain": "a.domain",
+        "tier": "best.tier",
+    }
+    order_col = sort_map.get(sort_by, "COALESCE(best.score, 0)")
+    order_dir = "DESC" if sort_dir.lower() == "desc" else "ASC"
+
+    count_sql = f"""
+        SELECT COUNT(*) as total FROM (
+            SELECT a.account_id
+            FROM accounts a
+            LEFT JOIN LATERAL (
+                SELECT score, tier FROM account_scores
+                WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+            ) best ON true
+            {where_sql}
+        ) sub
+    """
+    total = conn.execute(count_sql, params).fetchone()["total"]
+
+    offset = (page - 1) * per_page
+    data_params = list(params) + [per_page, offset]
+    data_sql = f"""
+        SELECT
+            a.account_id, a.company_name, a.domain, a.source_type,
+            COALESCE(best.score, 0) AS score,
+            COALESCE(best.tier, 'low') AS tier,
+            cr.research_status,
+            (SELECT string_agg(al.label, ',') FROM account_labels al WHERE al.account_id = a.account_id) AS labels
+        FROM accounts a
+        LEFT JOIN LATERAL (
+            SELECT score, tier
+            FROM account_scores
+            WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+        ) best ON true
+        LEFT JOIN company_research cr ON cr.account_id = a.account_id
+        {where_sql}
+        ORDER BY {order_col} {order_dir}
+        LIMIT %s OFFSET %s
+    """
+    rows = conn.execute(data_sql, data_params).fetchall()
+    return [dict(r) for r in rows], total
+
+
+def get_account_detail(conn, account_id: str) -> dict | None:
+    """Full account detail with scores, signals, research, contacts, labels."""
+    account = conn.execute("SELECT * FROM accounts WHERE account_id = %s", (account_id,)).fetchone()
+    if not account:
+        return None
+    result = dict(account)
+
+    scores = conn.execute(
+        "SELECT product, score, tier FROM account_scores WHERE account_id = %s ORDER BY score DESC",
+        (account_id,),
+    ).fetchall()
+    result["scores"] = [dict(r) for r in scores]
+
+    signals = conn.execute(
+        """SELECT signal_code, source, evidence_url, evidence_text, observed_at
+           FROM signal_observations WHERE account_id = %s ORDER BY observed_at DESC LIMIT 50""",
+        (account_id,),
+    ).fetchall()
+    result["signals"] = [dict(r) for r in signals]
+
+    result["research"] = get_company_research(conn, account_id)
+    result["contacts"] = get_contacts_for_account(conn, account_id)
+    result["labels"] = get_labels_for_account(conn, account_id)
+    return result

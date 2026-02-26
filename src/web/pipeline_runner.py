@@ -152,11 +152,17 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
             try:
                 from src.models import AccountScore
                 from src.scoring.engine import run_scoring
-                from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
+                from src.scoring.rules import (
+                    load_dimension_weights,
+                    load_signal_rules,
+                    load_source_registry,
+                    load_thresholds,
+                )
 
                 signal_rules = load_signal_rules(settings.signal_registry_path)
                 source_registry = load_source_registry(settings.source_registry_path)
                 thresholds = load_thresholds(settings.thresholds_path)
+                dimension_weights = load_dimension_weights(settings.dimension_weights_path)
 
                 score_run_id = db.create_score_run(conn, run_date)
                 observations = db.fetch_observations_for_scoring(conn, run_date)
@@ -170,6 +176,7 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                     rules=signal_rules,
                     thresholds=thresholds,
                     source_reliability_defaults=source_registry,
+                    dimension_weights=dimension_weights,
                     delta_lookup=None,
                 )
 
@@ -190,6 +197,7 @@ def _run_pipeline_sync(run_id: str, account_ids: list[str], stages: list[str], q
                                 tier="low",
                                 top_reasons_json="[]",
                                 delta_7d=0.0,
+                                dimension_scores_json="{}",
                             )
                         )
 

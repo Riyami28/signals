@@ -58,6 +58,7 @@ class AccountScore(BaseModel):
     tier: Literal["high", "medium", "low"]
     top_reasons_json: str
     delta_7d: float
+    dimension_scores_json: str = "{}"
 
 
 class ReviewLabel(BaseModel):

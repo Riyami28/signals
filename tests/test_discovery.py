@@ -289,7 +289,7 @@ def test_webhook_rejects_placeholder_domain(tmp_path: Path, monkeypatch):
 def test_discovery_policy_routes_high_to_crm_and_medium_to_manual(tmp_path: Path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_core_config(root)
-    _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,40\nmedium,10\nexplore,6\nlow,0\n")
+    _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,25\nmedium,10\nexplore,6\nlow,0\n")
     _write(
         root / "config" / "promotion_policy.csv",
         "key,value\n"

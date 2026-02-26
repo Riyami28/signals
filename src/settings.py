@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     signal_registry_path: Path = Field(default=Path(""))
     source_registry_path: Path = Field(default=Path(""))
     thresholds_path: Path = Field(default=Path(""))
+    dimension_weights_path: Path = Field(default=Path(""))
     keyword_lexicon_path: Path = Field(default=Path(""))
     source_execution_policy_path: Path = Field(default=Path(""))
     account_source_handles_path: Path = Field(default=Path(""))
@@ -173,6 +174,8 @@ class Settings(BaseSettings):
             self.source_registry_path = cd / "source_registry.csv"
         if self.thresholds_path == Path(""):
             self.thresholds_path = cd / "thresholds.csv"
+        if self.dimension_weights_path == Path(""):
+            self.dimension_weights_path = cd / "dimension_weights.csv"
         if self.keyword_lexicon_path == Path(""):
             self.keyword_lexicon_path = cd / "keyword_lexicon.csv"
         if self.source_execution_policy_path == Path(""):

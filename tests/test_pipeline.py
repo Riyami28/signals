@@ -192,6 +192,10 @@ def test_review_queue_is_account_level_and_excludes_internal_domain(tmp_path, mo
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
     _write(
+        root / "config" / "thresholds.csv",
+        "key,value\nhigh,70\nmedium,30\nlow,0\n",
+    )
+    _write(
         root / "config" / "seed_accounts.csv",
         "company_name,domain,source_type\nAcme,acme.example,seed\nZopdev,zop.dev,seed\n",
     )

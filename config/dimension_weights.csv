@@ -1,0 +1,6 @@
+dimension,weight,ceiling
+trigger_intent,0.35,60
+tech_fit,0.20,40
+engagement_pql,0.25,50
+firmographic,0.10,30
+hiring_growth,0.10,30

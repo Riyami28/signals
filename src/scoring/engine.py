@@ -9,7 +9,12 @@ from typing import Callable
 
 from src.models import AccountScore, ComponentScore
 from src.scoring.explain import rank_top_reasons, reasons_to_json
-from src.scoring.rules import SignalRule, Thresholds
+from src.scoring.rules import (
+    VALID_DIMENSIONS,
+    DimensionWeight,
+    SignalRule,
+    Thresholds,
+)
 from src.utils import parse_datetime
 
 logger = logging.getLogger(__name__)
@@ -17,6 +22,13 @@ logger = logging.getLogger(__name__)
 PRODUCTS = ("zopdev", "zopday", "zopnight")
 MAX_OBSERVATIONS_PER_SIGNAL = 3
 MAX_OBSERVATIONS_PER_SOURCE_PER_SIGNAL = 1
+DEFAULT_DIMENSION_WEIGHTS: dict[str, DimensionWeight] = {
+    "trigger_intent": DimensionWeight(dimension="trigger_intent", weight=0.35, ceiling=60.0),
+    "tech_fit": DimensionWeight(dimension="tech_fit", weight=0.20, ceiling=40.0),
+    "engagement_pql": DimensionWeight(dimension="engagement_pql", weight=0.25, ceiling=50.0),
+    "firmographic": DimensionWeight(dimension="firmographic", weight=0.10, ceiling=30.0),
+    "hiring_growth": DimensionWeight(dimension="hiring_growth", weight=0.10, ceiling=30.0),
+}
 
 
 @dataclass
@@ -58,6 +70,33 @@ def _resolve_products(observation_product: str, rule_scope: str) -> tuple[str, .
     return resolved
 
 
+def _resolve_dimension_weights(
+    configured_weights: dict[str, DimensionWeight] | None,
+) -> dict[str, DimensionWeight]:
+    merged = dict(DEFAULT_DIMENSION_WEIGHTS)
+    if configured_weights:
+        for dimension, details in configured_weights.items():
+            if dimension not in VALID_DIMENSIONS:
+                continue
+            if details.weight <= 0 or details.ceiling <= 0:
+                continue
+            merged[dimension] = details
+
+    total = sum(item.weight for item in merged.values())
+    if total <= 0:
+        return dict(DEFAULT_DIMENSION_WEIGHTS)
+    if abs(total - 1.0) < 0.000001:
+        return merged
+    return {
+        dimension: DimensionWeight(
+            dimension=dimension,
+            weight=details.weight / total,
+            ceiling=details.ceiling,
+        )
+        for dimension, details in merged.items()
+    }
+
+
 def run_scoring(
     run_id: str,
     run_date: date,
@@ -65,8 +104,10 @@ def run_scoring(
     rules: dict[str, SignalRule],
     thresholds: Thresholds,
     source_reliability_defaults: dict[str, float],
+    dimension_weights: dict[str, DimensionWeight] | None = None,
     delta_lookup: Callable[[str, str], float] | None = None,
 ) -> EngineOutput:
+    resolved_dimension_weights = _resolve_dimension_weights(dimension_weights)
     component_totals: dict[tuple[str, str, str], float] = {}
     reason_candidates: dict[tuple[str, str, str], dict] = {}
     component_contributions: dict[tuple[str, str, str], list[dict[str, float | str]]] = defaultdict(list)
@@ -209,7 +250,28 @@ def run_scoring(
         )
 
     for (account_id, product), items in grouped_components.items():
-        total_score = min(100.0, round(sum(value for _, value in items), 2))
+        raw_dimension_scores = {dimension: 0.0 for dimension in resolved_dimension_weights}
+        for signal_code, component_score in items:
+            dimension = "trigger_intent"
+            rule = rules.get(signal_code)
+            if rule and rule.dimension in VALID_DIMENSIONS:
+                dimension = rule.dimension
+            raw_dimension_scores[dimension] = raw_dimension_scores.get(dimension, 0.0) + component_score
+
+        dimension_scores = {
+            dimension: min(100.0, round((raw_dimension_scores.get(dimension, 0.0) / details.ceiling) * 100.0, 2))
+            for dimension, details in resolved_dimension_weights.items()
+        }
+        total_score = min(
+            100.0,
+            round(
+                sum(
+                    dimension_scores[dimension] * details.weight
+                    for dimension, details in resolved_dimension_weights.items()
+                ),
+                2,
+            ),
+        )
         tier = classify_tier(total_score, thresholds)
 
         reasons: list[dict] = []
@@ -235,6 +297,7 @@ def run_scoring(
                 tier=tier,
                 top_reasons_json=reasons_to_json(top_reasons),
                 delta_7d=delta,
+                dimension_scores_json=json.dumps(dimension_scores, sort_keys=True),
             )
         )
 
