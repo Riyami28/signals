@@ -142,6 +142,12 @@ class Settings(BaseSettings):
     crunchbase_api_key: str = Field(default="")
     crunchbase_rate_limit: int = Field(default=50, ge=1)
 
+    # --- G2 review intelligence ---
+    g2_api_key: str = Field(default="")
+    g2_api_base_url: str = Field(default="https://data.g2.com/api/v1")
+    g2_competitor_product_ids: tuple[str, ...] = Field(default_factory=tuple)
+    g2_review_lookback_days: int = Field(default=30, ge=1)
+
     @model_validator(mode="after")
     def _derive_paths_and_dsn(self) -> "Settings":
         root = self.project_root

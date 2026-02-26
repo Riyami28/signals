@@ -5,7 +5,10 @@ from datetime import date
 from pathlib import Path
 
 from src import db
-from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
+from src.review.import_reviews import (
+    import_reviews_for_date,
+    prepare_review_input_for_date,
+)
 from src.settings import load_settings
 
 

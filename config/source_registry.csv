@@ -17,3 +17,5 @@ manual_review_import,0.95,true
 huginn_webhook,0.72,true
 story_hunt,0.78,true
 story_hunt_js,0.74,true
+bombora_api,0.82,true
+g2_api,0.78,true

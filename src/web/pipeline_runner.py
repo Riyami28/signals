@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 import uuid
 from datetime import date
-from pathlib import Path
 
 from src import db
 from src.settings import load_settings

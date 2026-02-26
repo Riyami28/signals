@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from src.reporting import calibration
-from src.reporting.evals import OutputQualityBar, OutputQualityEval, evaluate_run_output_quality
+from src.reporting.evals import (
+    OutputQualityBar,
+    OutputQualityEval,
+    evaluate_run_output_quality,
+)
 from src.scoring.rules import Thresholds
 
 

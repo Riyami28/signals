@@ -1,7 +1,13 @@
 from datetime import date
 from pathlib import Path
 
-from src.utils import classify_text, load_csv_rows, normalize_domain, parse_date, stable_hash
+from src.utils import (
+    classify_text,
+    load_csv_rows,
+    normalize_domain,
+    parse_date,
+    stable_hash,
+)
 
 
 def test_normalize_domain_strips_protocol_and_path():

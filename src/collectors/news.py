@@ -15,7 +15,13 @@ from src import db
 from src.http_client import get as http_get
 from src.models import SignalObservation
 from src.settings import Settings
-from src.utils import classify_text, load_account_source_handles, load_csv_rows, stable_hash, utc_now_iso
+from src.utils import (
+    classify_text,
+    load_account_source_handles,
+    load_csv_rows,
+    stable_hash,
+    utc_now_iso,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -25,10 +25,20 @@ from src.discovery.config import (
 from src.integrations.zoho_dedup import check_crm_dedup
 from src.models import SignalObservation
 from src.promotion_policy import PromotionPolicy, load_promotion_policy
-from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry
+from src.scoring.rules import (
+    load_keyword_lexicon,
+    load_signal_rules,
+    load_source_registry,
+)
 from src.settings import Settings
 from src.source_policy import load_source_execution_policy
-from src.utils import classify_text, normalize_domain, stable_hash, utc_now_iso, write_csv_rows
+from src.utils import (
+    classify_text,
+    normalize_domain,
+    stable_hash,
+    utc_now_iso,
+    write_csv_rows,
+)
 
 
 def _flatten_lexicon(lexicon_by_source: dict[str, list[dict[str, str]]]) -> list[dict[str, str]]:

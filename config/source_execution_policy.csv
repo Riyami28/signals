@@ -12,3 +12,5 @@ social_provider,4,0.5,20,2,3,80,true
 earnings_transcripts_provider,4,0.5,25,2,3,60,true
 first_party_csv,4,5.0,10,1,1,500,true
 huginn_webhook,8,8.0,10,1,1,500,true
+bombora_api,6,1.0,30,3,3,100,true
+g2_api,4,0.5,30,2,3,100,true

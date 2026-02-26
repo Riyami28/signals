@@ -117,3 +117,37 @@ news,media_traffic_reliability_pressure,ad stack reliability,0.9
 news,media_traffic_reliability_pressure,cdn reliability incident,0.9
 news,media_traffic_reliability_pressure,paywall performance,0.84
 news,media_traffic_reliability_pressure,performance incident,0.84
+bombora,bombora_surge_high,cloud cost optimization,0.85
+bombora,bombora_surge_high,finops,0.85
+bombora,bombora_surge_high,cloud financial management,0.85
+bombora,bombora_surge_high,kubernetes,0.85
+bombora,bombora_surge_high,container orchestration,0.85
+bombora,bombora_surge_high,devops transformation,0.85
+bombora,bombora_surge_high,infrastructure automation,0.85
+bombora,bombora_surge_high,cloud migration,0.85
+bombora,bombora_surge_high,developer platforms,0.85
+bombora,bombora_surge_moderate,cloud cost optimization,0.7
+bombora,bombora_surge_moderate,finops,0.7
+bombora,bombora_surge_moderate,cloud financial management,0.7
+bombora,bombora_surge_moderate,kubernetes,0.7
+bombora,bombora_surge_moderate,container orchestration,0.7
+bombora,bombora_surge_moderate,devops transformation,0.7
+bombora,bombora_surge_moderate,infrastructure automation,0.7
+bombora,bombora_surge_moderate,cloud migration,0.7
+bombora,bombora_surge_moderate,developer platforms,0.7
+bombora,bombora_topic_cluster,cloud cost optimization,0.75
+bombora,bombora_topic_cluster,kubernetes,0.75
+bombora,bombora_topic_cluster,devops transformation,0.75
+bombora,bombora_topic_cluster,infrastructure automation,0.75
+bombora,bombora_topic_cluster,developer platforms,0.75
+g2,g2_active_research,g2 buyer intent,0.80
+g2,g2_active_research,g2 research activity,0.75
+g2,g2_active_research,g2 comparison,0.70
+g2,g2_active_research,g2 alternative search,0.75
+g2,competitor_review_activity,competitor review,0.70
+g2,competitor_review_activity,g2 review posted,0.65
+g2,competitor_review_activity,product evaluation,0.60
+g2,competitor_dissatisfaction,low rating competitor,0.75
+g2,competitor_dissatisfaction,negative review competitor,0.70
+g2,competitor_dissatisfaction,switching from,0.80
+g2,competitor_dissatisfaction,looking for alternative,0.75
