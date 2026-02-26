@@ -94,11 +94,10 @@ info "Initialising database schema..."
 python -m src.main migrate || python3 -m src.main migrate
 
 # ── 9. Seed data ────────────────────────────────────────────────────────────
-
-info "Loading seed accounts..."
-python -m src.main seed-accounts 2>/dev/null \
-    || python3 -m src.main seed-accounts 2>/dev/null \
-    || info "  seed-accounts command not found — skipping (data will be seeded on first run)"
+# Accounts are seeded from config/seed_accounts.csv and config/watchlist_accounts.csv
+# automatically on first pipeline run (./signals start or make dev).
+# Running `ingest` here would also trigger seeding via _bootstrap().
+info "Account seeding will happen automatically on first pipeline run (./signals start)."
 
 # ── 10. Smoke test ──────────────────────────────────────────────────────────
 

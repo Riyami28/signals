@@ -547,9 +547,11 @@ def _run_hunt_cycle(run_date: date, profile_name: str = "light") -> dict[str, in
 
 @app.command("migrate")
 def migrate() -> None:
-    """Apply any pending versioned SQL migrations from the migrations/ directory."""
-    settings, conn, _ = _bootstrap()
+    """Apply pending versioned SQL migrations from migrations/. Schema changes only — does not seed accounts."""
+    settings = load_settings()
+    conn = db.get_connection(settings.pg_dsn)
     try:
+        db.init_db(conn)  # ensure base schema tables exist
         newly_applied = db.run_migrations(conn)
         if newly_applied:
             typer.echo(f"migrations_applied={len(newly_applied)} versions={','.join(str(v) for v in newly_applied)}")
