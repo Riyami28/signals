@@ -43,7 +43,7 @@ def _fetch_page(url: str, timeout: int = 10) -> str:
             tag.decompose()
         return soup.get_text(separator="\n", strip=True)[:8000]
     except Exception:
-        logger.debug("failed to fetch %s", url, exc_info=True)
+        logger.warning("failed to fetch url=%s", url, exc_info=True)
         return ""
 
 
@@ -89,5 +89,5 @@ def scrape_company_info(domain: str, llm_client, settings=None) -> dict:
         logger.info("web_scrape enrichment domain=%s fields=%d", domain, len(data))
         return data
     except Exception:
-        logger.debug("web scrape LLM extraction failed for domain=%s", domain, exc_info=True)
+        logger.warning("web scrape LLM extraction failed for domain=%s", domain, exc_info=True)
         return {}

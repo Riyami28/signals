@@ -46,7 +46,8 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 @app.callback()
 def _app_callback() -> None:
     """Signals pipeline — structured logging enabled at startup."""
-    configure_logging(os.environ.get("LOG_LEVEL", "INFO"))
+    configure_logging(os.environ.get("SIGNALS_LOG_LEVEL", "INFO"))
+
 
 
 _RUN_DAILY_LOCK_NAME = "signals:run-daily"
@@ -63,11 +64,13 @@ class StageExecutionError(RuntimeError):
 
 
 def _run_with_watchdog(stage: str, timeout_seconds: int, fn):
+    logger.info("stage_started stage=%s timeout_seconds=%d", stage, timeout_seconds)
     started = time.monotonic()
     try:
         result = fn()
     except Exception as exc:
         elapsed = time.monotonic() - started
+        logger.error("stage_failed stage=%s duration_seconds=%.2f error=%s", stage, elapsed, str(exc)[:240])
         raise StageExecutionError(
             stage=stage,
             duration_seconds=elapsed,
@@ -76,12 +79,14 @@ def _run_with_watchdog(stage: str, timeout_seconds: int, fn):
         ) from exc
     elapsed = time.monotonic() - started
     if elapsed > float(timeout_seconds):
+        logger.error("stage_timeout stage=%s duration_seconds=%.2f timeout_seconds=%d", stage, elapsed, timeout_seconds)
         raise StageExecutionError(
             stage=stage,
             duration_seconds=elapsed,
             timed_out=True,
             message=f"{stage} exceeded timeout_seconds={timeout_seconds}",
         )
+    logger.info("stage_completed stage=%s duration_seconds=%.2f", stage, elapsed)
     return result, elapsed
 
 
@@ -443,6 +448,12 @@ def _run_ingest_cycle(run_date: date) -> dict[str, int | str]:
         collect_results = _collect_all(conn, settings)
         collect_inserted = sum(result["inserted"] for result in collect_results.values())
         collect_seen = sum(result["seen"] for result in collect_results.values())
+        logger.info(
+            "ingest_cycle_done run_date=%s observations_seen=%d observations_inserted=%d",
+            run_date.isoformat(),
+            collect_seen,
+            collect_inserted,
+        )
         return {
             "run_date": run_date.isoformat(),
             "observations_seen": collect_seen,
@@ -459,6 +470,13 @@ def _run_score_cycle(run_date: date) -> dict[str, int | float | str]:
         run_id = _run_scoring(conn, settings, run_date)
         export_result = _run_exports(conn, settings, run_date, run_id)
         icp_report = _write_icp_coverage_report(conn, settings, run_id, run_date)
+        logger.info(
+            "score_cycle_done run_date=%s run_id=%s daily_scores_rows=%d review_queue_rows=%d",
+            run_date.isoformat(),
+            run_id,
+            int(export_result["daily_scores"]),
+            int(export_result["review_queue"]),
+        )
         return {
             "run_id": run_id,
             "daily_scores_rows": int(export_result["daily_scores"]),
@@ -1270,9 +1288,17 @@ def run_daily(
             details=f"run_date={run_date.isoformat()}",
         )
         if not lock_acquired:
+            logger.warning("run_daily skipped reason=lock_busy lock_name=%s", _RUN_DAILY_LOCK_NAME)
             typer.echo(f"status=skipped reason=lock_busy lock_name={_RUN_DAILY_LOCK_NAME}")
             return
 
+        logger.info(
+            "run_daily_started run_date=%s seeded=%d live_max_accounts=%d timeout_seconds=%d",
+            run_date.isoformat(),
+            seeded,
+            settings.live_max_accounts,
+            settings.stage_timeout_seconds,
+        )
         typer.echo(
             f"stage=ingest status=started live_max_accounts={settings.live_max_accounts} "
             f"live_workers_per_source={settings.live_workers_per_source} "
@@ -1396,6 +1422,16 @@ def run_daily(
             f"ops_metrics_rows={ops_result['ops_metrics_rows']}"
         )
 
+        logger.info(
+            "run_daily_completed run_date=%s run_id=%s ingested=%d review_queue=%d daily_scores=%d research_attempted=%d research_completed=%d",
+            run_date.isoformat(),
+            run_id,
+            collect_inserted,
+            export_result["review_queue"],
+            export_result["daily_scores"],
+            research_result["attempted"],
+            research_result["completed"],
+        )
         typer.echo(
             " ".join(
                 [
@@ -1841,9 +1877,18 @@ def run_autonomous_loop(
         details=f"hunt_profile={hunt_profile}",
     )
     if not lock_acquired:
+        logger.warning("autonomous_loop skipped reason=lock_busy lock_name=%s", _AUTONOMOUS_LOCK_NAME)
         typer.echo(f"status=skipped reason=lock_busy lock_name={_AUTONOMOUS_LOCK_NAME}")
         lock_conn.close()
         return
+
+    logger.info(
+        "autonomous_loop_started ingest_interval=%dm score_interval=%dm discovery_interval=%dm hunt_profile=%s",
+        ingest_interval_minutes,
+        score_interval_minutes,
+        discovery_interval_minutes,
+        hunt_profile,
+    )
 
     next_ingest_at = 0.0
     next_score_at = 0.0

@@ -628,7 +628,7 @@ def _collect_ashby(
             if not titles:
                 continue
         except Exception:
-            logger.debug("ashby fetch failed for slug=%s", slug, exc_info=True)
+            logger.warning("ashby fetch failed for slug=%s", slug, exc_info=True)
             db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
             continue
 
@@ -689,7 +689,7 @@ def _collect_workday(
                 if not titles:
                     continue
             except Exception:
-                logger.debug("workday fetch failed for tenant=%s board=%s", tenant, board, exc_info=True)
+                logger.warning("workday fetch failed for tenant=%s board=%s", tenant, board, exc_info=True)
                 db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
                 continue
 

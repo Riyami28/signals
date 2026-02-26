@@ -68,7 +68,7 @@ def enrich_from_clearbit(domain: str, api_key: str) -> EnrichmentResult | None:
             confidence=0.9,
         )
     except Exception:
-        logger.debug("clearbit enrichment failed for domain=%s", domain, exc_info=True)
+        logger.warning("clearbit enrichment failed for domain=%s", domain, exc_info=True)
         return None
 
 
@@ -98,7 +98,7 @@ def enrich_from_hunter(domain: str, api_key: str) -> EnrichmentResult | None:
             confidence=0.85,
         )
     except Exception:
-        logger.debug("hunter enrichment failed for domain=%s", domain, exc_info=True)
+        logger.warning("hunter enrichment failed for domain=%s", domain, exc_info=True)
         return None
 
 
@@ -129,7 +129,7 @@ def enrich_from_web_scrape(domain: str, llm_client, settings=None) -> Enrichment
             confidence=0.7,
         )
     except Exception:
-        logger.debug("web scrape enrichment failed for domain=%s", domain, exc_info=True)
+        logger.warning("web scrape enrichment failed for domain=%s", domain, exc_info=True)
         return None
 
 

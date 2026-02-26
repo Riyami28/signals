@@ -88,7 +88,7 @@ def _parse_entry_observed_at(entry: Any) -> str:
         try:
             return datetime(*published_parsed[:6], tzinfo=timezone.utc).isoformat()
         except Exception:
-            logger.debug("failed to parse published_parsed for entry", exc_info=True)
+            logger.warning("failed to parse published_parsed for entry", exc_info=True)
     published = entry.get("published")
     if published:
         return str(published)

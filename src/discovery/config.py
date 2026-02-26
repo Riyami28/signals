@@ -42,6 +42,7 @@ try:
 
     _OFFLINE_TLD_EXTRACTOR = tldextract.TLDExtract(cache_dir=None, suffix_list_urls=())
 except Exception:  # pragma: no cover - optional dependency fallback.
+    logger.warning("tldextract import failed, domain_family will use fallback parsing", exc_info=True)
     _OFFLINE_TLD_EXTRACTOR = None
 
 
@@ -245,7 +246,7 @@ def domain_family(domain: str) -> str:
         if extracted.domain:
             return extracted.domain.lower()
     except Exception:
-        logger.debug("tldextract failed for domain=%s", normalized_domain, exc_info=True)
+        logger.warning("tldextract failed for domain=%s", normalized_domain, exc_info=True)
 
     parts = normalized_domain.split(".")
     if len(parts) >= 2:
