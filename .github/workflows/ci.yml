@@ -50,6 +50,6 @@ jobs:
           chmod +x scripts/check_migrations.sh
           ./scripts/check_migrations.sh
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          pytest -q --tb=short
+          pytest -q --tb=short --cov=src --cov-report=term-missing --cov-fail-under=60
