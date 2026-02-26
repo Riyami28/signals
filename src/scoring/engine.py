@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from collections import defaultdict
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from src.models import AccountScore, ComponentScore
 from src.scoring.explain import rank_top_reasons, reasons_to_json
 from src.scoring.rules import SignalRule, Thresholds
 from src.utils import parse_datetime
+
+logger = logging.getLogger(__name__)
 
 PRODUCTS = ("zopdev", "zopday", "zopnight")
 MAX_OBSERVATIONS_PER_SIGNAL = 3
@@ -68,63 +71,84 @@ def run_scoring(
     reason_candidates: dict[tuple[str, str, str], dict] = {}
     component_contributions: dict[tuple[str, str, str], list[dict[str, float | str]]] = defaultdict(list)
 
+    skipped_count = 0
     for observation in observations:
-        signal_code = str(observation["signal_code"])
-        rule = rules.get(signal_code)
-        if not rule or not rule.enabled:
-            continue
+        try:
+            signal_code = str(observation.get("signal_code", ""))
+            if not signal_code:
+                skipped_count += 1
+                continue
 
-        confidence = float(observation["confidence"] or 0.0)
-        if confidence < rule.min_confidence:
-            continue
+            rule = rules.get(signal_code)
+            if not rule or not rule.enabled:
+                continue
 
-        observed_at = parse_datetime(str(observation["observed_at"]))
-        days_since = max(0, (run_date - observed_at.date()).days)
+            confidence_raw = observation.get("confidence")
+            try:
+                confidence = float(confidence_raw or 0.0)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "observation_skipped signal=%s error=invalid_confidence value=%r", signal_code, confidence_raw
+                )
+                skipped_count += 1
+                continue
+            if confidence < rule.min_confidence:
+                continue
 
-        source = str(observation["source"])
-        registry_reliability = source_reliability_defaults.get(source)
-        if registry_reliability is not None and registry_reliability <= 0:
-            continue
+            observed_at = parse_datetime(str(observation.get("observed_at", "")))
+            days_since = max(0, (run_date - observed_at.date()).days)
 
-        source_reliability = observation["source_reliability"]
-        if source_reliability is None:
-            source_reliability = registry_reliability if registry_reliability is not None else 0.6
-        source_reliability = float(source_reliability)
-        if registry_reliability is not None:
-            source_reliability = min(source_reliability, float(registry_reliability))
+            source = str(observation.get("source", ""))
+            registry_reliability = source_reliability_defaults.get(source)
+            if registry_reliability is not None and registry_reliability <= 0:
+                continue
 
-        component = (
-            rule.base_weight
-            * confidence
-            * source_reliability
-            * recency_decay(days_since_observed=days_since, half_life_days=rule.half_life_days)
-        )
+            source_reliability = observation.get("source_reliability")
+            if source_reliability is None:
+                source_reliability = registry_reliability if registry_reliability is not None else 0.6
+            source_reliability = float(source_reliability)
+            if registry_reliability is not None:
+                source_reliability = min(source_reliability, float(registry_reliability))
 
-        if component <= 0:
-            continue
-
-        account_id = str(observation["account_id"])
-        resolved_products = _resolve_products(str(observation["product"]), rule.product_scope)
-        for product in resolved_products:
-            key = (account_id, product, signal_code)
-            component_contributions[key].append(
-                {
-                    "component_score": component,
-                    "source": source,
-                    "evidence_url": str(observation["evidence_url"] or ""),
-                    "evidence_text": str(observation["evidence_text"] or "")[:280],
-                    "evidence_sentence": str(observation.get("evidence_sentence", "") or "")[:500],
-                    "evidence_sentence_en": str(observation.get("evidence_sentence_en", "") or "")[:500],
-                    "matched_phrase": str(observation.get("matched_phrase", "") or "")[:200],
-                    "language": str(observation.get("language", "") or "")[:20],
-                    "speaker_name": str(observation.get("speaker_name", "") or "")[:120],
-                    "speaker_role": str(observation.get("speaker_role", "") or "")[:80],
-                    "evidence_quality": float(observation.get("evidence_quality", 0.0) or 0.0),
-                    "relevance_score": float(observation.get("relevance_score", 0.0) or 0.0),
-                    "document_id": str(observation.get("document_id", "") or "")[:64],
-                    "mention_id": str(observation.get("mention_id", "") or "")[:64],
-                }
+            component = (
+                rule.base_weight
+                * confidence
+                * source_reliability
+                * recency_decay(days_since_observed=days_since, half_life_days=rule.half_life_days)
             )
+
+            if component <= 0:
+                continue
+
+            account_id = str(observation["account_id"])
+            resolved_products = _resolve_products(str(observation.get("product", "")), rule.product_scope)
+            for product in resolved_products:
+                key = (account_id, product, signal_code)
+                component_contributions[key].append(
+                    {
+                        "component_score": component,
+                        "source": source,
+                        "evidence_url": str(observation.get("evidence_url", "") or ""),
+                        "evidence_text": str(observation.get("evidence_text", "") or "")[:280],
+                        "evidence_sentence": str(observation.get("evidence_sentence", "") or "")[:500],
+                        "evidence_sentence_en": str(observation.get("evidence_sentence_en", "") or "")[:500],
+                        "matched_phrase": str(observation.get("matched_phrase", "") or "")[:200],
+                        "language": str(observation.get("language", "") or "")[:20],
+                        "speaker_name": str(observation.get("speaker_name", "") or "")[:120],
+                        "speaker_role": str(observation.get("speaker_role", "") or "")[:80],
+                        "evidence_quality": float(observation.get("evidence_quality", 0.0) or 0.0),
+                        "relevance_score": float(observation.get("relevance_score", 0.0) or 0.0),
+                        "document_id": str(observation.get("document_id", "") or "")[:64],
+                        "mention_id": str(observation.get("mention_id", "") or "")[:64],
+                    }
+                )
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning("observation_skipped signal=%s error=%s", observation.get("signal_code"), e)
+            skipped_count += 1
+            continue
+
+    if skipped_count:
+        logger.warning("scoring_run skipped_observations=%d", skipped_count)
 
     for key, contributions in component_contributions.items():
         ranked = sorted(contributions, key=lambda row: float(row["component_score"]), reverse=True)
@@ -195,7 +219,12 @@ def run_scoring(
                 reasons.append(reason)
         top_reasons = rank_top_reasons(reasons, limit=3)
 
-        delta = round(delta_lookup(account_id, product), 2) if delta_lookup else 0.0
+        delta = 0.0
+        if delta_lookup:
+            try:
+                delta = round(delta_lookup(account_id, product), 2)
+            except Exception as e:
+                logger.warning("delta_lookup_failed account=%s product=%s error=%s", account_id, product, e)
 
         account_models.append(
             AccountScore(

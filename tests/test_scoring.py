@@ -221,3 +221,156 @@ def test_dimension_default_when_missing():
 
     assert "test_signal" in rules
     assert rules["test_signal"].dimension == "trigger_intent"
+
+
+# --- Issue #26: defensive error handling tests ---
+
+
+def test_scoring_completes_with_partial_malformed_input():
+    """Valid observations scored; malformed ones skipped without crashing."""
+    rules = {
+        "kubernetes_detected": SignalRule(
+            signal_code="kubernetes_detected",
+            product_scope="zopdev",
+            category="technographic",
+            base_weight=20,
+            half_life_days=30,
+            min_confidence=0.5,
+            enabled=True,
+        )
+    }
+    observations = [
+        # Valid observation
+        {
+            "account_id": "acc_ok",
+            "signal_code": "kubernetes_detected",
+            "product": "shared",
+            "source": "technographics_csv",
+            "observed_at": "2026-02-16T00:00:00Z",
+            "evidence_url": "",
+            "evidence_text": "kubernetes",
+            "confidence": 0.9,
+            "source_reliability": 0.8,
+        },
+        # Malformed: confidence=None
+        {
+            "account_id": "acc_bad1",
+            "signal_code": "kubernetes_detected",
+            "product": "shared",
+            "source": "technographics_csv",
+            "observed_at": "2026-02-16T00:00:00Z",
+            "evidence_url": "",
+            "evidence_text": "kubernetes",
+            "confidence": None,
+            "source_reliability": 0.8,
+        },
+        # Malformed: empty signal_code
+        {
+            "account_id": "acc_bad2",
+            "signal_code": "",
+            "product": "shared",
+            "source": "technographics_csv",
+            "observed_at": "2026-02-16T00:00:00Z",
+            "evidence_url": "",
+            "evidence_text": "kubernetes",
+            "confidence": 0.9,
+            "source_reliability": 0.8,
+        },
+    ]
+
+    output = run_scoring(
+        run_id="run_partial",
+        run_date=date(2026, 2, 16),
+        observations=observations,
+        rules=rules,
+        thresholds=Thresholds(high=70, medium=45, low=0),
+        source_reliability_defaults={"technographics_csv": 0.8},
+    )
+
+    # Only the valid observation should produce a score
+    assert len(output.account_scores) == 1
+    assert output.account_scores[0].account_id == "acc_ok"
+
+
+def test_delta_lookup_failure_defaults_to_zero():
+    """If delta_lookup raises, scoring still completes with delta_7d=0.0."""
+    rules = {
+        "kubernetes_detected": SignalRule(
+            signal_code="kubernetes_detected",
+            product_scope="zopdev",
+            category="technographic",
+            base_weight=20,
+            half_life_days=30,
+            min_confidence=0.5,
+            enabled=True,
+        )
+    }
+    observations = [
+        {
+            "account_id": "acc_delta",
+            "signal_code": "kubernetes_detected",
+            "product": "shared",
+            "source": "technographics_csv",
+            "observed_at": "2026-02-16T00:00:00Z",
+            "evidence_url": "",
+            "evidence_text": "kubernetes",
+            "confidence": 0.9,
+            "source_reliability": 0.8,
+        }
+    ]
+
+    def broken_delta_lookup(account_id, product):
+        raise RuntimeError("DB connection lost")
+
+    output = run_scoring(
+        run_id="run_delta_fail",
+        run_date=date(2026, 2, 16),
+        observations=observations,
+        rules=rules,
+        thresholds=Thresholds(high=70, medium=45, low=0),
+        source_reliability_defaults={"technographics_csv": 0.8},
+        delta_lookup=broken_delta_lookup,
+    )
+
+    assert len(output.account_scores) == 1
+    assert output.account_scores[0].delta_7d == 0.0
+
+
+def test_observation_with_invalid_confidence_type_skipped():
+    """Observation with non-numeric confidence is skipped, not crash."""
+    rules = {
+        "kubernetes_detected": SignalRule(
+            signal_code="kubernetes_detected",
+            product_scope="zopdev",
+            category="technographic",
+            base_weight=20,
+            half_life_days=30,
+            min_confidence=0.5,
+            enabled=True,
+        )
+    }
+    observations = [
+        {
+            "account_id": "acc_bad_conf",
+            "signal_code": "kubernetes_detected",
+            "product": "shared",
+            "source": "technographics_csv",
+            "observed_at": "2026-02-16T00:00:00Z",
+            "evidence_url": "",
+            "evidence_text": "kubernetes",
+            "confidence": "not_a_number",
+            "source_reliability": 0.8,
+        }
+    ]
+
+    output = run_scoring(
+        run_id="run_bad_conf",
+        run_date=date(2026, 2, 16),
+        observations=observations,
+        rules=rules,
+        thresholds=Thresholds(high=70, medium=45, low=0),
+        source_reliability_defaults={"technographics_csv": 0.8},
+    )
+
+    # Bad confidence observation skipped — no scores produced
+    assert len(output.account_scores) == 0
