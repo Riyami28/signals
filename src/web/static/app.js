@@ -175,12 +175,19 @@ function signalsApp() {
 
 function detailPanel() {
   return {
-    dtab: 'signals',
+    dtab: 'dimensions',
     detail: null,
     researchData: null,
     accountLabels: [],
     newLabel: '',
     newNotes: '',
+
+    // Timeline state
+    timelineItems: [],
+    timelineTotal: 0,
+    timelineOffset: 0,
+    timelineSignalCode: '',
+    timelineSource: '',
 
     async load(accountId) {
       try {
@@ -205,6 +212,31 @@ function detailPanel() {
         const data = await resp.json();
         this.accountLabels = data.labels || [];
       } catch (e) {}
+    },
+
+    async loadTimeline(accountId, append) {
+      if (!append) {
+        this.timelineOffset = 0;
+        this.timelineItems = [];
+      }
+      try {
+        const params = new URLSearchParams({
+          limit: 50,
+          offset: this.timelineOffset,
+          signal_code: this.timelineSignalCode,
+          source: this.timelineSource,
+        });
+        const resp = await fetch(`/api/accounts/${accountId}/timeline?${params}`);
+        const data = await resp.json();
+        if (append) {
+          this.timelineItems = this.timelineItems.concat(data.items || []);
+        } else {
+          this.timelineItems = data.items || [];
+        }
+        this.timelineTotal = data.total || 0;
+      } catch (e) {
+        console.error('Failed to load timeline:', e);
+      }
     },
 
     async addLabel(accountId) {

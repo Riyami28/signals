@@ -116,10 +116,46 @@
               <div class="detail-inner" x-data="detailPanel()" x-init="load(acc.account_id)">
                   <!-- Tabs -->
                   <div class="tabs">
+                    <div class="tab" :class="{'active': dtab==='dimensions'}" @click="dtab='dimensions'">Dimensions</div>
                     <div class="tab" :class="{'active': dtab==='signals'}" @click="dtab='signals'">Signals</div>
+                    <div class="tab" :class="{'active': dtab==='timeline'}" @click="dtab='timeline'; loadTimeline(acc.account_id)">Timeline</div>
                     <div class="tab" :class="{'active': dtab==='research'}" @click="dtab='research'; loadResearch(acc.account_id)">Research</div>
                     <div class="tab" :class="{'active': dtab==='contacts'}" @click="dtab='contacts'">Contacts</div>
                     <div class="tab" :class="{'active': dtab==='labels'}" @click="dtab='labels'; loadLabels(acc.account_id)">Labels</div>
+                  </div>
+
+                  <!-- Dimensions Tab -->
+                  <div x-show="dtab==='dimensions'">
+                    <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
+                      <div>
+                        <!-- Velocity Banner -->
+                        <template x-if="detail.velocity">
+                          <div class="velocity-banner">
+                            <span class="velocity-category" :class="'velocity-' + (detail.velocity.category || 'stable')"
+                                  x-text="(detail.velocity.category || 'stable').toUpperCase()"></span>
+                            <span class="velocity-delta">7d: <strong x-text="(detail.velocity['7d'] > 0 ? '+' : '') + detail.velocity['7d']"></strong></span>
+                            <span class="velocity-delta">14d: <strong x-text="(detail.velocity['14d'] > 0 ? '+' : '') + detail.velocity['14d']"></strong></span>
+                            <span class="velocity-delta">30d: <strong x-text="(detail.velocity['30d'] > 0 ? '+' : '') + detail.velocity['30d']"></strong></span>
+                          </div>
+                        </template>
+                        <!-- Dimension Bars -->
+                        <div class="dimension-grid">
+                          <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
+                            <div class="dimension-row">
+                              <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
+                              <div class="dimension-bar-bg">
+                                <div class="dimension-bar-fill"
+                                     :style="'width:' + Math.min(100, Math.max(0, (typeof score === 'object' ? (score.score || 0) : score))) + '%'"
+                                     :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'bar-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'bar-medium' : 'bar-low'">
+                                </div>
+                              </div>
+                              <span class="dimension-score" x-text="typeof score === 'object' ? (score.score || 0) : score"></span>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <div x-show="!detail || !detail.dimension_scores || Object.keys(detail.dimension_scores).length === 0" class="empty">No dimension scores available. Run scoring pipeline first.</div>
                   </div>
 
                   <!-- Signals Tab -->
@@ -141,6 +177,39 @@
                       </div>
                     </template>
                     <div x-show="!detail || !detail.signals || detail.signals.length === 0" class="empty">No signals detected</div>
+                  </div>
+
+                  <!-- Timeline Tab -->
+                  <div x-show="dtab==='timeline'">
+                    <div class="timeline-filters" style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+                      <input type="text" class="search-input" style="flex:0 0 160px;min-width:120px" placeholder="Signal code..." x-model="timelineSignalCode">
+                      <input type="text" class="search-input" style="flex:0 0 140px;min-width:100px" placeholder="Source..." x-model="timelineSource">
+                      <button class="btn btn-blue btn-sm" @click="loadTimeline(acc.account_id)">Filter</button>
+                      <button class="btn btn-sm" @click="timelineSignalCode=''; timelineSource=''; loadTimeline(acc.account_id)">Clear</button>
+                      <span class="timeline-total" style="font-size:12px;color:var(--text-muted)" x-text="'Total: ' + timelineTotal"></span>
+                    </div>
+                    <template x-if="timelineItems && timelineItems.length > 0">
+                      <div>
+                        <template x-for="item in timelineItems" :key="item.observed_at + item.signal_code">
+                          <div class="signal-card">
+                            <span class="signal-code" x-text="item.signal_code"></span>
+                            <span class="signal-pts" x-text="item.observed_at"></span>
+                            <div class="signal-evidence" x-text="item.evidence_text"></div>
+                            <div class="signal-meta">
+                              source: <span x-text="item.source"></span>
+                              | confidence: <span x-text="Number(item.confidence || 0).toFixed(2)"></span>
+                              <template x-if="item.evidence_url">
+                                <span> | <a class="signal-url" :href="item.evidence_url" target="_blank" x-text="item.evidence_url"></a></span>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                        <div style="margin-top:12px;display:flex;gap:8px;justify-content:center" x-show="timelineTotal > timelineItems.length">
+                          <button class="btn btn-sm" @click="timelineOffset += 50; loadTimeline(acc.account_id, true)">Load More</button>
+                        </div>
+                      </div>
+                    </template>
+                    <div x-show="!timelineItems || timelineItems.length === 0" class="empty">No signal observations found.</div>
                   </div>
 
                   <!-- Research Tab -->

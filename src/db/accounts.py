@@ -423,14 +423,14 @@ def get_accounts_paginated(
 
 
 def get_account_detail(conn, account_id: str) -> dict | None:
-    """Full account detail with scores, signals, research, contacts, labels."""
+    """Full account detail with scores, signals, research, contacts, labels, dimensions, velocity."""
     account = conn.execute("SELECT * FROM accounts WHERE account_id = %s", (account_id,)).fetchone()
     if not account:
         return None
     result = dict(account)
 
     scores = conn.execute(
-        "SELECT product, score, tier FROM account_scores WHERE account_id = %s ORDER BY score DESC",
+        "SELECT product, score, tier, dimension_scores_json FROM account_scores WHERE account_id = %s ORDER BY score DESC",
         (account_id,),
     ).fetchall()
     result["scores"] = [dict(r) for r in scores]
@@ -445,4 +445,147 @@ def get_account_detail(conn, account_id: str) -> dict | None:
     result["research"] = get_company_research(conn, account_id)
     result["contacts"] = get_contacts_for_account(conn, account_id)
     result["labels"] = get_labels_for_account(conn, account_id)
+
+    # Dimension scores from the highest-scoring product row
+    result["dimension_scores"] = get_dimension_scores(conn, account_id)
+
+    # Velocity metrics
+    result["velocity"] = get_account_velocity(conn, account_id)
+
     return result
+
+
+def get_dimension_scores(conn, account_id: str) -> dict:
+    """Parse dimension_scores_json from the latest highest-scoring row for this account."""
+    row = conn.execute(
+        """
+        SELECT s.dimension_scores_json
+        FROM account_scores s
+        JOIN score_runs r ON s.run_id = r.run_id
+        WHERE s.account_id = %s
+        ORDER BY r.started_at DESC, s.score DESC
+        LIMIT 1
+        """,
+        (account_id,),
+    ).fetchone()
+    if not row:
+        return {}
+    raw = str(row["dimension_scores_json"] or "{}").strip()
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def get_account_velocity(conn, account_id: str) -> dict:
+    """Compute 7d, 14d, 30d score deltas and classify the trend."""
+    rows = conn.execute(
+        """
+        SELECT s.score, r.run_date
+        FROM account_scores s
+        JOIN score_runs r ON s.run_id = r.run_id
+        WHERE s.account_id = %s
+          AND r.status = 'completed'
+        ORDER BY r.run_date DESC, s.score DESC
+        """,
+        (account_id,),
+    ).fetchall()
+
+    if not rows:
+        return {"7d": 0.0, "14d": 0.0, "30d": 0.0, "category": "stable"}
+
+    # Use the most recent score as the current score
+    current_score = float(rows[0]["score"])
+    current_date_str = str(rows[0]["run_date"])
+
+    try:
+        current_date = date.fromisoformat(current_date_str[:10])
+    except (ValueError, TypeError):
+        return {"7d": 0.0, "14d": 0.0, "30d": 0.0, "category": "stable"}
+
+    def _find_score_at_offset(days: int) -> float | None:
+        from datetime import timedelta
+
+        target = current_date - timedelta(days=days)
+        best = None
+        best_diff = None
+        for r in rows:
+            try:
+                rd = date.fromisoformat(str(r["run_date"])[:10])
+            except (ValueError, TypeError):
+                continue
+            diff = abs((rd - target).days)
+            if diff <= 3 and (best_diff is None or diff < best_diff):
+                best = float(r["score"])
+                best_diff = diff
+        return best
+
+    d7 = _find_score_at_offset(7)
+    d14 = _find_score_at_offset(14)
+    d30 = _find_score_at_offset(30)
+
+    delta_7d = round(current_score - d7, 2) if d7 is not None else 0.0
+    delta_14d = round(current_score - d14, 2) if d14 is not None else 0.0
+    delta_30d = round(current_score - d30, 2) if d30 is not None else 0.0
+
+    # Classify trend based on 7d delta
+    if delta_7d > 2.0:
+        category = "accelerating"
+    elif delta_7d < -2.0:
+        category = "decelerating"
+    else:
+        category = "stable"
+
+    return {"7d": delta_7d, "14d": delta_14d, "30d": delta_30d, "category": category}
+
+
+def get_signal_timeline(
+    conn,
+    account_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    signal_code: str = "",
+    source: str = "",
+    date_from: str = "",
+    date_to: str = "",
+) -> tuple[list[dict], int]:
+    """Return paginated signal observations for an account with optional filters."""
+    where_parts = ["account_id = %s"]
+    params: list = [account_id]
+
+    if signal_code:
+        where_parts.append("signal_code = %s")
+        params.append(signal_code)
+    if source:
+        where_parts.append("source = %s")
+        params.append(source)
+    if date_from:
+        where_parts.append("observed_at >= %s")
+        params.append(date_from)
+    if date_to:
+        where_parts.append("observed_at <= %s")
+        params.append(date_to)
+
+    where_sql = " AND ".join(where_parts)
+
+    count_row = conn.execute(
+        f"SELECT COUNT(*) AS total FROM signal_observations WHERE {where_sql}",
+        params,
+    ).fetchone()
+    total = int(count_row["total"]) if count_row else 0
+
+    data_params = list(params) + [max(1, min(limit, 200)), max(0, offset)]
+    rows = conn.execute(
+        f"""
+        SELECT signal_code, source, evidence_url, evidence_text, observed_at,
+               confidence, source_reliability, product
+        FROM signal_observations
+        WHERE {where_sql}
+        ORDER BY observed_at DESC
+        LIMIT %s OFFSET %s
+        """,
+        data_params,
+    ).fetchall()
+
+    return [dict(r) for r in rows], total

@@ -91,6 +91,42 @@ def get_account(account_id: str):
         conn.close()
 
 
+@router.get("/accounts/{account_id}/timeline")
+def get_account_timeline(
+    account_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    signal_code: str = Query(""),
+    source: str = Query(""),
+    date_from: str = Query(""),
+    date_to: str = Query(""),
+):
+    """Return paginated signal timeline for an account with optional filters."""
+    conn = _get_conn()
+    try:
+        if not db.account_exists(conn, account_id):
+            return {"error": "not found"}, 404
+        items, total = db.get_signal_timeline(
+            conn,
+            account_id,
+            limit=limit,
+            offset=offset,
+            signal_code=signal_code,
+            source=source,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        _serialize_dates(items)
+        return {
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+    finally:
+        conn.close()
+
+
 def _serialize_dates(obj):
     if isinstance(obj, dict):
         for k, v in obj.items():

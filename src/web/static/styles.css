@@ -192,6 +192,31 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .pagination { display: flex; gap: 4px; justify-content: center; margin-top: 16px; align-items: center; }
 .pagination .info { font-size: 12px; color: var(--text-muted); margin: 0 12px; }
 
+/* Dimension Scores */
+.dimension-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.dimension-row { display: flex; align-items: center; gap: 12px; }
+.dimension-label { width: 140px; font-size: 12px; color: var(--text-muted); text-transform: capitalize; flex-shrink: 0; }
+.dimension-bar-bg { flex: 1; height: 20px; background: var(--border-light); border-radius: 4px; overflow: hidden; }
+.dimension-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; min-width: 2px; }
+.dimension-bar-fill.bar-high { background: var(--green); }
+.dimension-bar-fill.bar-medium { background: var(--orange); }
+.dimension-bar-fill.bar-low { background: var(--text-muted); }
+.dimension-score { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text-bright); width: 36px; text-align: right; }
+
+/* Velocity Banner */
+.velocity-banner {
+  display: flex; gap: 16px; align-items: center; padding: 10px 14px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px;
+}
+.velocity-category {
+  font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px;
+}
+.velocity-accelerating { background: #23863633; color: var(--green); }
+.velocity-decelerating { background: #f8514933; color: var(--red); }
+.velocity-stable { background: var(--border-light); color: var(--text-muted); }
+.velocity-delta { font-size: 12px; color: var(--text-muted); }
+.velocity-delta strong { color: var(--text); }
+
 /* Empty state */
 .empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
 
