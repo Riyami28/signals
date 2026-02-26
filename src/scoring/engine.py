@@ -110,6 +110,23 @@ def classify_velocity(velocity_7d: float) -> VelocityCategory:
     return "stable"
 
 
+def classify_velocity(velocity_7d: float) -> VelocityCategory:
+    """Classify velocity based on 7-day score change.
+
+    Surging:       velocity_7d > +20
+    Accelerating:  velocity_7d > +10
+    Decelerating:  velocity_7d < -5
+    Stable:        -5 <= velocity_7d <= +10
+    """
+    if velocity_7d > 20:
+        return "surging"
+    if velocity_7d > 10:
+        return "accelerating"
+    if velocity_7d < -5:
+        return "decelerating"
+    return "stable"
+
+
 def classify_confidence_band(distinct_source_count: int) -> str:
     """Classify confidence band based on source diversity.
 
@@ -392,6 +409,25 @@ def run_scoring(
             if a_id == account_id and prod == product:
                 dim_bands[dim] = classify_confidence_band(len(sources))
         conf_band = overall_confidence_band(dim_bands)
+
+        # Compute per-dimension confidence bands
+        dim_bands: dict[str, str] = {}
+        for (a_id, prod, dim), sources in dimension_sources.items():
+            if a_id == account_id and prod == product:
+                dim_bands[dim] = classify_confidence_band(len(sources))
+        conf_band = overall_confidence_band(dim_bands)
+
+        if velocity_lookup:
+            v7, v14, v30 = velocity_lookup(account_id, product, total_score)
+            vel_7d = round(v7, 2)
+            vel_14d = round(v14, 2)
+            vel_30d = round(v30, 2)
+        else:
+            vel_7d = delta
+            vel_14d = 0.0
+            vel_30d = 0.0
+
+        vel_cat = classify_velocity(vel_7d)
 
         # Compute per-dimension confidence bands
         dim_bands: dict[str, str] = {}

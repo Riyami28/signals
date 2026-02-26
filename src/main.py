@@ -6,6 +6,7 @@ This file registers Typer commands and delegates to those modules.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -252,7 +253,7 @@ def _bootstrap(settings: Optional[Settings] = None):
     return local_settings, conn, seeded
 
 
-def _collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
+async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, int]]:
     lexicon = load_keyword_lexicon(settings.keyword_lexicon_path)
     source_reliability = load_source_registry(settings.source_registry_path)
     execution_policy = load_source_execution_policy(settings.source_execution_policy_path)

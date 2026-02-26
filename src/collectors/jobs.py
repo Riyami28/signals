@@ -1,19 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
+import httpx
 from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src import db
-from src.http_client import get as http_get
+from src.http_client import async_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import (
@@ -43,9 +43,8 @@ def _emit_progress(message: str) -> None:
         print(message, flush=True)
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True)
-def _request(url: str, settings: Settings) -> requests.Response:
-    return http_get(url, settings)
+async def _async_request(url: str, settings: Settings, client: httpx.AsyncClient) -> httpx.Response:
+    return await async_get(url, settings, client=client)
 
 
 def _today_start_iso() -> str:
@@ -208,7 +207,7 @@ def _derive_slug_candidates(domain: str) -> list[str]:
     return result[:3]
 
 
-def _collect_greenhouse(
+async def _collect_greenhouse(
     conn,
     account_id: str,
     domain: str,
@@ -216,6 +215,7 @@ def _collect_greenhouse(
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
     source_reliability: dict[str, float],
+    client: httpx.AsyncClient,
 ) -> tuple[int, int]:
     source = "greenhouse_api"
     reliability = source_reliability.get(source, 0.8)
@@ -250,7 +250,7 @@ def _collect_greenhouse(
             )
             continue
         try:
-            response = _request(url, settings)
+            response = await _async_request(url, settings, client)
             if response.status_code >= 400:
                 db.record_crawl_attempt(
                     conn,
@@ -324,7 +324,7 @@ def _collect_greenhouse(
     return inserted_total, seen_total
 
 
-def _collect_lever(
+async def _collect_lever(
     conn,
     account_id: str,
     domain: str,
@@ -332,6 +332,7 @@ def _collect_lever(
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
     source_reliability: dict[str, float],
+    client: httpx.AsyncClient,
 ) -> tuple[int, int]:
     source = "lever_api"
     reliability = source_reliability.get(source, 0.8)
@@ -367,7 +368,7 @@ def _collect_lever(
             )
             continue
         try:
-            response = _request(url, settings)
+            response = await _async_request(url, settings, client)
             if response.status_code >= 400:
                 db.record_crawl_attempt(
                     conn,
@@ -446,7 +447,7 @@ def _collect_lever(
     return inserted_total, seen_total
 
 
-def _collect_careers_pages(
+async def _collect_careers_pages(
     conn,
     account_id: str,
     domain: str,
@@ -454,6 +455,7 @@ def _collect_careers_pages(
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
     source_reliability: dict[str, float],
+    client: httpx.AsyncClient,
 ) -> tuple[int, int]:
     source = "careers_live"
     reliability = source_reliability.get(source, 0.65)
@@ -466,10 +468,8 @@ def _collect_careers_pages(
     website_url = row.get("website_url", "").strip()
     homepage_url = website_url or f"https://{domain}"
 
-    # Discover careers links from homepage nav/footer for enterprise sites that
-    # don't expose /careers or /jobs directly.
     try:
-        homepage_response = _request(homepage_url, settings)
+        homepage_response = await _async_request(homepage_url, settings, client)
         if homepage_response.status_code >= 400:
             db.record_crawl_attempt(
                 conn,
@@ -540,7 +540,7 @@ def _collect_careers_pages(
             continue
 
         try:
-            response = _request(normalized_url, settings)
+            response = await _async_request(normalized_url, settings, client)
             if response.status_code >= 400:
                 db.record_crawl_attempt(
                     conn,
@@ -604,13 +604,14 @@ def _collect_careers_pages(
     return inserted_total, seen_total
 
 
-def _collect_ashby(
+async def _collect_ashby(
     conn,
     account_id: str,
     domain: str,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
     source_reliability: dict[str, float],
+    client: httpx.AsyncClient,
 ) -> tuple[int, int]:
     source = "ashby_api"
     reliability = source_reliability.get(source, 0.25)
@@ -626,7 +627,7 @@ def _collect_ashby(
         if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=url):
             continue
         try:
-            response = _request(url, settings)
+            response = await _async_request(url, settings, client)
             db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
             if response.status_code >= 400:
                 continue
@@ -661,13 +662,14 @@ def _collect_ashby(
     return inserted_total, seen_total
 
 
-def _collect_workday(
+async def _collect_workday(
     conn,
     account_id: str,
     domain: str,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
     source_reliability: dict[str, float],
+    client: httpx.AsyncClient,
 ) -> tuple[int, int]:
     source = "workday_api"
     reliability = source_reliability.get(source, 0.25)
@@ -685,7 +687,7 @@ def _collect_workday(
             if db.was_crawled_today(conn, source=source, account_id=account_id, endpoint=url):
                 continue
             try:
-                response = _request(url, settings)
+                response = await _async_request(url, settings, client)
                 db.mark_crawled(conn, source=source, account_id=account_id, endpoint=url, commit=False)
                 if response.status_code >= 400:
                     continue
@@ -722,7 +724,7 @@ def _collect_workday(
     return inserted_total, seen_total
 
 
-def _process_live_account(
+async def _process_live_account(
     conn,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
@@ -730,6 +732,7 @@ def _process_live_account(
     handles: dict[str, dict[str, str]],
     account: dict[str, Any],
     account_index: int,
+    client: httpx.AsyncClient,
 ) -> tuple[int, int, int]:
     account_id = str(account["account_id"])
     domain = str(account["domain"])
@@ -739,7 +742,7 @@ def _process_live_account(
     _emit_progress(f"collector=jobs_live status=account_started account_index={account_index} domain={domain}")
     row = handles.get(domain, {"domain": domain, "company_name": str(account["company_name"] or domain)})
 
-    gh_inserted, gh_seen = _collect_greenhouse(
+    gh_inserted, gh_seen = await _collect_greenhouse(
         conn,
         account_id,
         domain,
@@ -747,8 +750,9 @@ def _process_live_account(
         settings,
         lexicon_rows,
         source_reliability,
+        client,
     )
-    lever_inserted, lever_seen = _collect_lever(
+    lever_inserted, lever_seen = await _collect_lever(
         conn,
         account_id,
         domain,
@@ -756,29 +760,32 @@ def _process_live_account(
         settings,
         lexicon_rows,
         source_reliability,
+        client,
     )
 
     ashby_inserted, ashby_seen = (0, 0)
     workday_inserted, workday_seen = (0, 0)
     if settings.auto_discover_job_handles:
-        ashby_inserted, ashby_seen = _collect_ashby(
+        ashby_inserted, ashby_seen = await _collect_ashby(
             conn,
             account_id,
             domain,
             settings,
             lexicon_rows,
             source_reliability,
+            client,
         )
-        workday_inserted, workday_seen = _collect_workday(
+        workday_inserted, workday_seen = await _collect_workday(
             conn,
             account_id,
             domain,
             settings,
             lexicon_rows,
             source_reliability,
+            client,
         )
 
-    careers_inserted, careers_seen = _collect_careers_pages(
+    careers_inserted, careers_seen = await _collect_careers_pages(
         conn,
         account_id,
         domain,
@@ -786,6 +793,7 @@ def _process_live_account(
         settings,
         lexicon_rows,
         source_reliability,
+        client,
     )
 
     inserted_delta = gh_inserted + lever_inserted + ashby_inserted + workday_inserted + careers_inserted
@@ -797,7 +805,7 @@ def _process_live_account(
     return inserted_delta, seen_delta, 1
 
 
-def _collect_live_jobs_parallel(
+async def _collect_live_jobs_async(
     conn,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
@@ -809,31 +817,16 @@ def _collect_live_jobs_parallel(
     if not accounts:
         return 0, 0
 
-    workers = min(max(1, int(settings.live_workers_per_source)), len(accounts))
-    if workers <= 1:
+    concurrency = min(max(1, int(settings.live_workers_per_source)), len(accounts))
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async with httpx.AsyncClient(
+        headers={"User-Agent": settings.http_user_agent},
+        follow_redirects=True,
+        timeout=settings.http_timeout_seconds,
+    ) as client:
         inserted_total = 0
         seen_total = 0
-        processed_accounts = 0
-        for idx, account in enumerate(accounts, start=1):
-            inserted_delta, seen_delta, processed = _process_live_account(
-                conn=conn,
-                settings=settings,
-                lexicon_rows=lexicon_rows,
-                source_reliability=source_reliability,
-                handles=handles,
-                account=account,
-                account_index=idx,
-            )
-            inserted_total += inserted_delta
-            seen_total += seen_delta
-            processed_accounts += processed
-            if processed_accounts and processed_accounts % _LIVE_PROGRESS_COMMIT_EVERY == 0:
-                conn.commit()
-                _emit_progress(
-                    f"collector=jobs_live status=checkpoint committed_accounts={processed_accounts} "
-                    f"inserted_total={inserted_total} seen_total={seen_total}"
-                )
-        return inserted_total, seen_total
 
     conn.commit()
     indexed_accounts = list(enumerate(accounts, start=1))
@@ -856,7 +849,8 @@ def _collect_live_jobs_parallel(
                     source_reliability=source_reliability,
                     handles=handles,
                     account=account,
-                    account_index=account_index,
+                    account_index=idx,
+                    client=client,
                 )
                 worker_inserted += inserted_delta
                 worker_seen += seen_delta
@@ -894,7 +888,7 @@ def _collect_live_jobs_parallel(
     return inserted_total, seen_total
 
 
-def collect(
+async def collect(
     conn,
     settings: Settings,
     lexicon_by_source: dict[str, list[dict[str, str]]],
@@ -964,7 +958,7 @@ def collect(
             f"collector=jobs_live status=started accounts={len(accounts)} workers={settings.live_workers_per_source}"
         )
         handles = load_account_source_handles(settings.account_source_handles_path)
-        live_inserted, live_seen = _collect_live_jobs_parallel(
+        live_inserted, live_seen = await _collect_live_jobs_async(
             conn=conn,
             settings=settings,
             lexicon_rows=lexicon_rows,

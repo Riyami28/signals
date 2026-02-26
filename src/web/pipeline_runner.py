@@ -91,9 +91,11 @@ def _run_pipeline_sync(
                     policy = exec_policy.get(policy_key.strip().lower())
                     return bool(policy.enabled) if policy is not None else True
 
+                import asyncio as _asyncio
+
                 total_inserted = 0
 
-                # First-party signals
+                # First-party signals (sync — no HTTP)
                 _emit(queue, {"type": "log", "stage": "ingest", "message": "Ingesting first-party signals..."})
                 if _collector_enabled("first_party_csv"):
                     fp_result = first_party.collect(conn, settings, keyword_lexicon, source_registry)
@@ -107,30 +109,30 @@ def _run_pipeline_sync(
                         },
                     )
 
-                # Jobs
+                # Jobs (async)
                 if _collector_enabled("jobs_pages"):
                     _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting job signals..."})
-                    j_result = jobs.collect(conn, settings, keyword_lexicon, source_registry)
+                    j_result = _asyncio.run(jobs.collect(conn, settings, keyword_lexicon, source_registry))
                     total_inserted += j_result.get("inserted", 0)
                     _emit(
                         queue,
                         {"type": "log", "stage": "ingest", "message": f"Jobs: {j_result.get('inserted', 0)} signals"},
                     )
 
-                # News
+                # News (async)
                 if _collector_enabled("news_rss"):
                     _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting news signals..."})
-                    n_result = news.collect(conn, settings, keyword_lexicon, source_registry)
+                    n_result = _asyncio.run(news.collect(conn, settings, keyword_lexicon, source_registry))
                     total_inserted += n_result.get("inserted", 0)
                     _emit(
                         queue,
                         {"type": "log", "stage": "ingest", "message": f"News: {n_result.get('inserted', 0)} signals"},
                     )
 
-                # Technographics
+                # Technographics (async)
                 if _collector_enabled("technographics"):
                     _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting technographics signals..."})
-                    t_result = technographics.collect(conn, settings, keyword_lexicon, source_registry)
+                    t_result = _asyncio.run(technographics.collect(conn, settings, keyword_lexicon, source_registry))
                     total_inserted += t_result.get("inserted", 0)
                     _emit(
                         queue,

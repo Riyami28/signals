@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-import requests
+import httpx
 from bs4 import BeautifulSoup
-from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src import db
-from src.http_client import get as http_get
+from src.http_client import async_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import classify_text, load_csv_rows, stable_hash, utc_now_iso
@@ -43,9 +41,8 @@ def _emit_progress(message: str) -> None:
         print(message, flush=True)
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True)
-def _fetch_page_profile(url: str, settings: Settings) -> tuple[str, list[str]]:
-    response = http_get(url, settings)
+async def _fetch_page_profile(url: str, settings: Settings, client: httpx.AsyncClient) -> tuple[str, list[str]]:
+    response = await async_get(url, settings, client=client)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -125,7 +122,7 @@ def _build_observation(
     )
 
 
-def _collect_live_technographics_account(
+async def _collect_live_technographics_account(
     conn,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
@@ -133,6 +130,7 @@ def _collect_live_technographics_account(
     account_index: int,
     scan_source: str,
     scan_reliability: float,
+    client: httpx.AsyncClient,
 ) -> tuple[int, int, int]:
     account_id = str(account["account_id"])
     domain = str(account["domain"])
@@ -167,8 +165,8 @@ def _collect_live_technographics_account(
             continue
 
         try:
-            page_text, discovered_links = _fetch_page_profile(url, settings)
-        except requests.HTTPError as exc:
+            page_text, discovered_links = await _fetch_page_profile(url, settings, client)
+        except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code if exc.response is not None else 0
             db.record_crawl_attempt(
                 conn,
@@ -235,7 +233,7 @@ def _collect_live_technographics_account(
     return inserted_delta, seen_delta, 1
 
 
-def _collect_live_technographics_parallel(
+async def _collect_live_technographics_async(
     conn,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
@@ -247,31 +245,16 @@ def _collect_live_technographics_parallel(
     if not accounts:
         return 0, 0
 
-    workers = min(max(1, int(settings.live_workers_per_source)), len(accounts))
-    if workers <= 1:
+    concurrency = min(max(1, int(settings.live_workers_per_source)), len(accounts))
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async with httpx.AsyncClient(
+        headers={"User-Agent": settings.http_user_agent},
+        follow_redirects=True,
+        timeout=settings.http_timeout_seconds,
+    ) as client:
         inserted_total = 0
         seen_total = 0
-        processed = 0
-        for idx, account in enumerate(accounts, start=1):
-            inserted_delta, seen_delta, processed_delta = _collect_live_technographics_account(
-                conn=conn,
-                settings=settings,
-                lexicon_rows=lexicon_rows,
-                account=account,
-                account_index=idx,
-                scan_source=scan_source,
-                scan_reliability=scan_reliability,
-            )
-            inserted_total += inserted_delta
-            seen_total += seen_delta
-            processed += processed_delta
-            if processed and processed % _LIVE_PROGRESS_COMMIT_EVERY == 0:
-                conn.commit()
-                _emit_progress(
-                    f"collector=technographics_live status=checkpoint committed_accounts={processed} "
-                    f"inserted_total={inserted_total} seen_total={seen_total}"
-                )
-        return inserted_total, seen_total
 
     conn.commit()
     indexed_accounts = list(enumerate(accounts, start=1))
@@ -292,9 +275,10 @@ def _collect_live_technographics_parallel(
                     settings=settings,
                     lexicon_rows=lexicon_rows,
                     account=account,
-                    account_index=account_index,
+                    account_index=idx,
                     scan_source=scan_source,
                     scan_reliability=scan_reliability,
+                    client=client,
                 )
                 worker_inserted += inserted_delta
                 worker_seen += seen_delta
@@ -332,7 +316,7 @@ def _collect_live_technographics_parallel(
     return inserted_total, seen_total
 
 
-def collect(
+async def collect(
     conn,
     settings: Settings,
     lexicon_by_source: dict[str, list[dict[str, str]]],
@@ -403,7 +387,7 @@ def collect(
         _emit_progress(
             f"collector=technographics_live status=started accounts={len(accounts)} workers={settings.live_workers_per_source}"
         )
-        live_inserted, live_seen = _collect_live_technographics_parallel(
+        live_inserted, live_seen = await _collect_live_technographics_async(
             conn=conn,
             settings=settings,
             lexicon_rows=lexicon_rows,

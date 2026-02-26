@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote_plus
 
 import feedparser
-import requests
-from tenacity import retry, stop_after_attempt, wait_fixed
+import httpx
 
 from src import db
-from src.http_client import get as http_get
+from src.http_client import async_get
 from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import (
@@ -37,9 +36,8 @@ def _emit_progress(message: str) -> None:
         print(message, flush=True)
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True)
-def _request_text(url: str, settings: Settings) -> str:
-    response = http_get(url, settings)
+async def _async_request_text(url: str, settings: Settings, client: httpx.AsyncClient) -> str:
+    response = await async_get(url, settings, client=client)
     response.raise_for_status()
     return response.text
 
@@ -137,7 +135,7 @@ def _ingest_entries(
     return inserted, seen
 
 
-def _collect_live_reddit_account(
+async def _collect_live_reddit_account(
     conn,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
@@ -146,6 +144,7 @@ def _collect_live_reddit_account(
     handles: dict[str, dict[str, str]],
     rss_source: str,
     rss_reliability: float,
+    client: httpx.AsyncClient,
 ) -> tuple[int, int, int]:
     domain = str(account["domain"])
     if domain.endswith(".example"):
@@ -172,9 +171,9 @@ def _collect_live_reddit_account(
         return 0, 0, 1
 
     try:
-        xml_text = _request_text(rss_url, settings)
+        xml_text = await _async_request_text(rss_url, settings, client)
         parsed = feedparser.parse(xml_text)
-    except requests.HTTPError as exc:
+    except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code if exc.response is not None else 0
         db.record_crawl_attempt(
             conn,
@@ -227,7 +226,7 @@ def _collect_live_reddit_account(
     return inserted_delta, seen_delta, 1
 
 
-def _collect_live_reddit_parallel(
+async def _collect_live_reddit_async(
     conn,
     settings: Settings,
     lexicon_rows: list[dict[str, str]],
@@ -240,32 +239,16 @@ def _collect_live_reddit_parallel(
     if not accounts:
         return 0, 0
 
-    workers = min(max(1, int(settings.live_workers_per_source)), len(accounts))
-    if workers <= 1:
+    concurrency = min(max(1, int(settings.live_workers_per_source)), len(accounts))
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async with httpx.AsyncClient(
+        headers={"User-Agent": settings.http_user_agent},
+        follow_redirects=True,
+        timeout=settings.http_timeout_seconds,
+    ) as client:
         inserted_total = 0
         seen_total = 0
-        processed = 0
-        for idx, account in enumerate(accounts, start=1):
-            inserted_delta, seen_delta, processed_delta = _collect_live_reddit_account(
-                conn=conn,
-                settings=settings,
-                lexicon_rows=lexicon_rows,
-                account=account,
-                account_index=idx,
-                handles=handles,
-                rss_source=rss_source,
-                rss_reliability=rss_reliability,
-            )
-            inserted_total += inserted_delta
-            seen_total += seen_delta
-            processed += processed_delta
-            if processed and processed % _LIVE_PROGRESS_COMMIT_EVERY == 0:
-                conn.commit()
-                _emit_progress(
-                    f"collector=community_live status=checkpoint committed_accounts={processed} "
-                    f"inserted_total={inserted_total} seen_total={seen_total}"
-                )
-        return inserted_total, seen_total
 
     conn.commit()
     indexed_accounts = list(enumerate(accounts, start=1))
@@ -286,10 +269,11 @@ def _collect_live_reddit_parallel(
                     settings=settings,
                     lexicon_rows=lexicon_rows,
                     account=account,
-                    account_index=account_index,
+                    account_index=idx,
                     handles=handles,
                     rss_source=rss_source,
                     rss_reliability=rss_reliability,
+                    client=client,
                 )
                 worker_inserted += inserted_delta
                 worker_seen += seen_delta
@@ -327,7 +311,7 @@ def _collect_live_reddit_parallel(
     return inserted_total, seen_total
 
 
-def collect(
+async def collect(
     conn,
     settings: Settings,
     lexicon_by_source: dict[str, list[dict[str, str]]],
@@ -400,7 +384,7 @@ def collect(
             conn.commit()
             return {"inserted": inserted, "seen": seen}
 
-        live_inserted, live_seen = _collect_live_reddit_parallel(
+        live_inserted, live_seen = await _collect_live_reddit_async(
             conn=conn,
             settings=settings,
             lexicon_rows=lexicon_rows,
