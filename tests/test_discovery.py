@@ -23,7 +23,7 @@ def _bootstrap_core_config(root: Path) -> None:
         root / "config" / "source_registry.csv",
         "source,reliability,enabled\ntechnographics_csv,0.8,true\nhuginn_webhook,0.9,true\nfirst_party_csv,0.9,true\n",
     )
-    _write(root / "config" / "thresholds.csv", "key,value\nhigh,20\nmedium,10\nlow,0\n")
+    _write(root / "config" / "thresholds.csv", "key,value\ntier_1,20\ntier_2,10\ntier_3,10\ntier_4,0\n")
     _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,20\nmedium,10\nexplore,6\nlow,0\n")
     _write(
         root / "config" / "signal_registry.csv",

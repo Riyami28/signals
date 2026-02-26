@@ -69,7 +69,7 @@ def test_suggest_thresholds_for_run_targets_requested_icp_coverage(tmp_path: Pat
         reference_csv_path=reference_path,
         medium_target_coverage=0.6,
         high_target_coverage=0.2,
-        current_thresholds=Thresholds(high=70.0, medium=45.0, low=0.0),
+        current_thresholds=Thresholds(tier_1=70.0, tier_2=45.0, tier_3=20.0, tier_4=0.0),
     )
 
     assert suggestion.high == 100.0
@@ -82,12 +82,13 @@ def test_suggest_thresholds_for_run_targets_requested_icp_coverage(tmp_path: Pat
 
 def test_write_thresholds_persists_csv(tmp_path: Path):
     path = tmp_path / "thresholds.csv"
-    calibration.write_thresholds(path, high=12.34, medium=5.67, low=0.0)
+    calibration.write_thresholds(path, tier_1=12.34, tier_2=5.67, tier_3=5.67, tier_4=0.0)
     rows = load_csv_rows(path)
     assert rows == [
-        {"key": "high", "value": "12.34"},
-        {"key": "medium", "value": "5.67"},
-        {"key": "low", "value": "0.0"},
+        {"key": "tier_1", "value": "12.34"},
+        {"key": "tier_2", "value": "5.67"},
+        {"key": "tier_3", "value": "5.67"},
+        {"key": "tier_4", "value": "0.0"},
     ]
 
 
@@ -169,7 +170,7 @@ def test_suggest_profile_for_run_balances_icp_and_non_icp(tmp_path: Path):
         max_non_icp_medium_hit_rate=0.5,
         max_non_icp_high_hit_rate=0.2,
         min_scenario_pass_rate=0.9,
-        current_thresholds=Thresholds(high=70.0, medium=45.0, low=0.0),
+        current_thresholds=Thresholds(tier_1=70.0, tier_2=45.0, tier_3=20.0, tier_4=0.0),
     )
 
     assert suggestion.constraints_satisfied is True

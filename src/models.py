@@ -59,7 +59,13 @@ class AccountScore(BaseModel):
     tier_v2: Literal["tier_1", "tier_2", "tier_3", "tier_4"] = "tier_4"
     top_reasons_json: str
     delta_7d: float
+    velocity_7d: float = 0.0
+    velocity_14d: float = 0.0
+    velocity_30d: float = 0.0
+    velocity_category: Literal["surging", "accelerating", "stable", "decelerating"] = "stable"
+    confidence_band: Literal["high", "medium", "low"] = "low"
     dimension_scores_json: str = "{}"
+    dimension_confidence_json: str = "{}"
 
 
 class ReviewLabel(BaseModel):

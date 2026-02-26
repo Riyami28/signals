@@ -20,9 +20,11 @@ from typing import Optional
 import typer
 
 from src import db
+from src.collectors import community, first_party, jobs, news, technographics
 from src.discovery import hunt as hunt_pipeline
 from src.discovery import pipeline as discovery_pipeline
 from src.discovery import watchlist_builder
+from src.discovery.config import classify_signal, load_account_profiles, load_discovery_blocklist, load_signal_classes
 from src.export import csv_exporter
 from src.integrations.zoho_dedup import ZohoCRMDedupClient, check_crm_dedup
 from src.logging_config import configure_logging
@@ -32,7 +34,9 @@ from src.pipeline.autonomous import execute_retry_task, run_autonomous_loop_impl
 from src.pipeline.daily import run_daily_impl, run_hunt_cycle, run_score_cycle
 from src.pipeline.export import persist_ops_metrics, run_exports, write_icp_coverage_report
 from src.pipeline.helpers import (
+    _AUTONOMOUS_LOCK_NAME,
     _RETRY_BACKOFF_SECONDS,
+    _RUN_DAILY_LOCK_NAME,
     bootstrap,
     retry_due_iso,
     review_queue_excluded_domains,
@@ -44,9 +48,17 @@ from src.reporting.evals import OutputQualityBar, evaluate_run_output_quality
 from src.reporting.improvement import run_threshold_self_improvement
 from src.research.orchestrator import run_research_stage
 from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
-from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
+from src.scoring.engine import classify_velocity, run_scoring
+from src.scoring.rules import (
+    load_dimension_weights,
+    load_keyword_lexicon,
+    load_signal_rules,
+    load_source_registry,
+    load_thresholds,
+)
 from src.server import serve_discovery_webhook_impl, serve_local_ui_impl, serve_web_impl
-from src.settings import load_settings
+from src.settings import Settings, load_settings
+from src.source_policy import load_source_execution_policy
 from src.sync.google_sheets import sync_outputs
 from src.sync.zoho_push import run_zoho_push
 from src.utils import ensure_project_directories, load_csv_rows, normalize_domain, parse_date, write_csv_rows
@@ -262,22 +274,22 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     try:
         results: dict[str, dict[str, int]] = {}
         results["jobs"] = (
-            jobs.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            await jobs.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
             if _collector_enabled("jobs_pages")
             else {"inserted": 0, "seen": 0}
         )
         results["news"] = (
-            news.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            await news.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
             if _collector_enabled("news_rss")
             else {"inserted": 0, "seen": 0}
         )
         results["technographics"] = (
-            technographics.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            await technographics.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
             if _collector_enabled("technographics")
             else {"inserted": 0, "seen": 0}
         )
         results["community"] = (
-            community.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            await community.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
             if _collector_enabled("reddit_api")
             else {"inserted": 0, "seen": 0}
         )
@@ -291,6 +303,11 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
         if pool is not None:
             pool.close()
             logger.info("db_pool_closed")
+
+
+def _collect_all(conn, settings: Settings) -> dict[str, dict[str, int]]:
+    """Sync wrapper around _collect_all_async."""
+    return asyncio.run(_collect_all_async(conn, settings))
 
 
 def _baseline_score_7d(conn, account_id: str, product: str, run_date: str) -> Optional[float]:
@@ -430,6 +447,32 @@ def _review_queue_excluded_domains(settings: Settings) -> set[str]:
         if value:
             normalized.add(value)
     return normalized
+
+
+def _run_crm_dedup_check(conn, settings: Settings) -> dict[str, int]:
+    """Batch CRM dedup check for all accounts."""
+    client = ZohoCRMDedupClient(settings)
+    if not client.is_configured:
+        return {"checked": 0, "existing": 0, "new": 0, "errors": 0}
+    accounts = conn.execute("SELECT account_id, domain, company_name FROM accounts").fetchall()
+    checked = existing = new = errors = 0
+    for row in accounts:
+        domain = str(row["domain"] or "")
+        company_name = str(row["company_name"] or "")
+        if not domain:
+            continue
+        try:
+            status = check_crm_dedup(domain, company_name, settings, client=client)
+            checked += 1
+            if status in ("existing_lead", "existing_customer"):
+                existing += 1
+                db.update_crm_status(conn, str(row["account_id"]), status)
+            else:
+                new += 1
+        except Exception:
+            errors += 1
+    conn.commit()
+    return {"checked": checked, "existing": existing, "new": new, "errors": errors}
 
 
 def _run_exports(conn, settings: Settings, run_date: date, run_id: str) -> dict[str, int | str]:
@@ -939,7 +982,11 @@ def calibrate_thresholds(
         )
         if write:
             calibration.write_thresholds(
-                settings.thresholds_path, high=suggestion.high, medium=suggestion.medium, low=suggestion.low
+                settings.thresholds_path,
+                tier_1=suggestion.high,
+                tier_2=suggestion.medium,
+                tier_3=current_thresholds.tier_3,
+                tier_4=suggestion.low,
             )
         typer.echo(
             f"run_id={run_id} suggested_high={suggestion.high} suggested_medium={suggestion.medium} "
@@ -987,7 +1034,11 @@ def tune_profile(
         )
         if write:
             calibration.write_thresholds(
-                settings.thresholds_path, high=suggestion.high, medium=suggestion.medium, low=suggestion.low
+                settings.thresholds_path,
+                tier_1=suggestion.high,
+                tier_2=suggestion.medium,
+                tier_3=current_thresholds.tier_3,
+                tier_4=suggestion.low,
             )
         typer.echo(
             f"run_id={run_id} suggested_high={suggestion.high} suggested_medium={suggestion.medium} suggested_low={suggestion.low} "
@@ -1101,9 +1152,10 @@ def self_improve_output(
         if write and thresholds_changed:
             calibration.write_thresholds(
                 settings.thresholds_path,
-                high=result.final_thresholds.high,
-                medium=result.final_thresholds.medium,
-                low=result.final_thresholds.low,
+                tier_1=result.final_thresholds.tier_1,
+                tier_2=result.final_thresholds.tier_2,
+                tier_3=result.final_thresholds.tier_3,
+                tier_4=result.final_thresholds.tier_4,
             )
             latest_run_id = _run_scoring(conn, settings, run_date)
             _run_exports(conn, settings, run_date, latest_run_id)
@@ -1682,214 +1734,6 @@ def run_autonomous_loop(
     run_autonomous_loop_impl(
         ingest_interval_minutes, score_interval_minutes, discovery_interval_minutes, hunt_profile, sleep_seconds, once
     )
-    if not lock_acquired:
-        logger.warning("autonomous_loop skipped reason=lock_busy lock_name=%s", _AUTONOMOUS_LOCK_NAME)
-        typer.echo(f"status=skipped reason=lock_busy lock_name={_AUTONOMOUS_LOCK_NAME}")
-        lock_conn.close()
-        return
-
-    logger.info(
-        "autonomous_loop_started ingest_interval=%dm score_interval=%dm discovery_interval=%dm hunt_profile=%s",
-        ingest_interval_minutes,
-        score_interval_minutes,
-        discovery_interval_minutes,
-        hunt_profile,
-    )
-
-    next_ingest_at = 0.0
-    next_score_at = 0.0
-    next_discovery_at = 0.0
-
-    ingest_every = float(ingest_interval_minutes * 60)
-    score_every = float(score_interval_minutes * 60)
-    discovery_every = float(discovery_interval_minutes * 60)
-
-    try:
-        while True:
-            now_mono = time.monotonic()
-            run_date = parse_date(None, settings.run_timezone)
-            now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-            did_work = False
-
-            due_ingest = now_mono >= next_ingest_at
-            due_discovery = now_mono >= next_discovery_at
-            due_score = now_mono >= next_score_at
-
-            # Ordering matters: discovery runs before score so exports reflect same-cycle webhook events.
-            if due_ingest:
-                did_work = True
-                try:
-                    ingest_result, _ = _run_with_watchdog(
-                        "ingest_cycle",
-                        settings.stage_timeout_seconds,
-                        lambda: _run_ingest_cycle(run_date),
-                    )
-                    typer.echo(
-                        " ".join(
-                            [
-                                f"ts={now_iso}",
-                                "job=ingest",
-                                f"run_date={ingest_result['run_date']}",
-                                f"observations_seen={ingest_result['observations_seen']}",
-                                f"observations_inserted={ingest_result['observations_inserted']}",
-                            ]
-                        )
-                    )
-                except StageExecutionError as exc:
-                    retry_task_id = _enqueue_retry_task(
-                        lock_conn,
-                        settings,
-                        task_type="ingest_cycle",
-                        payload={"run_date": run_date.isoformat()},
-                        reason=str(exc),
-                    )
-                    db.record_stage_failure(
-                        lock_conn,
-                        run_type="autonomous_loop",
-                        run_date=run_date.isoformat(),
-                        stage=exc.stage,
-                        error_summary=str(exc),
-                        duration_seconds=exc.duration_seconds,
-                        timed_out=exc.timed_out,
-                        retry_task_id=retry_task_id,
-                        commit=True,
-                    )
-                    send_alert(
-                        settings,
-                        title="Autonomous ingest job failed",
-                        body=(
-                            f"run_date={run_date.isoformat()} stage={exc.stage} timed_out={int(exc.timed_out)} "
-                            f"duration_seconds={round(exc.duration_seconds, 2)} retry_task_id={retry_task_id}"
-                        ),
-                        severity="error",
-                    )
-                    typer.echo(
-                        f"ts={now_iso} job=ingest status=failed error={str(exc)[:200]} retry_task_id={retry_task_id}"
-                    )
-                except Exception as exc:
-                    typer.echo(f"ts={now_iso} job=ingest status=failed error={str(exc)[:240]}")
-                next_ingest_at = now_mono + ingest_every
-
-            if due_discovery:
-                did_work = True
-                try:
-                    discovery_result, _ = _run_with_watchdog(
-                        "discovery_cycle",
-                        settings.stage_timeout_seconds,
-                        lambda: _run_hunt_cycle(run_date, profile_name=hunt_profile),
-                    )
-                    typer.echo(
-                        " ".join(
-                            [
-                                f"ts={now_iso}",
-                                "job=discovery",
-                                f"discovery_run_id={discovery_result['discovery_run_id']}",
-                                f"profile={discovery_result.get('profile', hunt_profile)}",
-                                f"events_processed={discovery_result.get('events_seen', 0)}",
-                                f"candidates={discovery_result.get('total_candidates', 0)}",
-                                f"crm_candidates_rows={discovery_result['crm_candidates_rows']}",
-                                f"manual_review_rows={discovery_result.get('manual_review_rows', 0)}",
-                            ]
-                        )
-                    )
-                except StageExecutionError as exc:
-                    retry_task_id = _enqueue_retry_task(
-                        lock_conn,
-                        settings,
-                        task_type="discovery_cycle",
-                        payload={"run_date": run_date.isoformat(), "hunt_profile": hunt_profile},
-                        reason=str(exc),
-                    )
-                    db.record_stage_failure(
-                        lock_conn,
-                        run_type="autonomous_loop",
-                        run_date=run_date.isoformat(),
-                        stage=exc.stage,
-                        error_summary=str(exc),
-                        duration_seconds=exc.duration_seconds,
-                        timed_out=exc.timed_out,
-                        retry_task_id=retry_task_id,
-                        commit=True,
-                    )
-                    send_alert(
-                        settings,
-                        title="Autonomous discovery job failed",
-                        body=(
-                            f"run_date={run_date.isoformat()} stage={exc.stage} timed_out={int(exc.timed_out)} "
-                            f"duration_seconds={round(exc.duration_seconds, 2)} retry_task_id={retry_task_id}"
-                        ),
-                        severity="error",
-                    )
-                    typer.echo(
-                        f"ts={now_iso} job=discovery status=failed error={str(exc)[:200]} retry_task_id={retry_task_id}"
-                    )
-                except Exception as exc:
-                    typer.echo(f"ts={now_iso} job=discovery status=failed error={str(exc)[:240]}")
-                next_discovery_at = now_mono + discovery_every
-
-            if due_score:
-                did_work = True
-                try:
-                    score_result, _ = _run_with_watchdog(
-                        "score_cycle",
-                        settings.stage_timeout_seconds,
-                        lambda: _run_score_cycle(run_date),
-                    )
-                    typer.echo(
-                        " ".join(
-                            [
-                                f"ts={now_iso}",
-                                "job=score",
-                                f"run_id={score_result['run_id']}",
-                                f"daily_scores_rows={score_result['daily_scores_rows']}",
-                                f"review_queue_rows={score_result['review_queue_rows']}",
-                                f"icp_coverage_rate={score_result['icp_coverage_rate']}",
-                            ]
-                        )
-                    )
-                except StageExecutionError as exc:
-                    retry_task_id = _enqueue_retry_task(
-                        lock_conn,
-                        settings,
-                        task_type="score_cycle",
-                        payload={"run_date": run_date.isoformat()},
-                        reason=str(exc),
-                    )
-                    db.record_stage_failure(
-                        lock_conn,
-                        run_type="autonomous_loop",
-                        run_date=run_date.isoformat(),
-                        stage=exc.stage,
-                        error_summary=str(exc),
-                        duration_seconds=exc.duration_seconds,
-                        timed_out=exc.timed_out,
-                        retry_task_id=retry_task_id,
-                        commit=True,
-                    )
-                    send_alert(
-                        settings,
-                        title="Autonomous score job failed",
-                        body=(
-                            f"run_date={run_date.isoformat()} stage={exc.stage} timed_out={int(exc.timed_out)} "
-                            f"duration_seconds={round(exc.duration_seconds, 2)} retry_task_id={retry_task_id}"
-                        ),
-                        severity="error",
-                    )
-                    typer.echo(
-                        f"ts={now_iso} job=score status=failed error={str(exc)[:200]} retry_task_id={retry_task_id}"
-                    )
-                except Exception as exc:
-                    typer.echo(f"ts={now_iso} job=score status=failed error={str(exc)[:240]}")
-                next_score_at = now_mono + score_every
-
-            if once and did_work:
-                return
-
-            time.sleep(float(sleep_seconds))
-    finally:
-        if lock_acquired:
-            db.release_advisory_lock(lock_conn, lock_name=_AUTONOMOUS_LOCK_NAME, owner_id=lock_owner)
-        lock_conn.close()
 
 
 # ---------------------------------------------------------------------------

@@ -84,6 +84,140 @@ def seed_accounts(conn: Any, seed_accounts_csv: Path) -> int:
     return inserted
 
 
+def update_crm_status(
+    conn: Any,
+    account_id: str,
+    crm_status: str,
+    commit: bool = True,
+) -> None:
+    """Update the crm_status field for an account."""
+    try:
+        conn.execute(
+            "UPDATE accounts SET crm_status = %s WHERE account_id = %s",
+            (crm_status, account_id),
+        )
+    except Exception as exc:
+        if "crm_status" in str(exc):
+            conn.rollback()
+            return
+        raise
+    if commit:
+        conn.commit()
+
+
+def get_crm_status(conn: Any, account_id: str) -> str:
+    """Return crm_status for an account, defaulting to 'new'."""
+    try:
+        cur = conn.execute(
+            "SELECT crm_status FROM accounts WHERE account_id = %s",
+            (account_id,),
+        )
+    except Exception as exc:
+        if "crm_status" in str(exc):
+            conn.rollback()
+            return "new"
+        raise
+    row = cur.fetchone()
+    return str(row["crm_status"]) if row else "new"
+
+
+def get_accounts_without_crm_check(conn: Any, limit: int = 500) -> list[dict[str, Any]]:
+    """Return accounts with crm_status='new'."""
+    try:
+        cur = conn.execute(
+            """
+            SELECT account_id, company_name, domain, crm_status
+            FROM accounts
+            WHERE crm_status = 'new'
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+    except Exception as exc:
+        if "crm_status" not in str(exc):
+            raise
+        conn.rollback()
+        cur = conn.execute(
+            """
+            SELECT account_id, company_name, domain, 'new' AS crm_status
+            FROM accounts
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+    return [dict(row) for row in cur.fetchall()]
+
+
+def save_dossier(conn: Any, dossier: dict[str, Any]) -> str:
+    """Persist a dossier snapshot and return dossier_id."""
+    account_id = str(dossier.get("account_id", "")).strip()
+    if not account_id:
+        raise ValueError("account_id is required")
+
+    cur = conn.execute(
+        "SELECT COALESCE(MAX(version), 0) AS max_v FROM dossiers WHERE account_id = %s",
+        (account_id,),
+    )
+    row = cur.fetchone()
+    version = int(row["max_v"] if row and row["max_v"] is not None else 0) + 1
+
+    dossier_id = f"dos_{uuid.uuid4().hex[:12]}"
+    sections_json = json.dumps(dossier.get("sections", []))
+    markdown = str(dossier.get("markdown", ""))
+    dossier_type = str(dossier.get("dossier_type", "full") or "full")
+    generated_at = str(dossier.get("generated_at", "") or utc_now_iso())
+
+    conn.execute(
+        """
+        INSERT INTO dossiers (
+            dossier_id,
+            account_id,
+            dossier_type,
+            version,
+            sections_json,
+            markdown,
+            generated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (dossier_id, account_id, dossier_type, version, sections_json, markdown, generated_at),
+    )
+    conn.commit()
+    return dossier_id
+
+
+def get_latest_dossier(conn: Any, account_id: str) -> dict[str, Any] | None:
+    """Return most recent dossier for an account."""
+    cur = conn.execute(
+        """
+        SELECT * FROM dossiers
+        WHERE account_id = %s
+        ORDER BY version DESC, generated_at DESC
+        LIMIT 1
+        """,
+        (account_id,),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def get_dossier_history(conn: Any, account_id: str, limit: int = 25) -> list[dict[str, Any]]:
+    """Return dossier history for an account (newest first)."""
+    cur = conn.execute(
+        """
+        SELECT dossier_id, account_id, dossier_type, version, generated_at
+        FROM dossiers
+        WHERE account_id = %s
+        ORDER BY version DESC, generated_at DESC
+        LIMIT %s
+        """,
+        (account_id, max(1, int(limit))),
+    )
+    return [dict(row) for row in cur.fetchall()]
+
+
 def account_exists(conn: Any, account_id: str) -> bool:
     cur = conn.execute("SELECT 1 FROM accounts WHERE account_id = %s LIMIT 1", (account_id,))
     return cur.fetchone() is not None

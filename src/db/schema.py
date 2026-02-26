@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   company_name TEXT NOT NULL,
   domain TEXT NOT NULL UNIQUE,
   source_type TEXT NOT NULL CHECK (source_type IN ('seed', 'discovered')),
+  crm_status TEXT NOT NULL DEFAULT 'new',
   created_at TEXT NOT NULL
 );
 
@@ -71,7 +72,13 @@ CREATE TABLE IF NOT EXISTS account_scores (
   tier_v2 TEXT NOT NULL DEFAULT 'tier_4' CHECK (tier_v2 IN ('tier_1', 'tier_2', 'tier_3', 'tier_4')),
   top_reasons_json TEXT NOT NULL,
   delta_7d REAL NOT NULL,
+  velocity_7d REAL NOT NULL DEFAULT 0.0,
+  velocity_14d REAL NOT NULL DEFAULT 0.0,
+  velocity_30d REAL NOT NULL DEFAULT 0.0,
+  velocity_category TEXT NOT NULL DEFAULT 'stable' CHECK (velocity_category IN ('surging', 'accelerating', 'stable', 'decelerating')),
+  confidence_band TEXT NOT NULL DEFAULT 'low' CHECK (confidence_band IN ('high', 'medium', 'low')),
   dimension_scores_json TEXT NOT NULL DEFAULT '{}',
+  dimension_confidence_json TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (run_id, account_id, product),
   FOREIGN KEY(run_id) REFERENCES score_runs(run_id),
   FOREIGN KEY(account_id) REFERENCES accounts(account_id)
@@ -395,7 +402,7 @@ CREATE TABLE IF NOT EXISTS company_research (
     research_profile    TEXT,
     enrichment_json     TEXT NOT NULL DEFAULT '{}',
     research_status     TEXT NOT NULL DEFAULT 'pending'
-        CHECK (research_status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')),
+        CHECK (research_status IN ('pending', 'in_progress', 'completed', 'partial', 'failed', 'skipped')),
     researched_at       TEXT,
     model_used          TEXT,
     prompt_hash         TEXT,
@@ -487,4 +494,26 @@ CREATE TABLE IF NOT EXISTS dossiers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dossiers_account ON dossiers(account_id);
+
+CREATE TABLE IF NOT EXISTS upload_batches (
+    batch_id    TEXT PRIMARY KEY,
+    uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    filename    TEXT NOT NULL DEFAULT '',
+    row_count   INTEGER NOT NULL DEFAULT 0,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    metadata    TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS batch_companies (
+    id               SERIAL PRIMARY KEY,
+    batch_id         TEXT NOT NULL REFERENCES upload_batches(batch_id),
+    company_name     TEXT NOT NULL,
+    domain           TEXT NOT NULL,
+    industry         TEXT NOT NULL DEFAULT '',
+    employee_count   INTEGER,
+    metadata         TEXT NOT NULL DEFAULT '{}',
+    account_id       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_companies_batch ON batch_companies(batch_id);
 """

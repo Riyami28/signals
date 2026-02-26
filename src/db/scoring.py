@@ -96,9 +96,15 @@ def replace_run_scores(
                 tier_v2,
                 top_reasons_json,
                 delta_7d,
-                dimension_scores_json
+                velocity_7d,
+                velocity_14d,
+                velocity_30d,
+                velocity_category,
+                confidence_band,
+                dimension_scores_json,
+                dimension_confidence_json
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 score.run_id,
@@ -109,7 +115,13 @@ def replace_run_scores(
                 score.tier_v2,
                 score.top_reasons_json,
                 score.delta_7d,
+                score.velocity_7d,
+                score.velocity_14d,
+                score.velocity_30d,
+                score.velocity_category,
+                score.confidence_band,
                 score.dimension_scores_json,
+                score.dimension_confidence_json,
             ),
         )
     conn.commit()

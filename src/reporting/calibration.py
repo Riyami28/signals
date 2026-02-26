@@ -223,7 +223,7 @@ def suggest_profile_for_run(
     icp_scores = segments.icp_scores
     non_icp_scores = segments.non_icp_scores
 
-    baseline = current_thresholds or Thresholds(high=70.0, medium=45.0, low=0.0)
+    baseline = current_thresholds or Thresholds(tier_1=70.0, tier_2=45.0, tier_3=20.0, tier_4=0.0)
     candidate_scores = sorted(
         {
             round(float(value), 2)
@@ -297,13 +297,14 @@ def suggest_profile_for_run(
     return best[4]
 
 
-def write_thresholds(path: Path, high: float, medium: float, low: float = 0.0) -> None:
+def write_thresholds(path: Path, tier_1: float, tier_2: float, tier_3: float, tier_4: float = 0.0) -> None:
     write_csv_rows(
         path,
         rows=[
-            {"key": "high", "value": round(float(high), 2)},
-            {"key": "medium", "value": round(float(medium), 2)},
-            {"key": "low", "value": round(float(low), 2)},
+            {"key": "tier_1", "value": round(float(tier_1), 2)},
+            {"key": "tier_2", "value": round(float(tier_2), 2)},
+            {"key": "tier_3", "value": round(float(tier_3), 2)},
+            {"key": "tier_4", "value": round(float(tier_4), 2)},
         ],
         fieldnames=["key", "value"],
     )

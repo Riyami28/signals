@@ -36,7 +36,8 @@ def _auto_live_workers(min_domain_request_interval_ms: int, max_workers: int = 6
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SIGNALS_",
-        env_file=".env",
+        # Keep direct Settings(...) deterministic; load_settings() decides which .env to load.
+        env_file=None,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -224,4 +225,6 @@ def load_settings(project_root: Path | None = None) -> Settings:
         kwargs["project_root"] = project_root
         # When a custom root is given (tests, webhook), read .env from that root.
         kwargs["_env_file"] = str(project_root / ".env")
+    else:
+        kwargs["_env_file"] = ".env"
     return Settings(**kwargs)

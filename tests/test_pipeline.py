@@ -24,7 +24,7 @@ def _bootstrap_fixture(root: Path) -> None:
     )
     _write(
         root / "config" / "thresholds.csv",
-        "key,value\nhigh,70\nmedium,45\nlow,0\n",
+        "key,value\ntier_1,70\ntier_2,45\ntier_3,45\ntier_4,0\n",
     )
     _write(
         root / "config" / "keyword_lexicon.csv",
@@ -193,7 +193,7 @@ def test_review_queue_is_account_level_and_excludes_internal_domain(tmp_path, mo
     _bootstrap_fixture(root)
     _write(
         root / "config" / "thresholds.csv",
-        "key,value\nhigh,70\nmedium,30\nlow,0\n",
+        "key,value\ntier_1,70\ntier_2,30\ntier_3,30\ntier_4,0\n",
     )
     _write(
         root / "config" / "seed_accounts.csv",
@@ -357,7 +357,7 @@ def test_backfill_run_daily_command_single_day(tmp_path, monkeypatch):
 def test_eval_output_command_reports_quality_status(tmp_path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
-    _write(root / "config" / "thresholds.csv", "key,value\nhigh,95\nmedium,90\nlow,0\n")
+    _write(root / "config" / "thresholds.csv", "key,value\ntier_1,95\ntier_2,90\ntier_3,90\ntier_4,0\n")
     _write(
         root / "config" / "icp_reference_accounts.csv",
         "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
@@ -377,7 +377,7 @@ def test_eval_output_command_reports_quality_status(tmp_path, monkeypatch):
 def test_self_improve_output_command_updates_thresholds(tmp_path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_fixture(root)
-    _write(root / "config" / "thresholds.csv", "key,value\nhigh,95\nmedium,90\nlow,0\n")
+    _write(root / "config" / "thresholds.csv", "key,value\ntier_1,95\ntier_2,90\ntier_3,90\ntier_4,0\n")
     _write(
         root / "config" / "icp_reference_accounts.csv",
         "company_name,domain,relationship_stage,notes\nAcme,acme.example,customer,\n",
@@ -405,5 +405,5 @@ def test_self_improve_output_command_updates_thresholds(tmp_path, monkeypatch):
 
     threshold_rows = load_csv_rows(root / "config" / "thresholds.csv")
     threshold_map = {row["key"]: float(row["value"]) for row in threshold_rows}
-    assert threshold_map["high"] < 95.0
-    assert threshold_map["medium"] < 90.0
+    assert threshold_map["tier_1"] < 95.0
+    assert threshold_map["tier_2"] < 90.0
