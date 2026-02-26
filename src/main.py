@@ -1,3 +1,9 @@
+"""Signals pipeline — thin CLI entry point.
+
+All orchestration logic lives in src/pipeline/ submodules.
+This file registers Typer commands and delegates to those modules.
+"""
+
 from __future__ import annotations
 
 import json
@@ -12,29 +18,32 @@ from pathlib import Path
 import typer
 
 from src import db
-from src.collectors import community, first_party, jobs, news, technographics
 from src.discovery import hunt as hunt_pipeline
 from src.discovery import pipeline as discovery_pipeline
 from src.discovery import watchlist_builder
-from src.discovery.config import (
-    classify_signal,
-    load_account_profiles,
-    load_discovery_blocklist,
-    load_signal_classes,
-)
 from src.export import csv_exporter
 from src.logging_config import configure_logging
 from src.models import AccountScore
 from src.notifier import send_alert
+from src.pipeline.autonomous import execute_retry_task, run_autonomous_loop_impl
+from src.pipeline.daily import run_daily_impl, run_hunt_cycle, run_score_cycle
+from src.pipeline.export import persist_ops_metrics, run_exports, write_icp_coverage_report
+from src.pipeline.helpers import (
+    _RETRY_BACKOFF_SECONDS,
+    bootstrap,
+    retry_due_iso,
+    review_queue_excluded_domains,
+)
+from src.pipeline.ingest import collect_all
+from src.pipeline.score import run_scoring_stage
 from src.reporting import calibration, icp_playbook, quality
 from src.reporting.evals import OutputQualityBar, evaluate_run_output_quality
 from src.reporting.improvement import run_threshold_self_improvement
 from src.research.orchestrator import run_research_stage
 from src.review.import_reviews import import_reviews_for_date, prepare_review_input_for_date
-from src.scoring.engine import run_scoring
-from src.scoring.rules import load_keyword_lexicon, load_signal_rules, load_source_registry, load_thresholds
-from src.settings import Settings, load_settings
-from src.source_policy import load_source_execution_policy
+from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
+from src.server import serve_discovery_webhook_impl, serve_local_ui_impl, serve_web_impl
+from src.settings import load_settings
 from src.sync.google_sheets import sync_outputs
 from src.utils import ensure_project_directories, load_csv_rows, normalize_domain, parse_date, write_csv_rows
 
@@ -56,9 +65,6 @@ def _app_callback() -> None:
 
 
 
-_RUN_DAILY_LOCK_NAME = "signals:run-daily"
-_AUTONOMOUS_LOCK_NAME = "signals:run-autonomous-loop"
-_RETRY_BACKOFF_SECONDS = [60, 300, 900]
 
 
 class StageExecutionError(RuntimeError):
@@ -605,11 +611,11 @@ def migrate() -> None:
 def ingest(all_sources: bool = typer.Option(True, "--all/--no-all", help="Run all collectors")) -> None:
     if not all_sources:
         raise typer.BadParameter("Partial ingest is not supported yet. Use --all.")
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     try:
-        results = _collect_all(conn, settings)
-        inserted_total = sum(result["inserted"] for result in results.values())
-        seen_total = sum(result["seen"] for result in results.values())
+        results = collect_all(conn, settings)
+        inserted_total = sum(r["inserted"] for r in results.values())
+        seen_total = sum(r["seen"] for r in results.values())
         typer.echo(f"seeded_accounts={seeded} observations_seen={seen_total} observations_inserted={inserted_total}")
         for name, result in results.items():
             typer.echo(f"collector={name} seen={result['seen']} inserted={result['inserted']}")
@@ -619,11 +625,11 @@ def ingest(all_sources: bool = typer.Option(True, "--all/--no-all", help="Run al
 
 @app.command("score")
 def score(date_str: str = typer.Option(None, "--date", help="Scoring date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
-        run_id = _run_scoring(conn, settings, run_date)
+        run_id = run_scoring_stage(conn, settings, run_date)
         summary = db.dump_run_summary(conn, run_id)
         typer.echo(f"run_id={run_id} account_count={summary['account_count']} score_rows={summary['score_rows']}")
     finally:
@@ -632,23 +638,17 @@ def score(date_str: str = typer.Option(None, "--date", help="Scoring date YYYY-M
 
 @app.command("export")
 def export(date_str: str = typer.Option(None, "--date", help="Export date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-        result = _run_exports(conn, settings, run_date, run_id)
+        result = run_exports(conn, settings, run_date, run_id)
         typer.echo(
-            " ".join(
-                [
-                    f"review_queue_rows={result['review_queue']}",
-                    f"daily_scores_rows={result['daily_scores']}",
-                    f"source_quality_rows={result['source_quality']}",
-                    f"promotion_readiness_rows={result['promotion_readiness']}",
-                ]
-            )
+            f"review_queue_rows={result['review_queue']} daily_scores_rows={result['daily_scores']} "
+            f"source_quality_rows={result['source_quality']} promotion_readiness_rows={result['promotion_readiness']}"
         )
     finally:
         conn.close()
@@ -661,7 +661,7 @@ def research(
     max_accounts: int = typer.Option(None, "--max-accounts", help="Override research_max_accounts setting"),
 ) -> None:
     """Run LLM research on top-scoring accounts from a score run."""
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     del seeded
     run_date = parse_date(date_str, settings.run_timezone)
     if max_accounts is not None:
@@ -677,15 +677,15 @@ def research(
 def export_sales_ready_cmd(
     date_str: str = typer.Option(..., "--date", help="Run date YYYY-MM-DD"),
     score_run_id: str = typer.Option(..., "--score-run-id", help="Score run ID to export"),
-    output: Path = typer.Option(None, "--output", help="Output path (default: out_dir/sales_ready_{date}.csv)"),
+    output: Path = typer.Option(None, "--output", help="Output path"),
 ) -> None:
     """Export the unified sales-ready CSV for a given score run."""
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     del seeded
     run_date = parse_date(date_str, settings.run_timezone)
     out_path = output or settings.out_dir / f"sales_ready_{csv_exporter.date_suffix(run_date)}.csv"
     try:
-        excluded = _review_queue_excluded_domains(settings)
+        excluded = review_queue_excluded_domains(settings)
         rows = csv_exporter.export_sales_ready(conn, score_run_id, out_path, excluded)
         typer.echo(f"sales_ready_rows={rows} path={out_path}")
     finally:
@@ -694,36 +694,28 @@ def export_sales_ready_cmd(
 
 @app.command("sync-sheet")
 def sync_sheet(date_str: str = typer.Option(None, "--date", help="Sync date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del conn, seeded
-
     result = sync_outputs(settings, run_date)
     typer.echo(
-        " ".join(
-            [
-                f"review_queue_rows={result['review_queue_rows']}",
-                f"daily_scores_rows={result['daily_scores_rows']}",
-                f"source_quality_rows={result['source_quality_rows']}",
-            ]
-        )
+        f"review_queue_rows={result['review_queue_rows']} daily_scores_rows={result['daily_scores_rows']} "
+        f"source_quality_rows={result['source_quality_rows']}"
     )
 
 
 @app.command("import-reviews")
 def import_reviews(date_str: str = typer.Option(None, "--date", help="Import date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         imported = import_reviews_for_date(conn, settings, run_date)
         quality.compute_and_persist_source_metrics(conn, run_date)
         readiness = quality.compute_promotion_readiness(conn, run_date)
-
         paths = csv_exporter.output_paths(settings.out_dir, run_date)
         csv_exporter.export_source_quality(conn, run_date.isoformat(), paths["source_quality"])
         csv_exporter.export_promotion_readiness(readiness, paths["promotion_readiness"])
-
         typer.echo(f"imported_reviews={imported}")
     finally:
         conn.close()
@@ -732,14 +724,7 @@ def import_reviews(date_str: str = typer.Option(None, "--date", help="Import dat
 @app.command("prepare-review-input")
 def prepare_review_input(date_str: str = typer.Option(None, "--date", help="Review date YYYY-MM-DD")) -> None:
     settings = load_settings()
-    ensure_project_directories(
-        [
-            settings.project_root,
-            settings.data_dir,
-            settings.raw_dir,
-            settings.out_dir,
-        ]
-    )
+    ensure_project_directories([settings.project_root, settings.data_dir, settings.raw_dir, settings.out_dir])
     run_date = parse_date(date_str, settings.run_timezone)
     prepared = prepare_review_input_for_date(settings, run_date)
     typer.echo(f"prepared_review_rows={prepared}")
@@ -747,47 +732,24 @@ def prepare_review_input(date_str: str = typer.Option(None, "--date", help="Revi
 
 @app.command("build-cpg-watchlist")
 def build_cpg_watchlist(
-    limit: int = typer.Option(1000, "--limit", min=100, help="Maximum watchlist rows to keep"),
-    merge_handles: bool = typer.Option(
-        True,
-        "--merge-handles/--no-merge-handles",
-        help="Merge generated domains into account_source_handles.csv",
-    ),
+    limit: int = typer.Option(1000, "--limit", min=100, help="Maximum watchlist rows"),
+    merge_handles: bool = typer.Option(True, "--merge-handles/--no-merge-handles"),
 ) -> None:
     settings = load_settings()
     ensure_project_directories([settings.project_root, settings.config_dir, settings.data_dir])
-
-    result = watchlist_builder.build_cpg_watchlist(
-        settings=settings,
-        limit=limit,
-        merge_handles=merge_handles,
-    )
-
+    result = watchlist_builder.build_cpg_watchlist(settings=settings, limit=limit, merge_handles=merge_handles)
     top_regions = ",".join(
         f"{region}:{count}"
-        for region, count in sorted(
-            result["selected_per_region"].items(),  # type: ignore[arg-type]
-            key=lambda item: item[1],
-            reverse=True,
-        )
+        for region, count in sorted(result["selected_per_region"].items(), key=lambda item: item[1], reverse=True)
     )
     failed_country_count = int(result.get("failed_country_count", 0) or 0)
     typer.echo(
-        " ".join(
-            [
-                f"requested_limit={result['requested_limit']}",
-                f"raw_rows={result['raw_rows']}",
-                f"deduped_rows={result['deduped_rows']}",
-                f"selected_rows={result['selected_rows']}",
-                f"handles_inserted={result['handles_inserted']}",
-                f"failed_country_count={failed_country_count}",
-                f"watchlist_path={result['watchlist_path']}",
-                f"region_split={top_regions}",
-            ]
-        )
+        f"requested_limit={result['requested_limit']} raw_rows={result['raw_rows']} deduped_rows={result['deduped_rows']} "
+        f"selected_rows={result['selected_rows']} handles_inserted={result['handles_inserted']} "
+        f"failed_country_count={failed_country_count} watchlist_path={result['watchlist_path']} region_split={top_regions}"
     )
     if failed_country_count > 0:
-        failures = result.get("failed_countries", {})  # type: ignore[assignment]
+        failures = result.get("failed_countries", {})
         if isinstance(failures, dict):
             for country, message in sorted(failures.items()):
                 typer.echo(f"country_error={country} detail={str(message)[:240]}")
@@ -795,36 +757,28 @@ def build_cpg_watchlist(
 
 @app.command("migrate-watchlist-from-db")
 def migrate_watchlist_from_db(
-    limit: int = typer.Option(1000, "--limit", min=100, help="Maximum rows to persist into watchlist_accounts.csv"),
+    limit: int = typer.Option(1000, "--limit", min=100, help="Maximum rows to persist"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     del seeded
     try:
         existing_rows = load_csv_rows(settings.watchlist_accounts_path)
         existing_by_domain: dict[str, dict[str, str]] = {}
         for row in existing_rows:
             domain = normalize_domain(row.get("domain", ""))
-            if not domain:
-                continue
-            existing_by_domain[domain] = row
+            if domain:
+                existing_by_domain[domain] = row
 
         handle_rows = load_csv_rows(settings.account_source_handles_path)
         website_by_domain: dict[str, str] = {}
         for row in handle_rows:
             domain = normalize_domain(row.get("domain", ""))
-            if not domain:
-                continue
             website = str(row.get("website_url", "")).strip()
-            if website:
+            if domain and website:
                 website_by_domain[domain] = website
 
         account_rows = conn.execute(
-            """
-            SELECT company_name, domain
-            FROM accounts
-            WHERE source_type = 'seed'
-            ORDER BY created_at::timestamp ASC, company_name ASC
-            """
+            "SELECT company_name, domain FROM accounts WHERE source_type = 'seed' ORDER BY created_at::timestamp ASC, company_name ASC"
         ).fetchall()
 
         refreshed_on = date.today().isoformat()
@@ -835,7 +789,6 @@ def migrate_watchlist_from_db(
             if not domain or domain == "zop.dev" or domain.endswith(".example"):
                 continue
             company_name = str(account["company_name"] or domain).strip() or domain
-
             existing = existing_by_domain.get(domain, {})
             if existing:
                 preserved_metadata_rows += 1
@@ -885,13 +838,7 @@ def migrate_watchlist_from_db(
             ],
         )
         typer.echo(
-            " ".join(
-                [
-                    f"watchlist_path={settings.watchlist_accounts_path}",
-                    f"rows_written={len(migrated_rows)}",
-                    f"preserved_metadata_rows={preserved_metadata_rows}",
-                ]
-            )
+            f"watchlist_path={settings.watchlist_accounts_path} rows_written={len(migrated_rows)} preserved_metadata_rows={preserved_metadata_rows}"
         )
     finally:
         conn.close()
@@ -899,74 +846,43 @@ def migrate_watchlist_from_db(
 
 @app.command("crawl-diagnostics")
 def crawl_diagnostics(
-    date_str: str = typer.Option(None, "--date", help="Diagnostics date YYYY-MM-DD"),
-    failure_limit: int = typer.Option(10, "--failure-limit", help="Number of recent failures to show"),
+    date_str: str = typer.Option(None, "--date"),
+    failure_limit: int = typer.Option(10, "--failure-limit"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_date_str = run_date.isoformat()
         summary_rows = db.fetch_crawl_attempt_summary(conn, run_date_str)
         failure_rows = db.fetch_latest_crawl_failures(conn, run_date_str, limit=max(1, failure_limit))
-
         if not summary_rows:
             typer.echo(f"run_date={run_date_str} crawl_attempts=0")
             return
-
         total_attempts = sum(int(row["attempt_count"]) for row in summary_rows)
         totals_by_status: dict[str, int] = {"success": 0, "http_error": 0, "exception": 0, "skipped": 0}
         source_status_counts: dict[str, dict[str, int]] = {}
-
         for row in summary_rows:
-            source = str(row["source"])
-            status = str(row["status"])
-            count = int(row["attempt_count"])
+            source, status, count = str(row["source"]), str(row["status"]), int(row["attempt_count"])
             totals_by_status[status] = totals_by_status.get(status, 0) + count
             source_status_counts.setdefault(source, {}).setdefault(status, 0)
             source_status_counts[source][status] += count
-
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={run_date_str}",
-                    f"crawl_attempts={total_attempts}",
-                    f"success={totals_by_status.get('success', 0)}",
-                    f"http_error={totals_by_status.get('http_error', 0)}",
-                    f"exception={totals_by_status.get('exception', 0)}",
-                    f"skipped={totals_by_status.get('skipped', 0)}",
-                ]
-            )
+            f"run_date={run_date_str} crawl_attempts={total_attempts} success={totals_by_status.get('success', 0)} "
+            f"http_error={totals_by_status.get('http_error', 0)} exception={totals_by_status.get('exception', 0)} "
+            f"skipped={totals_by_status.get('skipped', 0)}"
         )
-
         for source in sorted(source_status_counts):
-            source_total = sum(source_status_counts[source].values())
+            st = source_status_counts[source]
             typer.echo(
-                " ".join(
-                    [
-                        f"source={source}",
-                        f"attempts={source_total}",
-                        f"success={source_status_counts[source].get('success', 0)}",
-                        f"http_error={source_status_counts[source].get('http_error', 0)}",
-                        f"exception={source_status_counts[source].get('exception', 0)}",
-                        f"skipped={source_status_counts[source].get('skipped', 0)}",
-                    ]
-                )
+                f"source={source} attempts={sum(st.values())} success={st.get('success', 0)} "
+                f"http_error={st.get('http_error', 0)} exception={st.get('exception', 0)} skipped={st.get('skipped', 0)}"
             )
-
         for row in failure_rows:
-            error_summary = str(row["error_summary"] or "").replace("\n", " ").replace("\r", " ").strip()
+            err = str(row["error_summary"] or "").replace("\n", " ").replace("\r", " ").strip()
             typer.echo(
-                " ".join(
-                    [
-                        f"failure_source={row['source']}",
-                        f"status={row['status']}",
-                        f"account_id={row['account_id']}",
-                        f"attempted_at={row['attempted_at']}",
-                        f"endpoint={row['endpoint']}",
-                        f"error={error_summary}",
-                    ]
-                )
+                f"failure_source={row['source']} status={row['status']} account_id={row['account_id']} "
+                f"attempted_at={row['attempted_at']} endpoint={row['endpoint']} error={err}"
             )
     finally:
         conn.close()
@@ -974,19 +890,18 @@ def crawl_diagnostics(
 
 @app.command("calibrate-thresholds")
 def calibrate_thresholds(
-    date_str: str = typer.Option(None, "--date", help="Calibration date YYYY-MM-DD"),
+    date_str: str = typer.Option(None, "--date"),
     medium_target_coverage: float = typer.Option(0.6, "--medium-target-coverage", min=0.0, max=1.0),
     high_target_coverage: float = typer.Option(0.2, "--high-target-coverage", min=0.0, max=1.0),
-    write: bool = typer.Option(False, "--write", help="Persist suggested thresholds into config/thresholds.csv"),
+    write: bool = typer.Option(False, "--write"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-
         current_thresholds = load_thresholds(settings.thresholds_path)
         suggestion = calibration.suggest_thresholds_for_run(
             conn=conn,
@@ -996,31 +911,15 @@ def calibrate_thresholds(
             high_target_coverage=high_target_coverage,
             current_thresholds=current_thresholds,
         )
-
         if write:
             calibration.write_thresholds(
-                settings.thresholds_path,
-                high=suggestion.high,
-                medium=suggestion.medium,
-                low=suggestion.low,
+                settings.thresholds_path, high=suggestion.high, medium=suggestion.medium, low=suggestion.low
             )
-
         typer.echo(
-            " ".join(
-                [
-                    f"run_id={run_id}",
-                    f"suggested_high={suggestion.high}",
-                    f"suggested_medium={suggestion.medium}",
-                    f"suggested_low={suggestion.low}",
-                    f"icp_accounts={suggestion.icp_accounts}",
-                    f"icp_high_coverage={suggestion.icp_high_coverage}",
-                    f"icp_medium_coverage={suggestion.icp_medium_coverage}",
-                    f"non_icp_accounts={suggestion.non_icp_accounts}",
-                    f"non_icp_high_hit_rate={suggestion.non_icp_high_hit_rate}",
-                    f"non_icp_medium_hit_rate={suggestion.non_icp_medium_hit_rate}",
-                    f"written={int(write)}",
-                ]
-            )
+            f"run_id={run_id} suggested_high={suggestion.high} suggested_medium={suggestion.medium} "
+            f"suggested_low={suggestion.low} icp_accounts={suggestion.icp_accounts} icp_high_coverage={suggestion.icp_high_coverage} "
+            f"icp_medium_coverage={suggestion.icp_medium_coverage} non_icp_accounts={suggestion.non_icp_accounts} "
+            f"non_icp_high_hit_rate={suggestion.non_icp_high_hit_rate} non_icp_medium_hit_rate={suggestion.non_icp_medium_hit_rate} written={int(write)}"
         )
     finally:
         conn.close()
@@ -1028,33 +927,27 @@ def calibrate_thresholds(
 
 @app.command("tune-profile")
 def tune_profile(
-    date_str: str = typer.Option(None, "--date", help="Tuning date YYYY-MM-DD"),
+    date_str: str = typer.Option(None, "--date"),
     min_icp_medium_coverage: float = typer.Option(0.6, "--min-icp-medium-coverage", min=0.0, max=1.0),
     max_non_icp_medium_hit_rate: float = typer.Option(0.5, "--max-non-icp-medium-hit-rate", min=0.0, max=1.0),
     max_non_icp_high_hit_rate: float = typer.Option(0.25, "--max-non-icp-high-hit-rate", min=0.0, max=1.0),
     min_scenario_pass_rate: float = typer.Option(0.9, "--min-scenario-pass-rate", min=0.0, max=1.0),
-    scenarios_path: str = typer.Option(
-        "config/profile_scenarios.csv",
-        "--scenarios-path",
-        help="Scenario CSV path relative to project root (or absolute path)",
-    ),
-    write: bool = typer.Option(False, "--write", help="Persist tuned thresholds into config/thresholds.csv"),
+    scenarios_path: str = typer.Option("config/profile_scenarios.csv", "--scenarios-path"),
+    write: bool = typer.Option(False, "--write"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-
         raw_scenario_path = Path(scenarios_path)
         scenario_path = (
             raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
         )
         scenarios = calibration.load_scenarios(scenario_path)
         current_thresholds = load_thresholds(settings.thresholds_path)
-
         suggestion = calibration.suggest_profile_for_run(
             conn=conn,
             run_id=run_id,
@@ -1066,34 +959,17 @@ def tune_profile(
             min_scenario_pass_rate=min_scenario_pass_rate,
             current_thresholds=current_thresholds,
         )
-
         if write:
             calibration.write_thresholds(
-                settings.thresholds_path,
-                high=suggestion.high,
-                medium=suggestion.medium,
-                low=suggestion.low,
+                settings.thresholds_path, high=suggestion.high, medium=suggestion.medium, low=suggestion.low
             )
-
         typer.echo(
-            " ".join(
-                [
-                    f"run_id={run_id}",
-                    f"suggested_high={suggestion.high}",
-                    f"suggested_medium={suggestion.medium}",
-                    f"suggested_low={suggestion.low}",
-                    f"icp_accounts={suggestion.icp_accounts}",
-                    f"icp_medium_coverage={suggestion.icp_medium_coverage}",
-                    f"icp_high_coverage={suggestion.icp_high_coverage}",
-                    f"non_icp_accounts={suggestion.non_icp_accounts}",
-                    f"non_icp_medium_hit_rate={suggestion.non_icp_medium_hit_rate}",
-                    f"non_icp_high_hit_rate={suggestion.non_icp_high_hit_rate}",
-                    f"scenario_count={suggestion.scenario_count}",
-                    f"scenario_pass_rate={suggestion.scenario_pass_rate}",
-                    f"constraints_satisfied={int(suggestion.constraints_satisfied)}",
-                    f"written={int(write)}",
-                ]
-            )
+            f"run_id={run_id} suggested_high={suggestion.high} suggested_medium={suggestion.medium} suggested_low={suggestion.low} "
+            f"icp_accounts={suggestion.icp_accounts} icp_medium_coverage={suggestion.icp_medium_coverage} "
+            f"icp_high_coverage={suggestion.icp_high_coverage} non_icp_accounts={suggestion.non_icp_accounts} "
+            f"non_icp_medium_hit_rate={suggestion.non_icp_medium_hit_rate} non_icp_high_hit_rate={suggestion.non_icp_high_hit_rate} "
+            f"scenario_count={suggestion.scenario_count} scenario_pass_rate={suggestion.scenario_pass_rate} "
+            f"constraints_satisfied={int(suggestion.constraints_satisfied)} written={int(write)}"
         )
     finally:
         conn.close()
@@ -1101,26 +977,21 @@ def tune_profile(
 
 @app.command("eval-output")
 def eval_output(
-    date_str: str = typer.Option(None, "--date", help="Evaluation date YYYY-MM-DD"),
+    date_str: str = typer.Option(None, "--date"),
     min_icp_medium_coverage: float = typer.Option(0.6, "--min-icp-medium-coverage", min=0.0, max=1.0),
     min_icp_high_coverage: float = typer.Option(0.2, "--min-icp-high-coverage", min=0.0, max=1.0),
     max_non_icp_medium_hit_rate: float = typer.Option(0.5, "--max-non-icp-medium-hit-rate", min=0.0, max=1.0),
     max_non_icp_high_hit_rate: float = typer.Option(0.25, "--max-non-icp-high-hit-rate", min=0.0, max=1.0),
     min_scenario_pass_rate: float = typer.Option(0.9, "--min-scenario-pass-rate", min=0.0, max=1.0),
-    scenarios_path: str = typer.Option(
-        "config/profile_scenarios.csv",
-        "--scenarios-path",
-        help="Scenario CSV path relative to project root (or absolute path)",
-    ),
+    scenarios_path: str = typer.Option("config/profile_scenarios.csv", "--scenarios-path"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-
         raw_scenario_path = Path(scenarios_path)
         scenario_path = (
             raw_scenario_path if raw_scenario_path.is_absolute() else (settings.project_root / raw_scenario_path)
@@ -1143,23 +1014,12 @@ def eval_output(
             scenarios=scenarios,
         )
         typer.echo(
-            " ".join(
-                [
-                    f"run_id={run_id}",
-                    f"threshold_high={result.thresholds.high}",
-                    f"threshold_medium={result.thresholds.medium}",
-                    f"threshold_low={result.thresholds.low}",
-                    f"icp_accounts={result.icp_accounts}",
-                    f"non_icp_accounts={result.non_icp_accounts}",
-                    f"icp_high_coverage={result.icp_high_coverage}",
-                    f"icp_medium_coverage={result.icp_medium_coverage}",
-                    f"non_icp_high_hit_rate={result.non_icp_high_hit_rate}",
-                    f"non_icp_medium_hit_rate={result.non_icp_medium_hit_rate}",
-                    f"scenario_pass_rate={result.scenario_pass_rate}",
-                    f"quality_passed={int(result.passed)}",
-                    f"failed_checks={'|'.join(result.failed_checks) if result.failed_checks else 'none'}",
-                ]
-            )
+            f"run_id={run_id} threshold_high={result.thresholds.high} threshold_medium={result.thresholds.medium} "
+            f"threshold_low={result.thresholds.low} icp_accounts={result.icp_accounts} non_icp_accounts={result.non_icp_accounts} "
+            f"icp_high_coverage={result.icp_high_coverage} icp_medium_coverage={result.icp_medium_coverage} "
+            f"non_icp_high_hit_rate={result.non_icp_high_hit_rate} non_icp_medium_hit_rate={result.non_icp_medium_hit_rate} "
+            f"scenario_pass_rate={result.scenario_pass_rate} quality_passed={int(result.passed)} "
+            f"failed_checks={'|'.join(result.failed_checks) if result.failed_checks else 'none'}"
         )
     finally:
         conn.close()
@@ -1167,28 +1027,23 @@ def eval_output(
 
 @app.command("self-improve-output")
 def self_improve_output(
-    date_str: str = typer.Option(None, "--date", help="Self-improvement date YYYY-MM-DD"),
+    date_str: str = typer.Option(None, "--date"),
     max_iterations: int = typer.Option(5, "--max-iterations", min=1),
     min_icp_medium_coverage: float = typer.Option(0.6, "--min-icp-medium-coverage", min=0.0, max=1.0),
     min_icp_high_coverage: float = typer.Option(0.2, "--min-icp-high-coverage", min=0.0, max=1.0),
     max_non_icp_medium_hit_rate: float = typer.Option(0.5, "--max-non-icp-medium-hit-rate", min=0.0, max=1.0),
     max_non_icp_high_hit_rate: float = typer.Option(0.25, "--max-non-icp-high-hit-rate", min=0.0, max=1.0),
     min_scenario_pass_rate: float = typer.Option(0.9, "--min-scenario-pass-rate", min=0.0, max=1.0),
-    scenarios_path: str = typer.Option(
-        "config/profile_scenarios.csv",
-        "--scenarios-path",
-        help="Scenario CSV path relative to project root (or absolute path)",
-    ),
-    write: bool = typer.Option(False, "--write", help="Persist tuned thresholds and regenerate scoring outputs"),
+    scenarios_path: str = typer.Option("config/profile_scenarios.csv", "--scenarios-path"),
+    write: bool = typer.Option(False, "--write"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-
         current_thresholds = load_thresholds(settings.thresholds_path)
         raw_scenario_path = Path(scenarios_path)
         scenario_path = (
@@ -1202,7 +1057,6 @@ def self_improve_output(
             max_non_icp_high_hit_rate=max_non_icp_high_hit_rate,
             min_scenario_pass_rate=min_scenario_pass_rate,
         )
-
         result = run_threshold_self_improvement(
             conn=conn,
             run_id=run_id,
@@ -1212,7 +1066,6 @@ def self_improve_output(
             max_iterations=max_iterations,
             scenarios=scenarios,
         )
-
         latest_run_id = run_id
         thresholds_changed = (
             round(result.final_thresholds.high, 4) != round(current_thresholds.high, 4)
@@ -1243,46 +1096,27 @@ def self_improve_output(
             )
         )
         typer.echo(
-            " ".join(
-                [
-                    f"run_id={latest_run_id}",
-                    f"iterations={len(result.iterations)}",
-                    f"initial_high={current_thresholds.high}",
-                    f"initial_medium={current_thresholds.medium}",
-                    f"final_high={result.final_thresholds.high}",
-                    f"final_medium={result.final_thresholds.medium}",
-                    f"quality_passed={int(result.passed)}",
-                    f"converged={int(result.converged)}",
-                    f"failed_checks={'|'.join(final_eval.failed_checks) if final_eval.failed_checks else 'none'}",
-                    f"written={int(write and thresholds_changed)}",
-                ]
-            )
+            f"run_id={latest_run_id} iterations={len(result.iterations)} initial_high={current_thresholds.high} "
+            f"initial_medium={current_thresholds.medium} final_high={result.final_thresholds.high} "
+            f"final_medium={result.final_thresholds.medium} quality_passed={int(result.passed)} converged={int(result.converged)} "
+            f"failed_checks={'|'.join(final_eval.failed_checks) if final_eval.failed_checks else 'none'} "
+            f"written={int(write and thresholds_changed)}"
         )
     finally:
         conn.close()
 
 
+# ---------------------------------------------------------------------------
+# Orchestrator commands
+# ---------------------------------------------------------------------------
+
+
 @app.command("run-daily")
 def run_daily(
-    date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD"),
-    live_max_accounts: int | None = typer.Option(
-        None,
-        "--live-max-accounts",
-        min=1,
-        help="Override live crawl account budget for this run only.",
-    ),
-    live_workers_per_source: int | None = typer.Option(
-        None,
-        "--live-workers-per-source",
-        min=1,
-        help="Override live crawl workers per source for this run only.",
-    ),
-    stage_timeout_seconds: int | None = typer.Option(
-        None,
-        "--stage-timeout-seconds",
-        min=30,
-        help="Override per-stage timeout for this run only.",
-    ),
+    date_str: str = typer.Option(None, "--date"),
+    live_max_accounts: int | None = typer.Option(None, "--live-max-accounts", min=1),
+    live_workers_per_source: int | None = typer.Option(None, "--live-workers-per-source", min=1),
+    stage_timeout_seconds: int | None = typer.Option(None, "--stage-timeout-seconds", min=30),
 ) -> None:
     settings, conn, seeded = _bootstrap()
     overrides: dict[str, object] = {}
@@ -1555,24 +1389,17 @@ def run_daily(
 
 
 @app.command("icp-report")
-def icp_report(date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+def icp_report(date_str: str = typer.Option(None, "--date")) -> None:
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-        report = _write_icp_coverage_report(conn, settings, run_id, run_date)
+        report = write_icp_coverage_report(conn, settings, run_id, run_date)
         typer.echo(
-            " ".join(
-                [
-                    f"path={report['path']}",
-                    f"total_accounts={report['total_accounts']}",
-                    f"high_or_medium_accounts={report['high_or_medium_accounts']}",
-                    f"coverage_rate={report['coverage_rate']}",
-                ]
-            )
+            f"path={report['path']} total_accounts={report['total_accounts']} high_or_medium_accounts={report['high_or_medium_accounts']} coverage_rate={report['coverage_rate']}"
         )
     finally:
         conn.close()
@@ -1580,80 +1407,50 @@ def icp_report(date_str: str = typer.Option(None, "--date", help="Run date YYYY-
 
 @app.command("icp-signal-gaps")
 def icp_signal_gaps(
-    date_str: str = typer.Option(None, "--date", help="Run date YYYY-MM-DD"),
-    playbook_path: str = typer.Option(
-        "config/icp_signal_playbook.csv",
-        "--playbook-path",
-        help="Playbook CSV path relative to project root (or absolute path)",
-    ),
-    reference_path: str = typer.Option(
-        "config/icp_reference_accounts.csv",
-        "--reference-path",
-        help="ICP reference CSV path relative to project root (or absolute path)",
-    ),
+    date_str: str = typer.Option(None, "--date"),
+    playbook_path: str = typer.Option("config/icp_signal_playbook.csv", "--playbook-path"),
+    reference_path: str = typer.Option("config/icp_reference_accounts.csv", "--reference-path"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         run_id = db.get_latest_run_id_for_date(conn, run_date.isoformat())
         if not run_id:
             raise typer.BadParameter(f"No score run found for date {run_date.isoformat()}")
-
-        raw_playbook_path = Path(playbook_path)
-        resolved_playbook_path = (
-            raw_playbook_path if raw_playbook_path.is_absolute() else (settings.project_root / raw_playbook_path)
-        )
-        raw_reference_path = Path(reference_path)
-        resolved_reference_path = (
-            raw_reference_path if raw_reference_path.is_absolute() else (settings.project_root / raw_reference_path)
-        )
-
+        raw_pb = Path(playbook_path)
+        resolved_pb = raw_pb if raw_pb.is_absolute() else (settings.project_root / raw_pb)
+        raw_ref = Path(reference_path)
+        resolved_ref = raw_ref if raw_ref.is_absolute() else (settings.project_root / raw_ref)
         rows, summary = icp_playbook.compute_icp_signal_gaps(
-            conn=conn,
-            run_id=run_id,
-            reference_csv_path=resolved_reference_path,
-            playbook_path=resolved_playbook_path,
+            conn=conn, run_id=run_id, reference_csv_path=resolved_ref, playbook_path=resolved_pb
         )
-
         output_path = settings.out_dir / f"icp_signal_gaps_{run_date.strftime('%Y%m%d')}.csv"
         icp_playbook.write_icp_signal_gap_report(output_path, rows)
-
         typer.echo(
-            " ".join(
-                [
-                    f"path={output_path}",
-                    f"total_accounts={summary['total_accounts']}",
-                    f"expected_signals={summary['expected_signals']}",
-                    f"observed_signals={summary['observed_signals']}",
-                    f"coverage_rate={summary['coverage_rate']}",
-                    f"high_priority_gaps={summary['high_priority_gaps']}",
-                    f"accounts_with_full_coverage={summary['accounts_with_full_coverage']}",
-                ]
-            )
+            f"path={output_path} total_accounts={summary['total_accounts']} expected_signals={summary['expected_signals']} "
+            f"observed_signals={summary['observed_signals']} coverage_rate={summary['coverage_rate']} "
+            f"high_priority_gaps={summary['high_priority_gaps']} accounts_with_full_coverage={summary['accounts_with_full_coverage']}"
         )
     finally:
         conn.close()
 
 
+# ---------------------------------------------------------------------------
+# Discovery commands
+# ---------------------------------------------------------------------------
+
+
 @app.command("discover-ingest")
-def discover_ingest(date_str: str = typer.Option(None, "--date", help="Discovery ingest date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+def discover_ingest(date_str: str = typer.Option(None, "--date")) -> None:
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         result = discovery_pipeline.ingest_external_events(conn, settings, run_date)
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={result['run_date']}",
-                    f"events_seen={result['events_seen']}",
-                    f"events_processed={result['events_processed']}",
-                    f"events_failed={result['events_failed']}",
-                    f"signal_matches={result['signal_matches']}",
-                    f"observations_inserted={result['observations_inserted']}",
-                ]
-            )
+            f"run_date={result['run_date']} events_seen={result['events_seen']} events_processed={result['events_processed']} "
+            f"events_failed={result['events_failed']} signal_matches={result['signal_matches']} observations_inserted={result['observations_inserted']}"
         )
     finally:
         conn.close()
@@ -1661,26 +1458,17 @@ def discover_ingest(date_str: str = typer.Option(None, "--date", help="Discovery
 
 @app.command("discover-frontier")
 def discover_frontier(
-    date_str: str = typer.Option(None, "--date", help="Frontier build date YYYY-MM-DD"),
-    profile: str = typer.Option("light", "--profile", help="Hunt profile: light|balanced|heavy"),
+    date_str: str = typer.Option(None, "--date"), profile: str = typer.Option("light", "--profile")
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         profile_cfg = hunt_pipeline.resolve_profile(profile)
         result = hunt_pipeline.build_frontier(conn, settings, run_date, profile=profile_cfg)
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={result['run_date']}",
-                    f"profile={profile_cfg.name}",
-                    f"events_seen={result['events_seen']}",
-                    f"frontier_queued={result['frontier_queued']}",
-                    f"frontier_duplicates={result['frontier_duplicates']}",
-                    f"events_failed={result['events_failed']}",
-                ]
-            )
+            f"run_date={result['run_date']} profile={profile_cfg.name} events_seen={result['events_seen']} "
+            f"frontier_queued={result['frontier_queued']} frontier_duplicates={result['frontier_duplicates']} events_failed={result['events_failed']}"
         )
     finally:
         conn.close()
@@ -1688,26 +1476,17 @@ def discover_frontier(
 
 @app.command("discover-fetch")
 def discover_fetch(
-    date_str: str = typer.Option(None, "--date", help="Fetch date YYYY-MM-DD"),
-    profile: str = typer.Option("light", "--profile", help="Hunt profile: light|balanced|heavy"),
+    date_str: str = typer.Option(None, "--date"), profile: str = typer.Option("light", "--profile")
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         profile_cfg = hunt_pipeline.resolve_profile(profile)
         result = hunt_pipeline.fetch_documents(conn, settings, run_date, profile=profile_cfg)
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={result['run_date']}",
-                    f"profile={profile_cfg.name}",
-                    f"frontier_rows_seen={result['frontier_rows_seen']}",
-                    f"documents_fetched={result['documents_fetched']}",
-                    f"documents_failed={result['documents_failed']}",
-                    f"js_fetches_used={result['js_fetches_used']}",
-                ]
-            )
+            f"run_date={result['run_date']} profile={profile_cfg.name} frontier_rows_seen={result['frontier_rows_seen']} "
+            f"documents_fetched={result['documents_fetched']} documents_failed={result['documents_failed']} js_fetches_used={result['js_fetches_used']}"
         )
     finally:
         conn.close()
@@ -1715,29 +1494,19 @@ def discover_fetch(
 
 @app.command("discover-extract")
 def discover_extract(
-    date_str: str = typer.Option(None, "--date", help="Extraction date YYYY-MM-DD"),
-    profile: str = typer.Option("light", "--profile", help="Hunt profile: light|balanced|heavy"),
+    date_str: str = typer.Option(None, "--date"), profile: str = typer.Option("light", "--profile")
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         profile_cfg = hunt_pipeline.resolve_profile(profile)
         result = hunt_pipeline.extract_documents(conn, settings, run_date, profile=profile_cfg)
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={result['run_date']}",
-                    f"profile={profile_cfg.name}",
-                    f"documents_seen={result['documents_seen']}",
-                    f"documents_parsed={result['documents_parsed']}",
-                    f"listing_pages={result['listing_pages']}",
-                    f"links_enqueued={result['links_enqueued']}",
-                    f"mentions_inserted={result['mentions_inserted']}",
-                    f"observations_inserted={result['observations_inserted']}",
-                    f"people_activity_inserted={result['people_activity_inserted']}",
-                ]
-            )
+            f"run_date={result['run_date']} profile={profile_cfg.name} documents_seen={result['documents_seen']} "
+            f"documents_parsed={result['documents_parsed']} listing_pages={result['listing_pages']} links_enqueued={result['links_enqueued']} "
+            f"mentions_inserted={result['mentions_inserted']} observations_inserted={result['observations_inserted']} "
+            f"people_activity_inserted={result['people_activity_inserted']}"
         )
     finally:
         conn.close()
@@ -1750,11 +1519,11 @@ def discover_score(
         False, "--quality-gates/--no-quality-gates", help="Enforce evidence/relevance gates"
     ),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
-        score_run_id = _run_scoring(conn, settings, run_date)
+        score_run_id = run_scoring_stage(conn, settings, run_date)
         result = discovery_pipeline.score_discovery_candidates(
             conn=conn,
             settings=settings,
@@ -1767,26 +1536,18 @@ def discover_score(
             min_relevance_score=0.65,
         )
         typer.echo(
-            " ".join(
-                [
-                    f"score_run_id={score_run_id}",
-                    f"quality_gates={int(quality_gates)}",
-                    f"discovery_run_id={result['discovery_run_id']}",
-                    f"total_candidates={result['total_candidates']}",
-                    f"high_candidates={result['high_candidates']}",
-                    f"medium_candidates={result['medium_candidates']}",
-                    f"explore_candidates={result['explore_candidates']}",
-                    f"crm_eligible_candidates={result['crm_eligible_candidates']}",
-                ]
-            )
+            f"score_run_id={score_run_id} quality_gates={int(quality_gates)} discovery_run_id={result['discovery_run_id']} "
+            f"total_candidates={result['total_candidates']} high_candidates={result['high_candidates']} "
+            f"medium_candidates={result['medium_candidates']} explore_candidates={result['explore_candidates']} "
+            f"crm_eligible_candidates={result['crm_eligible_candidates']}"
         )
     finally:
         conn.close()
 
 
 @app.command("discover-report")
-def discover_report(date_str: str = typer.Option(None, "--date", help="Discovery report date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+def discover_report(date_str: str = typer.Option(None, "--date")) -> None:
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
@@ -1795,19 +1556,11 @@ def discover_report(date_str: str = typer.Option(None, "--date", help="Discovery
             raise typer.BadParameter(f"No discovery run found for date {run_date.isoformat()}")
         result = discovery_pipeline.write_discovery_reports(conn, settings, run_date, discovery_run_id)
         typer.echo(
-            " ".join(
-                [
-                    f"discovery_run_id={discovery_run_id}",
-                    f"discovery_queue_rows={result['discovery_queue_rows']}",
-                    f"crm_candidates_rows={result['crm_candidates_rows']}",
-                    f"manual_review_rows={result['manual_review_rows']}",
-                    f"metrics_rows={result['metrics_rows']}",
-                    f"discovery_queue_path={result['discovery_queue_path']}",
-                    f"crm_candidates_path={result['crm_candidates_path']}",
-                    f"manual_review_path={result['manual_review_path']}",
-                    f"discovery_metrics_path={result['discovery_metrics_path']}",
-                ]
-            )
+            f"discovery_run_id={discovery_run_id} discovery_queue_rows={result['discovery_queue_rows']} "
+            f"crm_candidates_rows={result['crm_candidates_rows']} manual_review_rows={result['manual_review_rows']} "
+            f"metrics_rows={result['metrics_rows']} discovery_queue_path={result['discovery_queue_path']} "
+            f"crm_candidates_path={result['crm_candidates_path']} manual_review_path={result['manual_review_path']} "
+            f"discovery_metrics_path={result['discovery_metrics_path']}"
         )
     finally:
         conn.close()
@@ -1815,62 +1568,33 @@ def discover_report(date_str: str = typer.Option(None, "--date", help="Discovery
 
 @app.command("run-discovery")
 def run_discovery(
-    date_str: str = typer.Option(None, "--date", help="Discovery run date YYYY-MM-DD"),
-    profile: str = typer.Option("light", "--profile", help="Hunt profile: light|balanced|heavy"),
+    date_str: str = typer.Option(None, "--date"), profile: str = typer.Option("light", "--profile")
 ) -> None:
-    # Backward-compatible command name; runtime is now story-deep hunt only.
     run_date = parse_date(date_str, load_settings().run_timezone)
-    result = _run_hunt_cycle(run_date, profile_name=profile)
+    result = run_hunt_cycle(run_date, profile_name=profile)
     typer.echo(
-        " ".join(
-            [
-                f"run_date={result['run_date']}",
-                f"profile={result['profile']}",
-                f"events_seen={result['events_seen']}",
-                f"frontier_queued={result['frontier_queued']}",
-                f"documents_fetched={result['documents_fetched']}",
-                f"documents_parsed={result['documents_parsed']}",
-                f"mentions_inserted={result['mentions_inserted']}",
-                f"observations_inserted={result['observations_inserted']}",
-                f"score_run_id={result['score_run_id']}",
-                f"discovery_run_id={result['discovery_run_id']}",
-                f"total_candidates={result['total_candidates']}",
-                f"crm_candidates_rows={result['crm_candidates_rows']}",
-                f"manual_review_rows={result['manual_review_rows']}",
-                f"story_evidence_rows={result['story_evidence_rows']}",
-                f"signal_lineage_rows={result['signal_lineage_rows']}",
-            ]
-        )
+        f"run_date={result['run_date']} profile={result['profile']} events_seen={result['events_seen']} "
+        f"frontier_queued={result['frontier_queued']} documents_fetched={result['documents_fetched']} "
+        f"documents_parsed={result['documents_parsed']} mentions_inserted={result['mentions_inserted']} "
+        f"observations_inserted={result['observations_inserted']} score_run_id={result['score_run_id']} "
+        f"discovery_run_id={result['discovery_run_id']} total_candidates={result['total_candidates']} "
+        f"crm_candidates_rows={result['crm_candidates_rows']} manual_review_rows={result['manual_review_rows']} "
+        f"story_evidence_rows={result['story_evidence_rows']} signal_lineage_rows={result['signal_lineage_rows']}"
     )
 
 
 @app.command("run-hunt")
-def run_hunt(
-    date_str: str = typer.Option(None, "--date", help="Hunt run date YYYY-MM-DD"),
-    profile: str = typer.Option("light", "--profile", help="Hunt profile: light|balanced|heavy"),
-) -> None:
+def run_hunt(date_str: str = typer.Option(None, "--date"), profile: str = typer.Option("light", "--profile")) -> None:
     run_date = parse_date(date_str, load_settings().run_timezone)
-    result = _run_hunt_cycle(run_date, profile_name=profile)
+    result = run_hunt_cycle(run_date, profile_name=profile)
     typer.echo(
-        " ".join(
-            [
-                f"run_date={result['run_date']}",
-                f"profile={result['profile']}",
-                f"events_seen={result['events_seen']}",
-                f"frontier_queued={result['frontier_queued']}",
-                f"documents_fetched={result['documents_fetched']}",
-                f"documents_parsed={result['documents_parsed']}",
-                f"mentions_inserted={result['mentions_inserted']}",
-                f"observations_inserted={result['observations_inserted']}",
-                f"score_run_id={result['score_run_id']}",
-                f"discovery_run_id={result['discovery_run_id']}",
-                f"total_candidates={result['total_candidates']}",
-                f"crm_candidates_rows={result['crm_candidates_rows']}",
-                f"manual_review_rows={result['manual_review_rows']}",
-                f"story_evidence_rows={result['story_evidence_rows']}",
-                f"signal_lineage_rows={result['signal_lineage_rows']}",
-            ]
-        )
+        f"run_date={result['run_date']} profile={result['profile']} events_seen={result['events_seen']} "
+        f"frontier_queued={result['frontier_queued']} documents_fetched={result['documents_fetched']} "
+        f"documents_parsed={result['documents_parsed']} mentions_inserted={result['mentions_inserted']} "
+        f"observations_inserted={result['observations_inserted']} score_run_id={result['score_run_id']} "
+        f"discovery_run_id={result['discovery_run_id']} total_candidates={result['total_candidates']} "
+        f"crm_candidates_rows={result['crm_candidates_rows']} manual_review_rows={result['manual_review_rows']} "
+        f"story_evidence_rows={result['story_evidence_rows']} signal_lineage_rows={result['signal_lineage_rows']}"
     )
 
 
@@ -1879,19 +1603,12 @@ def run_autonomous_loop(
     ingest_interval_minutes: int = typer.Option(15, "--ingest-interval-minutes", min=1),
     score_interval_minutes: int = typer.Option(60, "--score-interval-minutes", min=5),
     discovery_interval_minutes: int = typer.Option(180, "--discovery-interval-minutes", min=10),
-    hunt_profile: str = typer.Option("light", "--hunt-profile", help="Hunt profile: light|balanced|heavy"),
+    hunt_profile: str = typer.Option("light", "--hunt-profile"),
     sleep_seconds: int = typer.Option(5, "--sleep-seconds", min=1),
-    once: bool = typer.Option(False, "--once", help="Run one cycle for each due job and exit"),
+    once: bool = typer.Option(False, "--once"),
 ) -> None:
-    settings = load_settings()
-    lock_conn = db.get_connection(settings.pg_dsn)
-    db.init_db(lock_conn)
-    lock_owner = f"pid{os.getpid()}-{uuid.uuid4().hex[:8]}"
-    lock_acquired = db.try_advisory_lock(
-        lock_conn,
-        lock_name=_AUTONOMOUS_LOCK_NAME,
-        owner_id=lock_owner,
-        details=f"hunt_profile={hunt_profile}",
+    run_autonomous_loop_impl(
+        ingest_interval_minutes, score_interval_minutes, discovery_interval_minutes, hunt_profile, sleep_seconds, once
     )
     if not lock_acquired:
         logger.warning("autonomous_loop skipped reason=lock_busy lock_name=%s", _AUTONOMOUS_LOCK_NAME)
@@ -2103,59 +1820,16 @@ def run_autonomous_loop(
         lock_conn.close()
 
 
-def _execute_retry_task(task: dict[str, object], settings: Settings) -> None:
-    task_type = str(task.get("task_type", "") or "").strip().lower()
-    payload_raw = str(task.get("payload_json", "{}") or "{}")
-    try:
-        payload = json.loads(payload_raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError("invalid_retry_payload_json") from exc
-    if not isinstance(payload, dict):
-        raise ValueError("invalid_retry_payload")
-
-    raw_run_date = payload.get("run_date")
-    run_date_value = str(raw_run_date).strip() if raw_run_date is not None else ""
-    run_date = parse_date(run_date_value or None, settings.run_timezone)
-    if task_type == "run_daily":
-        previous_flag = os.getenv("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE")
-        os.environ["SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE"] = "1"
-        try:
-            run_daily(
-                date_str=run_date.isoformat(),
-                live_max_accounts=None,
-                live_workers_per_source=None,
-                stage_timeout_seconds=None,
-            )
-        finally:
-            if previous_flag is None:
-                os.environ.pop("SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE", None)
-            else:
-                os.environ["SIGNALS_DISABLE_AUTO_RETRY_ENQUEUE"] = previous_flag
-        return
-
-    if task_type == "ingest_cycle":
-        _run_ingest_cycle(run_date)
-        return
-    if task_type == "score_cycle":
-        _run_score_cycle(run_date)
-        return
-    if task_type == "discovery_cycle":
-        profile = str(payload.get("hunt_profile", "light") or "light")
-        _run_hunt_cycle(run_date, profile_name=profile)
-        return
-    raise ValueError(f"unsupported_retry_task_type={task_type}")
+# ---------------------------------------------------------------------------
+# Admin / utility commands
+# ---------------------------------------------------------------------------
 
 
 @app.command("retry-failures")
-def retry_failures(
-    limit: int = typer.Option(20, "--limit", min=1, help="Maximum due retry tasks to process in this run"),
-) -> None:
-    settings, conn, seeded = _bootstrap()
+def retry_failures(limit: int = typer.Option(20, "--limit", min=1)) -> None:
+    settings, conn, seeded = bootstrap()
     del seeded
-    processed = 0
-    completed = 0
-    rescheduled = 0
-    quarantined = 0
+    processed = completed = rescheduled = quarantined = 0
     try:
         tasks = db.fetch_due_retry_tasks(conn, limit=limit)
         for task in tasks:
@@ -2165,7 +1839,7 @@ def retry_failures(
             payload_json = str(task["payload_json"] or "{}")
             db.mark_retry_task_running(conn, task_id, commit=True)
             try:
-                _execute_retry_task(dict(task), settings=settings)
+                execute_retry_task(dict(task), settings=settings)
                 db.mark_retry_task_completed(conn, task_id, commit=True)
                 completed += 1
             except Exception as exc:
@@ -2196,24 +1870,13 @@ def retry_failures(
                         conn,
                         task_id=task_id,
                         attempt_count=attempt_count,
-                        due_at=_retry_due_iso(_RETRY_BACKOFF_SECONDS[backoff_index]),
+                        due_at=retry_due_iso(_RETRY_BACKOFF_SECONDS[backoff_index]),
                         error_summary=str(exc),
                         commit=True,
                     )
                     rescheduled += 1
-
         typer.echo(
-            " ".join(
-                [
-                    f"processed={processed}",
-                    f"completed={completed}",
-                    f"rescheduled={rescheduled}",
-                    f"quarantined={quarantined}",
-                    f"queue_size={db.fetch_retry_queue_size(conn)}",
-                    f"retry_depth={db.fetch_retry_depth(conn)}",
-                    f"quarantine_size={db.fetch_quarantine_size(conn)}",
-                ]
-            )
+            f"processed={processed} completed={completed} rescheduled={rescheduled} quarantined={quarantined} queue_size={db.fetch_retry_queue_size(conn)} retry_depth={db.fetch_retry_depth(conn)} quarantine_size={db.fetch_quarantine_size(conn)}"
         )
     finally:
         conn.close()
@@ -2221,30 +1884,18 @@ def retry_failures(
 
 @app.command("replay-discovery-events")
 def replay_discovery_events(
-    date_str: str = typer.Option(None, "--date", help="Replay date YYYY-MM-DD"),
-    include_processed: bool = typer.Option(
-        False,
-        "--include-processed/--only-failed",
-        help="Replay both failed and processed events instead of failed-only",
-    ),
+    date_str: str = typer.Option(None, "--date"),
+    include_processed: bool = typer.Option(False, "--include-processed/--only-failed"),
 ) -> None:
-    settings, conn, seeded = _bootstrap()
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
         replayed = db.requeue_external_discovery_events(
-            conn,
-            run_date=run_date.isoformat(),
-            include_processed=include_processed,
+            conn, run_date=run_date.isoformat(), include_processed=include_processed
         )
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={run_date.isoformat()}",
-                    f"replayed_events={replayed}",
-                    f"include_processed={int(include_processed)}",
-                ]
-            )
+            f"run_date={run_date.isoformat()} replayed_events={replayed} include_processed={int(include_processed)}"
         )
     finally:
         conn.close()
@@ -2252,26 +1903,20 @@ def replay_discovery_events(
 
 @app.command("backfill-run-daily")
 def backfill_run_daily(
-    start_date: str = typer.Option(..., "--start-date", help="Backfill start date YYYY-MM-DD"),
-    end_date: str = typer.Option(..., "--end-date", help="Backfill end date YYYY-MM-DD"),
-    continue_on_error: bool = typer.Option(
-        False,
-        "--continue-on-error/--stop-on-error",
-        help="Continue backfill even if one run fails",
-    ),
+    start_date: str = typer.Option(..., "--start-date"),
+    end_date: str = typer.Option(..., "--end-date"),
+    continue_on_error: bool = typer.Option(False, "--continue-on-error/--stop-on-error"),
 ) -> None:
     settings = load_settings()
     start = parse_date(start_date, settings.run_timezone)
     end = parse_date(end_date, settings.run_timezone)
     if end < start:
         raise typer.BadParameter("end-date must be on or after start-date")
-
     current = start
-    succeeded = 0
-    failed = 0
+    succeeded = failed = 0
     while current <= end:
         try:
-            run_daily(
+            run_daily_impl(
                 date_str=current.isoformat(),
                 live_max_accounts=None,
                 live_workers_per_source=None,
@@ -2284,41 +1929,22 @@ def backfill_run_daily(
             if not continue_on_error:
                 raise
         current += timedelta(days=1)
-
-    typer.echo(
-        " ".join(
-            [
-                f"start_date={start.isoformat()}",
-                f"end_date={end.isoformat()}",
-                f"succeeded={succeeded}",
-                f"failed={failed}",
-            ]
-        )
-    )
+    typer.echo(f"start_date={start.isoformat()} end_date={end.isoformat()} succeeded={succeeded} failed={failed}")
 
 
 @app.command("ops-metrics")
-def ops_metrics(date_str: str = typer.Option(None, "--date", help="Metrics date YYYY-MM-DD")) -> None:
-    settings, conn, seeded = _bootstrap()
+def ops_metrics(date_str: str = typer.Option(None, "--date")) -> None:
+    settings, conn, seeded = bootstrap()
     run_date = parse_date(date_str, settings.run_timezone)
     del seeded
     try:
-        result = _persist_ops_metrics(conn, settings, run_date)
+        result = persist_ops_metrics(conn, settings, run_date)
         path = settings.out_dir / f"ops_metrics_{run_date.strftime('%Y%m%d')}.csv"
         typer.echo(
-            " ".join(
-                [
-                    f"run_date={run_date.isoformat()}",
-                    f"ops_metrics_rows={result['ops_metrics_rows']}",
-                    f"retry_depth={result['retry_depth']}",
-                    f"retry_queue_size={result['retry_queue_size']}",
-                    f"quarantine_size={result['quarantine_size']}",
-                    f"lock_busy_24h={result['lock_busy_24h']}",
-                    f"lock_release_missed_24h={result['lock_release_missed_24h']}",
-                    f"handoff_success_rate={result['handoff_success_rate']}",
-                    f"path={path}",
-                ]
-            )
+            f"run_date={run_date.isoformat()} ops_metrics_rows={result['ops_metrics_rows']} retry_depth={result['retry_depth']} "
+            f"retry_queue_size={result['retry_queue_size']} quarantine_size={result['quarantine_size']} "
+            f"lock_busy_24h={result['lock_busy_24h']} lock_release_missed_24h={result['lock_release_missed_24h']} "
+            f"handoff_success_rate={result['handoff_success_rate']} path={path}"
         )
     finally:
         conn.close()
@@ -2333,8 +1959,8 @@ def alert_test(
     settings = load_settings()
     ensure_project_directories([settings.out_dir])
     result = send_alert(settings, title=title, body=body, severity=severity)
-    channels = ",".join(str(channel) for channel in result.get("delivered_channels", []))
-    errors = ",".join(str(item) for item in result.get("errors", []))
+    channels = ",".join(str(c) for c in result.get("delivered_channels", []))
+    errors = ",".join(str(e) for e in result.get("errors", []))
     typer.echo(f"channels={channels} errors={errors}")
 
 
@@ -2344,17 +1970,7 @@ def serve_discovery_webhook(
     port: int = typer.Option(8787, "--port"),
     log_level: str = typer.Option("info", "--log-level"),
 ) -> None:
-    try:
-        import uvicorn  # type: ignore
-    except Exception as exc:
-        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
-
-    from src.discovery.webhook import app as discovery_app
-
-    if discovery_app is None:
-        raise typer.BadParameter("fastapi is required. Install project dependencies first.")
-
-    uvicorn.run(discovery_app, host=host, port=port, log_level=log_level)
+    serve_discovery_webhook_impl(host, port, log_level)
 
 
 @app.command("serve-local-ui")
@@ -2363,14 +1979,7 @@ def serve_local_ui(
     port: int = typer.Option(8788, "--port"),
     log_level: str = typer.Option("info", "--log-level"),
 ) -> None:
-    try:
-        import uvicorn  # type: ignore
-    except Exception as exc:
-        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
-
-    from src.ui.local_app import app as local_ui_app
-
-    uvicorn.run(local_ui_app, host=host, port=port, log_level=log_level)
+    serve_local_ui_impl(host, port, log_level)
 
 
 @app.command("serve-web")
@@ -2380,15 +1989,7 @@ def serve_web(
     log_level: str = typer.Option("info", "--log-level"),
 ) -> None:
     """Launch the Signals pipeline web UI."""
-    try:
-        import uvicorn  # type: ignore
-    except Exception as exc:
-        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
-
-    from src.web.app import create_app
-
-    web_app = create_app()
-    uvicorn.run(web_app, host=host, port=port, log_level=log_level)
+    serve_web_impl(host, port, log_level)
 
 
 if __name__ == "__main__":
