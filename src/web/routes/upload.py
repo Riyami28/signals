@@ -10,6 +10,7 @@ import uuid
 from typing import Optional
 
 import anthropic
+import httpx
 from fastapi import APIRouter, HTTPException, UploadFile
 
 from src import db
@@ -93,7 +94,6 @@ _HEADER_ALIASES: dict[str, list[str]] = {
 def _get_conn():
     settings = load_settings()
     conn = db.get_connection(settings.pg_dsn)
-    db.init_db(conn)
     return conn
 
 
@@ -138,21 +138,49 @@ def _ai_detect_columns(
     api_key: str,
     model: str = "claude-sonnet-4-5",
     timeout: int = 30,
+    provider: str = "claude",
 ) -> dict[str, str]:
-    """Use Claude to detect column mappings from headers + sample data."""
+    """Use LLM to detect column mappings from headers + sample data."""
     sample_text = "Headers: " + ", ".join(headers) + "\n\nSample rows:\n"
     for row in sample_rows[:5]:
         sample_text += json.dumps(row, ensure_ascii=False) + "\n"
 
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model=model,
-        max_tokens=256,
-        system=_AI_PARSE_SYSTEM,
-        messages=[{"role": "user", "content": sample_text}],
-        timeout=timeout,
-    )
-    raw = message.content[0].text if message.content else "{}"
+    if provider == "minimax":
+        http_client = httpx.Client(
+            base_url="https://api.minimax.io/v1",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        response = http_client.post(
+            "/chat/completions",
+            json={
+                "model": model,
+                "max_tokens": 256,
+                "messages": [
+                    {"role": "system", "content": _AI_PARSE_SYSTEM},
+                    {"role": "user", "content": sample_text},
+                ],
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        first = choices[0] if choices else {}
+        msg = first.get("message") if isinstance(first, dict) else {}
+        raw = (msg or {}).get("content") or "{}"
+    else:
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model=model,
+            max_tokens=256,
+            system=_AI_PARSE_SYSTEM,
+            messages=[{"role": "user", "content": sample_text}],
+            timeout=timeout,
+        )
+        raw = message.content[0].text if message.content else "{}"
     # Strip any markdown fencing the model might add.
     raw = raw.strip()
     if raw.startswith("```"):
@@ -196,6 +224,7 @@ def _parse_and_validate_csv(
     content: str,
     ai_api_key: str,
     ai_model: str,
+    ai_provider: str = "claude",
 ) -> tuple[list[dict], dict[str, str], list[str]]:
     """Parse CSV content, detect columns, validate rows.
 
@@ -236,6 +265,7 @@ def _parse_and_validate_csv(
                 raw_rows[:5],
                 ai_api_key,
                 ai_model,
+                provider=ai_provider,
             )
             # Merge AI results (don't overwrite alias matches).
             for key, val in ai_mapping.items():
@@ -357,14 +387,20 @@ async def upload_csv(file: UploadFile):
 
     # Load settings for AI API key.
     settings = load_settings()
-    ai_api_key = settings.claude_api_key
-    ai_model = settings.claude_model
+    provider = getattr(settings, "llm_provider", "claude")
+    if provider == "minimax":
+        ai_api_key = settings.minimax_api_key
+        ai_model = settings.minimax_model
+    else:
+        ai_api_key = settings.claude_api_key
+        ai_model = settings.claude_model
 
     # Parse, detect columns, and validate.
     parsed_rows, column_mapping, validation_errors = _parse_and_validate_csv(
         content,
         ai_api_key,
         ai_model,
+        ai_provider=provider,
     )
 
     if not parsed_rows and validation_errors:

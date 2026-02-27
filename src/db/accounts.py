@@ -581,13 +581,25 @@ def get_accounts_paginated(
     order_col = sort_map.get(sort_by, "COALESCE(best.score, 0)")
     order_dir = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
+    # Use latest completed score run to avoid scanning all runs
+    latest_run_cte = """
+        WITH latest_run AS (
+            SELECT run_id FROM score_runs
+            WHERE status = 'completed'
+            ORDER BY started_at DESC LIMIT 1
+        )
+    """
+
     count_sql = f"""
+        {latest_run_cte}
         SELECT COUNT(*) as total FROM (
             SELECT a.account_id
             FROM accounts a
             LEFT JOIN LATERAL (
                 SELECT score, tier FROM account_scores
-                WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+                WHERE account_id = a.account_id
+                  AND run_id = (SELECT run_id FROM latest_run)
+                ORDER BY score DESC LIMIT 1
             ) best ON true
             {where_sql}
         ) sub
@@ -597,6 +609,7 @@ def get_accounts_paginated(
     offset = (page - 1) * per_page
     data_params = list(params) + [per_page, offset]
     data_sql = f"""
+        {latest_run_cte}
         SELECT
             a.account_id, a.company_name, a.domain, a.source_type,
             COALESCE(best.score, 0) AS score,
@@ -607,7 +620,9 @@ def get_accounts_paginated(
         LEFT JOIN LATERAL (
             SELECT score, tier
             FROM account_scores
-            WHERE account_id = a.account_id ORDER BY score DESC LIMIT 1
+            WHERE account_id = a.account_id
+              AND run_id = (SELECT run_id FROM latest_run)
+            ORDER BY score DESC LIMIT 1
         ) best ON true
         LEFT JOIN company_research cr ON cr.account_id = a.account_id
         {where_sql}
@@ -625,8 +640,20 @@ def get_account_detail(conn, account_id: str) -> dict | None:
         return None
     result = dict(account)
 
+    # Only return scores from the latest score run to avoid duplicates across runs
     scores = conn.execute(
-        "SELECT product, score, tier, dimension_scores_json FROM account_scores WHERE account_id = %s ORDER BY score DESC",
+        """
+        SELECT s.product, s.score, s.tier, s.dimension_scores_json
+        FROM account_scores s
+        JOIN score_runs r ON s.run_id = r.run_id
+        WHERE s.account_id = %s
+          AND r.run_id = (
+              SELECT run_id FROM score_runs
+              WHERE status = 'completed'
+              ORDER BY started_at DESC LIMIT 1
+          )
+        ORDER BY s.score DESC
+        """,
         (account_id,),
     ).fetchall()
     result["scores"] = [dict(r) for r in scores]
@@ -652,26 +679,43 @@ def get_account_detail(conn, account_id: str) -> dict | None:
 
 
 def get_dimension_scores(conn, account_id: str) -> dict:
-    """Parse dimension_scores_json from the latest highest-scoring row for this account."""
-    row = conn.execute(
+    """Merge dimension scores across all products (take MAX per dimension) from the latest completed run.
+
+    This gives the most complete picture of an account's strength across
+    all dimensions, regardless of which product the signal was scored under.
+    """
+    rows = conn.execute(
         """
         SELECT s.dimension_scores_json
         FROM account_scores s
-        JOIN score_runs r ON s.run_id = r.run_id
         WHERE s.account_id = %s
-        ORDER BY r.started_at DESC, s.score DESC
-        LIMIT 1
+          AND s.run_id = (
+              SELECT run_id FROM score_runs
+              WHERE status = 'completed'
+              ORDER BY started_at DESC LIMIT 1
+          )
         """,
         (account_id,),
-    ).fetchone()
-    if not row:
+    ).fetchall()
+    if not rows:
         return {}
-    raw = str(row["dimension_scores_json"] or "{}").strip()
-    try:
-        parsed = json.loads(raw)
-        return parsed if isinstance(parsed, dict) else {}
-    except (json.JSONDecodeError, TypeError):
-        return {}
+
+    merged: dict[str, float] = {}
+    for row in rows:
+        raw = str(row["dimension_scores_json"] or "{}").strip()
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                for dim, val in parsed.items():
+                    try:
+                        fval = float(val)
+                    except (TypeError, ValueError):
+                        fval = 0.0
+                    merged[dim] = max(merged.get(dim, 0.0), fval)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    return merged
 
 
 def get_account_velocity(conn, account_id: str) -> dict:

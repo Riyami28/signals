@@ -126,6 +126,18 @@ class Settings(BaseSettings):
     minimax_model: str = Field(default="MiniMax-M2.5")
     llm_provider: str = Field(default="minimax")  # "minimax" or "claude"
 
+    # --- Serper (Google Search API for real news) ---
+    serper_api_key: str = Field(default="")
+    serper_max_accounts: int = Field(default=50, ge=1)
+    serper_results_per_query: int = Field(default=10, ge=1, le=100)
+
+    # --- Website Tech Scan (FREE — no API key needed) ---
+    techscan_max_accounts: int = Field(default=100, ge=1)
+
+    # --- GNews.io (free tier: 100 req/day, no CC needed) ---
+    gnews_api_key: str = Field(default="")
+    gnews_max_accounts: int = Field(default=80, ge=1)
+
     # --- connection pooling ---
     db_pool_min_size: int = Field(default=4, ge=1)
     db_pool_max_size: int = Field(default=32, ge=1)

@@ -14,7 +14,6 @@ router = APIRouter(tags=["research"])
 def get_research(account_id: str):
     settings = load_settings()
     conn = db.get_connection(settings.pg_dsn)
-    db.init_db(conn)
     try:
         research = db.get_company_research(conn, account_id)
         contacts = db.get_contacts_for_account(conn, account_id)

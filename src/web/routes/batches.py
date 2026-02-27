@@ -21,7 +21,6 @@ router = APIRouter(tags=["batches"])
 def _get_conn():
     settings = load_settings()
     conn = db.get_connection(settings.pg_dsn)
-    db.init_db(conn)
     return conn
 
 

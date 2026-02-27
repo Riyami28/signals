@@ -127,6 +127,74 @@ def replace_run_scores(
     conn.commit()
 
 
+def _get_score_at_offset(conn: Any, account_id: str, product: str, run_date: str, days_back: int) -> float | None:
+    """Get the most recent score from *days_back* or more days ago."""
+    cur = conn.execute(
+        """
+        SELECT s.score
+        FROM account_scores s
+        JOIN score_runs r ON s.run_id = r.run_id
+        WHERE s.account_id = %s
+          AND s.product = %s
+          AND r.run_date::date <= (%s::date - INTERVAL '%s days')
+        ORDER BY r.run_date::date DESC, r.started_at DESC
+        LIMIT 1
+        """,
+        (account_id, product, run_date, days_back),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return float(row["score"])
+
+
+def get_score_velocity(
+    conn: Any, account_id: str, product: str, current_score: float, run_date: str
+) -> tuple[float, float, float]:
+    """Return (velocity_7d, velocity_14d, velocity_30d) for an account-product pair."""
+    results: list[float] = []
+    for days in (7, 14, 30):
+        past = _get_score_at_offset(conn, account_id, product, run_date, days)
+        if past is None:
+            results.append(0.0)
+        else:
+            results.append(round(current_score - past, 2))
+    return (results[0], results[1], results[2])
+
+
+def batch_get_velocity(
+    conn: Any,
+    run_date: str,
+) -> dict[tuple[str, str], dict[str, float | None]]:
+    """Fetch historical scores for ALL accounts at 7/14/30 day offsets in 3 queries.
+
+    Returns dict keyed by (account_id, product) -> {"past_7": score, "past_14": score, "past_30": score}.
+    Much faster than calling get_score_velocity per-account (3 queries vs 9000+).
+    """
+    result: dict[tuple[str, str], dict[str, float | None]] = {}
+
+    for days, key in ((7, "past_7"), (14, "past_14"), (30, "past_30")):
+        cur = conn.execute(
+            """
+            SELECT DISTINCT ON (s.account_id, s.product)
+                   s.account_id, s.product, s.score
+            FROM account_scores s
+            JOIN score_runs r ON s.run_id = r.run_id
+            WHERE r.run_date::date <= (%s::date - INTERVAL '%s days')
+              AND r.status = 'completed'
+            ORDER BY s.account_id, s.product, r.run_date::date DESC, r.started_at DESC
+            """,
+            (run_date, days),
+        )
+        for row in cur.fetchall():
+            pair = (str(row["account_id"]), str(row["product"]))
+            if pair not in result:
+                result[pair] = {"past_7": None, "past_14": None, "past_30": None}
+            result[pair][key] = float(row["score"])
+
+    return result
+
+
 def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) -> float:
     cur = conn.execute(
         """

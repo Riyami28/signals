@@ -103,14 +103,48 @@ community,poc_stage_progression,procurement opened,0.88
 community,poc_stage_progression,legal review opened,0.88
 community,vendor_consolidation_program,tool consolidation,0.75
 community,vendor_consolidation_program,single control plane,0.8
-news,enterprise_modernization_program,digital transformation,0.45
+news,enterprise_modernization_program,digital transformation,0.55
+news,enterprise_modernization_program,digital strategy,0.6
+news,enterprise_modernization_program,technology modernization,0.65
+news,enterprise_modernization_program,it transformation,0.65
+news,enterprise_modernization_program,technology investment,0.55
 news,data_platform_initiative,data platform,0.62
+news,data_platform_initiative,data analytics,0.55
+news,data_platform_initiative,ai platform,0.6
+news,data_platform_initiative,machine learning,0.55
 news,cloud_platform_messaging,cloud platform,0.6
+news,cloud_migration_intent,cloud migration,0.7
+news,cloud_migration_intent,cloud strategy,0.65
+news,cloud_migration_intent,aws,0.55
+news,cloud_migration_intent,azure,0.55
+news,cloud_migration_intent,google cloud,0.6
 news,compliance_governance_messaging,data governance,0.72
 news,compliance_governance_messaging,data governance program,0.74
 news,compliance_governance_messaging,security compliance,0.7
 news,compliance_governance_messaging,policy enforcement,0.72
 news,compliance_governance_messaging,audit readiness,0.72
+news,compliance_initiative,cybersecurity,0.65
+news,compliance_initiative,data breach,0.7
+news,compliance_initiative,cyber attack,0.7
+news,compliance_initiative,gdpr,0.7
+news,compliance_initiative,regulatory compliance,0.65
+news,erp_s4_migration_milestone,sap,0.55
+news,erp_s4_migration_milestone,erp,0.55
+news,erp_s4_migration_milestone,oracle cloud,0.6
+news,launch_or_scale_event,acquisition,0.55
+news,launch_or_scale_event,acquires,0.6
+news,launch_or_scale_event,merger,0.55
+news,launch_or_scale_event,new factory,0.6
+news,launch_or_scale_event,new plant,0.6
+news,launch_or_scale_event,expansion,0.5
+news,launch_or_scale_event,new market,0.55
+news,supply_chain_platform_rollout,supply chain,0.55
+news,supply_chain_platform_rollout,logistics platform,0.65
+news,supply_chain_platform_rollout,warehouse automation,0.7
+news,cost_reduction_mandate,cost cutting,0.65
+news,cost_reduction_mandate,restructuring,0.55
+news,cost_reduction_mandate,operational efficiency,0.6
+news,cost_reduction_mandate,margin improvement,0.65
 news,media_traffic_reliability_pressure,traffic surge,0.84
 news,media_traffic_reliability_pressure,ad stack outage,0.88
 news,media_traffic_reliability_pressure,ad stack reliability,0.9

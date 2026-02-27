@@ -34,7 +34,6 @@ async def start_pipeline(body: PipelineRunRequest):
         settings = load_settings()
         conn = db.get_connection(settings.pg_dsn)
         try:
-            db.init_db(conn)
             batch = db.get_upload_batch(conn, body.batch_id)
             if not batch:
                 raise HTTPException(status_code=404, detail=f"Batch {body.batch_id} not found")

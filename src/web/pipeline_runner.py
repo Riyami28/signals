@@ -54,7 +54,7 @@ def _run_pipeline_sync(
     """Synchronous pipeline execution — runs in a thread."""
     settings = load_settings()
     conn = db.get_connection(settings.pg_dsn)
-    db.init_db(conn)
+    # DB schema is initialized at app startup — no init_db() here to avoid locks
 
     run_date_obj = date.today()
     run_date = run_date_obj.isoformat()
@@ -79,7 +79,6 @@ def _run_pipeline_sync(
             _emit(queue, {"type": "stage", "stage": "ingest", "status": "running", "message": "Collecting signals..."})
             t0 = time.monotonic()
             try:
-                from src.collectors import community, first_party, jobs, news, technographics
                 from src.scoring.rules import load_keyword_lexicon, load_source_registry
                 from src.source_policy import load_source_execution_policy
 
@@ -95,9 +94,11 @@ def _run_pipeline_sync(
 
                 total_inserted = 0
 
-                # First-party signals (sync — no HTTP)
-                _emit(queue, {"type": "log", "stage": "ingest", "message": "Ingesting first-party signals..."})
+                # First-party signals (sync — no HTTP, always fast)
                 if _collector_enabled("first_party_csv"):
+                    _emit(queue, {"type": "log", "stage": "ingest", "message": "Ingesting first-party signals..."})
+                    from src.collectors import first_party
+
                     fp_result = first_party.collect(conn, settings, keyword_lexicon, source_registry)
                     total_inserted += fp_result.get("inserted", 0)
                     _emit(
@@ -109,39 +110,149 @@ def _run_pipeline_sync(
                         },
                     )
 
-                # Jobs (async)
-                if _collector_enabled("jobs_pages"):
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting job signals..."})
-                    j_result = _asyncio.run(jobs.collect(conn, settings, keyword_lexicon, source_registry))
-                    total_inserted += j_result.get("inserted", 0)
-                    _emit(
-                        queue,
-                        {"type": "log", "stage": "ingest", "message": f"Jobs: {j_result.get('inserted', 0)} signals"},
-                    )
+                # Legacy HTTP collectors (jobs, news, technographics) — run only if enabled
+                # These crawl actual websites and are slow, so skip quickly if disabled
+                legacy_collectors = [
+                    ("jobs_pages", "jobs", "Job"),
+                    ("news_rss", "news", "News"),
+                    ("technographics", "technographics", "Technographics"),
+                ]
+                for policy_key, module_name, label in legacy_collectors:
+                    if _collector_enabled(policy_key):
+                        _emit(queue, {"type": "log", "stage": "ingest", "message": f"Collecting {label} signals..."})
+                        import importlib
 
-                # News (async)
-                if _collector_enabled("news_rss"):
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting news signals..."})
-                    n_result = _asyncio.run(news.collect(conn, settings, keyword_lexicon, source_registry))
-                    total_inserted += n_result.get("inserted", 0)
-                    _emit(
-                        queue,
-                        {"type": "log", "stage": "ingest", "message": f"News: {n_result.get('inserted', 0)} signals"},
-                    )
+                        mod = importlib.import_module(f"src.collectors.{module_name}")
+                        c_result = _asyncio.run(mod.collect(conn, settings, keyword_lexicon, source_registry))
+                        ins = c_result.get("inserted", 0)
+                        total_inserted += ins
+                        _emit(
+                            queue,
+                            {"type": "log", "stage": "ingest", "message": f"{label}: {ins} signals"},
+                        )
 
-                # Technographics (async)
-                if _collector_enabled("technographics"):
-                    _emit(queue, {"type": "log", "stage": "ingest", "message": "Collecting technographics signals..."})
-                    t_result = _asyncio.run(technographics.collect(conn, settings, keyword_lexicon, source_registry))
-                    total_inserted += t_result.get("inserted", 0)
+                # --- ALL external collectors in PARALLEL ---
+                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional)
+                serper_news_enabled = _collector_enabled("serper_news") and settings.serper_api_key
+                serper_jobs_enabled = _collector_enabled("serper_jobs") and settings.serper_api_key
+                techscan_enabled = _collector_enabled("website_techscan")
+                gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
+
+                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled
+
+                if any_external:
+                    active_sources = []
+                    if serper_news_enabled:
+                        active_sources.append("serper_news")
+                    if serper_jobs_enabled:
+                        active_sources.append("serper_jobs")
+                    if techscan_enabled:
+                        active_sources.append("website_techscan")
+                    if gnews_enabled:
+                        active_sources.append("gnews")
+
                     _emit(
                         queue,
                         {
                             "type": "log",
                             "stage": "ingest",
-                            "message": f"Technographics: {t_result.get('inserted', 0)} signals",
+                            "message": f"Collecting from {len(active_sources)} sources in parallel: {', '.join(active_sources)}...",
                         },
                     )
+
+                    # Build ALL lexicon variants once
+                    all_news_lexicon = []
+                    for source_key in ("news", "technographics", "community"):
+                        all_news_lexicon.extend(r for r in keyword_lexicon.get(source_key, []) if r.get("keyword"))
+                    jobs_lexicon = [r for r in keyword_lexicon.get("jobs", []) if r.get("keyword")]
+
+                    async def _run_all_external():
+                        """Run ALL external collectors concurrently."""
+                        tasks = []
+                        task_labels = []
+
+                        # --- Serper collectors ---
+                        if serper_news_enabled:
+                            from src.collectors import serper_news
+
+                            tasks.append(
+                                serper_news.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_rows=all_news_lexicon,
+                                    source_reliability=source_registry.get("serper_news", 0.85),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("serper_news")
+
+                        if serper_jobs_enabled:
+                            from src.collectors import serper_jobs
+
+                            tasks.append(
+                                serper_jobs.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_rows=jobs_lexicon,
+                                    source_reliability=source_registry.get("serper_jobs", 0.80),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("serper_jobs")
+
+                        # --- Website tech scanner (FREE — no API key needed) ---
+                        if techscan_enabled:
+                            from src.collectors import website_techscan
+
+                            tasks.append(
+                                website_techscan.collect(
+                                    conn,
+                                    settings,
+                                    source_reliability=source_registry.get("website_techscan", 0.70),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("website_techscan")
+
+                        # --- GNews (optional, needs free gnews.io key) ---
+                        if gnews_enabled:
+                            from src.collectors import gnews_collector
+
+                            tasks.append(
+                                gnews_collector.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_rows=all_news_lexicon,
+                                    source_reliability=source_registry.get("gnews", 0.78),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("gnews")
+
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
+                        return list(zip(task_labels, results))
+
+                    external_results = _asyncio.run(_run_all_external())
+
+                    for label, result in external_results:
+                        if isinstance(result, Exception):
+                            logger.warning("collector_error collector=%s error=%s", label, result)
+                            _emit(
+                                queue,
+                                {"type": "log", "stage": "ingest", "message": f"{label}: failed ({result})"},
+                            )
+                            continue
+                        ins = result.get("inserted", 0)
+                        accts = result.get("accounts_processed", 0)
+                        total_inserted += ins
+                        _emit(
+                            queue,
+                            {
+                                "type": "log",
+                                "stage": "ingest",
+                                "message": f"{label}: {ins} signals from {accts} accounts",
+                            },
+                        )
 
                 dt = time.monotonic() - t0
                 _emit(
@@ -228,9 +339,19 @@ def _run_pipeline_sync(
                             )
                         )
 
-                # Compute velocity (7d/14d/30d) for each account-product
+                # Batch velocity: 3 queries instead of 9000+
+                _emit(queue, {"type": "log", "stage": "score", "message": "Computing velocity (batch)..."})
+                velocity_cache = db.batch_get_velocity(conn, run_date)
+
                 for score in result.account_scores:
-                    v7, v14, v30 = db.get_score_velocity(conn, score.account_id, score.product, score.score, run_date)
+                    pair = (score.account_id, score.product)
+                    hist = velocity_cache.get(pair, {})
+                    past_7 = hist.get("past_7")
+                    past_14 = hist.get("past_14")
+                    past_30 = hist.get("past_30")
+                    v7 = round(score.score - past_7, 2) if past_7 is not None else 0.0
+                    v14 = round(score.score - past_14, 2) if past_14 is not None else 0.0
+                    v30 = round(score.score - past_30, 2) if past_30 is not None else 0.0
                     score.velocity_7d = v7
                     score.velocity_14d = v14
                     score.velocity_30d = v30

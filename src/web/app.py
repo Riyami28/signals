@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from src import db
 from src.settings import load_settings
 from src.web.routes import accounts, batches, labels, pipeline, research, upload
 
@@ -22,6 +23,15 @@ _STATIC_DIR = Path(__file__).parent / "static"
 def create_app() -> FastAPI:
     settings = load_settings()
     app = FastAPI(title="Signals Pipeline UI", version="0.2.0")
+
+    # Initialize DB schema once at startup (not on every request)
+    try:
+        conn = db.get_connection(settings.pg_dsn)
+        db.init_db(conn)
+        conn.close()
+        logger.info("db_initialized at startup")
+    except Exception as exc:
+        logger.warning("db_init_at_startup failed: %s", exc)
 
     # --- Configurable CORS ---
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
