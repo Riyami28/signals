@@ -237,20 +237,139 @@
 
                   <!-- Contacts Tab -->
                   <div x-show="dtab==='contacts'">
+                    <!-- Empty state: no contacts yet -->
+                    <template x-if="!detail || !detail.contacts || detail.contacts.length === 0">
+                      <div class="empty">
+                        <div style="margin-bottom:16px">No decision makers found yet.</div>
+                        <button class="btn btn-blue"
+                                @click="discoverContacts(acc.account_id)"
+                                :disabled="contactsLoading">
+                          <template x-if="contactsLoading"><span>Discovering...</span></template>
+                          <template x-if="!contactsLoading"><span>Discover Decision Makers</span></template>
+                        </button>
+                      </div>
+                    </template>
+
+                    <!-- Contact cards -->
                     <template x-if="detail && detail.contacts && detail.contacts.length > 0">
                       <div>
-                        <template x-for="c in detail.contacts">
-                          <div class="contact-card">
-                            <div class="contact-name" x-text="c.first_name + ' ' + c.last_name"></div>
-                            <div class="contact-title" x-text="c.title || ''"></div>
-                            <template x-if="c.email"><div><a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a></div></template>
-                            <template x-if="c.linkedin_url"><div><a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a></div></template>
-                            <template x-if="c.management_level"><span class="tier tier-medium" style="margin-top:4px;display:inline-block" x-text="c.management_level"></span></template>
+                        <!-- Header: count + refresh -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                          <span style="font-size:12px;color:var(--text-muted)"
+                                x-text="detail.contacts.length + ' contact(s)'"></span>
+                          <button class="btn btn-sm"
+                                  @click="discoverContacts(acc.account_id)"
+                                  :disabled="contactsLoading">
+                            <template x-if="contactsLoading">Refreshing...</template>
+                            <template x-if="!contactsLoading">Refresh</template>
+                          </button>
+                        </div>
+
+                        <template x-for="c in detail.contacts" :key="c.contact_id">
+                          <div class="contact-card"
+                               :class="{ 'warm-highlight': c.warmth_score > 0 }"
+                               :style="c.contact_status === 'ranked' ? 'border-left:3px solid var(--blue)' :
+                                        c.contact_status === 'verified' ? 'border-left:3px solid var(--green)' :
+                                        c.contact_status === 'enriched' ? 'border-left:3px solid var(--orange)' : ''">
+
+                            <!-- Row 1: Name + badges -->
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                              <div>
+                                <div class="contact-name" x-text="c.first_name + ' ' + c.last_name"></div>
+                                <div class="contact-title" x-text="c.title || 'Unknown Title'"></div>
+                              </div>
+                              <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+                                <template x-if="c.management_level">
+                                  <span class="tier"
+                                        :class="c.management_level === 'C-Level' ? 'tier-high' :
+                                                c.management_level === 'VP' ? 'tier-medium' : 'tier-low'"
+                                        x-text="c.management_level"></span>
+                                </template>
+                                <template x-if="c.authority_score > 0">
+                                  <span style="font-family:var(--mono);font-size:11px;color:var(--blue)"
+                                        x-text="'Auth: ' + (c.authority_score * 100).toFixed(0) + '%'"></span>
+                                </template>
+                              </div>
+                            </div>
+
+                            <!-- Warm path badge -->
+                            <template x-if="c.warmth_score > 0">
+                              <div style="margin-top:6px">
+                                <span class="warm-badge" x-text="c.warm_path_reason"></span>
+                              </div>
+                            </template>
+
+                            <!-- Semantic role tag -->
+                            <template x-if="c.semantic_role">
+                              <div style="margin-top:4px">
+                                <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--border-light);color:var(--cyan)"
+                                      x-text="c.semantic_role"></span>
+                              </div>
+                            </template>
+
+                            <!-- Contact info (visible after enrichment) -->
+                            <template x-if="c.contact_status === 'enriched' || c.contact_status === 'verified'">
+                              <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                                <template x-if="c.email">
+                                  <div style="display:flex;align-items:center;gap:4px">
+                                    <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
+                                    <template x-if="c.email_verified">
+                                      <span style="font-size:10px;color:var(--green);font-weight:600" title="Verified">&#10003;</span>
+                                    </template>
+                                    <template x-if="c.verification_status === 'catch_all'">
+                                      <span style="font-size:10px;color:var(--orange)" title="Catch-all domain">&#9888;</span>
+                                    </template>
+                                  </div>
+                                </template>
+                                <template x-if="!c.email">
+                                  <span style="font-size:11px;color:var(--text-muted)">No email found</span>
+                                </template>
+                                <template x-if="c.linkedin_url">
+                                  <a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a>
+                                </template>
+                              </div>
+                            </template>
+
+                            <!-- Pre-enrichment: show email/LinkedIn if already available from discovery -->
+                            <template x-if="c.contact_status !== 'enriched' && c.contact_status !== 'verified' && (c.email || c.linkedin_url)">
+                              <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                                <template x-if="c.email">
+                                  <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
+                                </template>
+                                <template x-if="c.linkedin_url">
+                                  <a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a>
+                                </template>
+                              </div>
+                            </template>
+
+                            <!-- Reveal / Enrich button -->
+                            <template x-if="c.contact_status !== 'enriched' && c.contact_status !== 'verified'">
+                              <div style="margin-top:8px">
+                                <button class="btn btn-sm btn-blue"
+                                        @click.stop="enrichContact(c.contact_id, acc.account_id)"
+                                        :disabled="enrichingContactId === c.contact_id">
+                                  <template x-if="enrichingContactId === c.contact_id">
+                                    <span>Enriching...</span>
+                                  </template>
+                                  <template x-if="enrichingContactId !== c.contact_id">
+                                    <span>Reveal Contact</span>
+                                  </template>
+                                </button>
+                              </div>
+                            </template>
+
+                            <!-- Status footer -->
+                            <div style="margin-top:6px;display:flex;gap:8px;font-size:10px;color:var(--text-muted)">
+                              <template x-if="c.enrichment_source">
+                                <span x-text="'Source: ' + c.enrichment_source"></span>
+                              </template>
+                              <span :style="'color:' + contactStatusColor(c.contact_status)"
+                                    x-text="(c.contact_status || 'discovered').toUpperCase()"></span>
+                            </div>
                           </div>
                         </template>
                       </div>
                     </template>
-                    <div x-show="!detail || !detail.contacts || detail.contacts.length === 0" class="empty">No contacts found. Run research to discover contacts.</div>
                   </div>
 
                   <!-- Labels Tab -->

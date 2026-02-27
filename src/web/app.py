@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.settings import load_settings
-from src.web.routes import accounts, batches, labels, pipeline, research, upload
+from src.web.routes import accounts, batches, contacts, labels, pipeline, research, upload
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     # API routes
     app.include_router(accounts.router, prefix="/api")
     app.include_router(batches.router, prefix="/api")
+    app.include_router(contacts.router, prefix="/api")
     app.include_router(labels.router, prefix="/api")
     app.include_router(pipeline.router, prefix="/api")
     app.include_router(research.router, prefix="/api")

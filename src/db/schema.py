@@ -421,11 +421,39 @@ CREATE TABLE IF NOT EXISTS contact_research (
     management_level    TEXT
         CHECK (management_level IN ('C-Level', 'VP', 'Director', 'Manager', 'IC')),
     year_joined         INTEGER,
-    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
+    verification_status TEXT NOT NULL DEFAULT '',
+    enrichment_source   TEXT NOT NULL DEFAULT '',
+    contact_status      TEXT NOT NULL DEFAULT 'discovered',
+    semantic_role       TEXT NOT NULL DEFAULT '',
+    authority_score     REAL NOT NULL DEFAULT 0.0,
+    warmth_score        REAL NOT NULL DEFAULT 0.0,
+    warm_path_reason    TEXT NOT NULL DEFAULT '',
+    department          TEXT NOT NULL DEFAULT '',
+    created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_contact_research_account
     ON contact_research(account_id);
+
+CREATE TABLE IF NOT EXISTS internal_network (
+    network_id              TEXT PRIMARY KEY,
+    team_member             TEXT NOT NULL,
+    connection_name         TEXT NOT NULL,
+    connection_linkedin_url TEXT,
+    connection_title        TEXT,
+    connection_company      TEXT,
+    past_companies          TEXT NOT NULL DEFAULT '',
+    relationship_type       TEXT NOT NULL DEFAULT 'connection',
+    imported_at             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_internal_network_linkedin
+    ON internal_network(connection_linkedin_url);
+
+CREATE INDEX IF NOT EXISTS idx_internal_network_name
+    ON internal_network(LOWER(connection_name));
 
 CREATE TABLE IF NOT EXISTS contacts (
     contact_id          TEXT PRIMARY KEY,

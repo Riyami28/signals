@@ -189,6 +189,10 @@ function detailPanel() {
     timelineSignalCode: '',
     timelineSource: '',
 
+    // Contacts state
+    contactsLoading: false,
+    enrichingContactId: null,
+
     async load(accountId) {
       try {
         const resp = await fetch(`/api/accounts/${accountId}`);
@@ -254,6 +258,55 @@ function detailPanel() {
     async removeLabel(labelId, accountId) {
       await fetch(`/api/labels/${labelId}`, { method: 'DELETE' });
       await this.loadLabels(accountId);
+    },
+
+    // --- Contacts: Discovery + Enrichment ---
+
+    async discoverContacts(accountId) {
+      this.contactsLoading = true;
+      try {
+        const resp = await fetch(`/api/contacts/${accountId}/discover`, {
+          method: 'POST',
+        });
+        const data = await resp.json();
+        if (this.detail) {
+          this.detail.contacts = data.contacts || [];
+        }
+      } catch (e) {
+        console.error('Failed to discover contacts:', e);
+      } finally {
+        this.contactsLoading = false;
+      }
+    },
+
+    async enrichContact(contactId, accountId) {
+      this.enrichingContactId = contactId;
+      try {
+        const resp = await fetch(`/api/contacts/${contactId}/enrich`, {
+          method: 'POST',
+        });
+        const data = await resp.json();
+        if (data.contact && this.detail && this.detail.contacts) {
+          const idx = this.detail.contacts.findIndex(c => c.contact_id === contactId);
+          if (idx !== -1) {
+            this.detail.contacts[idx] = data.contact;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to enrich contact:', e);
+      } finally {
+        this.enrichingContactId = null;
+      }
+    },
+
+    contactStatusColor(status) {
+      const map = {
+        discovered: 'var(--text-muted)',
+        ranked: 'var(--blue)',
+        enriched: 'var(--orange)',
+        verified: 'var(--green)',
+      };
+      return map[status] || 'var(--text-muted)';
     },
   };
 }
