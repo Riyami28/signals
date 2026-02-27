@@ -548,7 +548,8 @@ def load_internal_network(conn, csv_path: str) -> int:
 
     Returns the number of rows imported.
     """
-    rows = load_csv_rows(csv_path)
+    from pathlib import Path as _Path
+    rows = load_csv_rows(_Path(csv_path))
     count = 0
     for row in rows:
         team_member = (row.get("team_member") or "").strip()

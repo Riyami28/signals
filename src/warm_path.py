@@ -34,6 +34,11 @@ def compute_warm_paths(
     Returns the same contacts list with ``warmth_score`` and ``warm_path_reason``
     populated.
     """
+    # Always ensure warmth keys exist on every contact
+    for contact in contacts:
+        contact.setdefault("warmth_score", 0.0)
+        contact.setdefault("warm_path_reason", "")
+
     # Check if internal_network has any rows (avoid N queries on empty table)
     row = conn.execute("SELECT COUNT(*) AS cnt FROM internal_network").fetchone()
     if not row or dict(row)["cnt"] == 0:
