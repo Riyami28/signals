@@ -9,6 +9,7 @@ from src import db
 from src.research.client import ResearchClient, create_research_client
 from src.research.enrichment import run_enrichment_waterfall
 from src.research.parser import parse_extraction_response, parse_scoring_response
+from src.models import EnrichmentData
 from src.research.prompts import (
     build_extraction_prompt,
     build_scoring_prompt,
@@ -126,6 +127,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
 
             research_brief = ext_parsed.research_brief
             enrichment_dict = _enrichment_to_dict(ext_parsed.enrichment, pre_enrichment)
+            validated_enrichment = EnrichmentData.model_validate(enrichment_dict).model_dump()
 
             # Step f2: persist extraction results immediately as "partial".
             db.upsert_company_research(
@@ -133,7 +135,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
                 account_id,
                 research_brief=research_brief,
                 research_profile=research_brief,
-                enrichment_json=json.dumps(enrichment_dict, ensure_ascii=False),
+                enrichment_json=json.dumps(validated_enrichment, ensure_ascii=False),
                 research_status="partial",
                 model_used=ext_response.model,
                 prompt_hash=current_hash,
@@ -183,7 +185,7 @@ def run_research_stage(conn, settings, run_date: str, score_run_id: str, account
                 account_id,
                 research_brief=research_brief,
                 research_profile=profile,
-                enrichment_json=json.dumps(enrichment_dict, ensure_ascii=False),
+                enrichment_json=json.dumps(validated_enrichment, ensure_ascii=False),
                 research_status="completed",
                 model_used=ext_response.model,
                 prompt_hash=current_hash,

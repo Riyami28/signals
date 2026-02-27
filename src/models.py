@@ -91,3 +91,19 @@ class RunResult(BaseModel):
     run_date: str
     status: Literal["running", "completed", "failed"]
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class EnrichmentData(BaseModel):
+    website: str = ""
+    industry: str = ""
+    sub_industry: str = ""
+    employees: int | None = None
+    employee_range: str = ""
+    city: str = ""
+    state: str = ""
+    country: str = ""
+    company_linkedin_url: str = ""
+    revenue_range: str = ""
+    tech_stack: list[str] = Field(default_factory=list)
+    funding_stage: str = ""
+    total_funding: float | None = None

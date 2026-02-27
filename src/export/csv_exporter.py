@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from src import db
+from src.models import EnrichmentData
 from src.scoring.rules import legacy_tier_from_v2
 from src.utils import normalize_domain, write_csv_rows
 
@@ -420,8 +421,38 @@ def export_sales_ready(
         enrichment: dict = {}
         if research:
             try:
-                enrichment = json.loads(research.get("enrichment_json", "{}") or "{}")
-            except json.JSONDecodeError:
+                raw_enrich = json.loads(research.get("enrichment_json", "{}") or "{}")
+                validated = EnrichmentData.model_validate(raw_enrich)
+                enrichment = validated.model_dump()
+                
+                # Validation logic
+                fields_to_check = [
+                    "website", "industry", "sub_industry", "country", "city", "state", 
+                    "employees", "employee_range", "revenue_range", "company_linkedin_url",
+                    "funding_stage", "total_funding"
+                ]
+                missing = []
+                for field in fields_to_check:
+                    val = enrichment.get(field)
+                    if val is None or val == "" or val == []:
+                        missing.append(field)
+                
+                if missing:
+                    logger.warning("Enrichment data for %s is missing fields: %s", domain, ", ".join(missing))
+                
+                completeness = 1.0 - (len(missing) / len(fields_to_check)) if fields_to_check else 1.0
+                
+                # Record ops metric
+                db.insert_ops_metric(
+                    conn,
+                    run_date=score_run_id.split("_")[0] if "_" in score_run_id else score_run_id, # Or use today's date if safer, but since this exports via run_id we can use it. Wait, `insert_ops_metric` expects `run_date`
+                    metric="enrichment_completeness",
+                    value=completeness,
+                    meta_json=json.dumps({"account_id": account_id}, ensure_ascii=True)
+                )
+
+            except Exception as exc:
+                logger.warning("Failed to parse enrichment JSON for account %s: %s", account_id, exc)
                 enrichment = {}
 
         # Contacts.
