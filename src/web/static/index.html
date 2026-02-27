@@ -19,9 +19,9 @@
              @change="handleCsvUpload($event)">
       <button class="btn" style="background:#6366f1;color:#fff;font-size:13px;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;"
               @click="document.getElementById('csvFileInput').click()"
-              :disabled="csvUploading">
-        <span x-show="!csvUploading">Import CSV</span>
-        <span x-show="csvUploading">Uploading...</span>
+              :disabled="csvUploading"
+              x-text="csvUploading ? 'Uploading...' : 'Import CSV'">
+        Import CSV
       </button>
       <!-- CSV Export -->
       <button class="btn" style="background:#059669;color:#fff;font-size:13px;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;"
