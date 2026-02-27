@@ -27,7 +27,7 @@ def _bootstrap_hunt_fixture(root: Path) -> None:
         "story_hunt_js,0.74,true\n",
     )
     _write(root / "config" / "thresholds.csv", "key,value\ntier_1,20\ntier_2,10\ntier_3,10\ntier_4,0\n")
-    _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,20\nmedium,10\nexplore,6\nlow,0\n")
+    _write(root / "config" / "discovery_thresholds.csv", "key,value\ntier_1,20\ntier_2,10\ntier_3,6\ntier_4,0\n")
     _write(
         root / "config" / "signal_registry.csv",
         "signal_code,product_scope,category,base_weight,half_life_days,min_confidence,enabled\n"

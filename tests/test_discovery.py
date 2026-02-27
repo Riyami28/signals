@@ -24,7 +24,7 @@ def _bootstrap_core_config(root: Path) -> None:
         "source,reliability,enabled\ntechnographics_csv,0.8,true\nhuginn_webhook,0.9,true\nfirst_party_csv,0.9,true\n",
     )
     _write(root / "config" / "thresholds.csv", "key,value\ntier_1,20\ntier_2,10\ntier_3,10\ntier_4,0\n")
-    _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,20\nmedium,10\nexplore,6\nlow,0\n")
+    _write(root / "config" / "discovery_thresholds.csv", "key,value\ntier_1,20\ntier_2,10\ntier_3,6\ntier_4,0\n")
     _write(
         root / "config" / "signal_registry.csv",
         "signal_code,product_scope,category,base_weight,half_life_days,min_confidence,enabled\n"
@@ -289,7 +289,7 @@ def test_webhook_rejects_placeholder_domain(tmp_path: Path, monkeypatch):
 def test_discovery_policy_routes_high_to_crm_and_medium_to_manual(tmp_path: Path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_core_config(root)
-    _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,25\nmedium,10\nexplore,6\nlow,0\n")
+    _write(root / "config" / "discovery_thresholds.csv", "key,value\ntier_1,25\ntier_2,10\ntier_3,6\ntier_4,0\n")
     _write(
         root / "config" / "promotion_policy.csv",
         "key,value\n"
@@ -414,7 +414,7 @@ def test_discovery_policy_routes_high_to_crm_and_medium_to_manual(tmp_path: Path
 def test_discovery_policy_blocks_high_without_strict_evidence(tmp_path: Path, monkeypatch):
     root = tmp_path / "signals"
     _bootstrap_core_config(root)
-    _write(root / "config" / "discovery_thresholds.csv", "key,value\nhigh,15\nmedium,10\nexplore,6\nlow,0\n")
+    _write(root / "config" / "discovery_thresholds.csv", "key,value\ntier_1,15\ntier_2,10\ntier_3,6\ntier_4,0\n")
     monkeypatch.setenv("SIGNALS_PROJECT_ROOT", str(root))
 
     conn = db.get_connection()
