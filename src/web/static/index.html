@@ -13,7 +13,22 @@
   <!-- Header -->
   <div class="header">
     <h1>Signals Pipeline</h1>
-    <div class="header-right">
+    <div class="header-right" style="display:flex;gap:8px;align-items:center;">
+      <!-- CSV Import -->
+      <input type="file" id="csvFileInput" accept=".csv" style="display:none"
+             @change="handleCsvUpload($event)">
+      <button class="btn" style="background:#6366f1;color:#fff;font-size:13px;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;"
+              @click="document.getElementById('csvFileInput').click()"
+              :disabled="csvUploading">
+        <span x-show="!csvUploading">Import CSV</span>
+        <span x-show="csvUploading">Uploading...</span>
+      </button>
+      <!-- CSV Export -->
+      <button class="btn" style="background:#059669;color:#fff;font-size:13px;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;"
+              @click="exportCsv()">
+        Export CSV
+      </button>
+      <!-- Pipeline -->
       <button class="btn btn-primary" @click="runPipelineAll()" :disabled="pipelineRunning">
         Run Full Pipeline
       </button>

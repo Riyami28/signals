@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from src import db
 from src.export.dossier import render_dossier
@@ -188,3 +191,96 @@ def _serialize_dates(obj):
     elif isinstance(obj, list):
         for item in obj:
             _serialize_dates(item)
+
+
+# ---------------------------------------------------------------------------
+# CSV Export
+# ---------------------------------------------------------------------------
+
+
+@router.get("/export/csv")
+def export_accounts_csv(
+    tier: str = Query(""),
+    label: str = Query(""),
+    q: str = Query(""),
+):
+    """Export all scored accounts as a downloadable CSV file.
+
+    Includes: company_name, domain, score, tier, velocity_7d, velocity_14d,
+    top signals, dimension breakdown, and research status.
+    """
+    conn = _get_conn()
+    try:
+        rows, total = db.get_accounts_paginated(
+            conn,
+            page=1,
+            per_page=10000,  # Export all
+            sort_by="score",
+            sort_dir="desc",
+            tier_filter=tier,
+            label_filter=label.strip()[:100],
+            search=_sanitize_search(q) if q else "",
+        )
+
+        # Build CSV in memory
+        output = io.StringIO()
+        fieldnames = [
+            "company_name",
+            "domain",
+            "score",
+            "tier",
+            "velocity_7d",
+            "velocity_14d",
+            "velocity_30d",
+            "signal_count",
+            "top_signals",
+            "research_status",
+            "labels",
+        ]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for row in rows:
+            # Get signal details for this account
+            signals_summary = ""
+            try:
+                detail = db.get_account_detail(conn, str(row.get("account_id", "")))
+                if detail and detail.get("signals"):
+                    signal_list = detail["signals"]
+                    # Filter out internal:// signals
+                    real_signals = [
+                        s
+                        for s in signal_list
+                        if not str(s.get("evidence_url", "")).startswith("internal://")
+                    ]
+                    signal_codes = [s.get("signal_code", "") for s in real_signals[:5]]
+                    signals_summary = "; ".join(signal_codes)
+            except Exception:
+                pass
+
+            writer.writerow(
+                {
+                    "company_name": row.get("company_name", ""),
+                    "domain": row.get("domain", ""),
+                    "score": row.get("score", 0),
+                    "tier": row.get("tier", ""),
+                    "velocity_7d": row.get("velocity_7d", 0),
+                    "velocity_14d": row.get("velocity_14d", 0),
+                    "velocity_30d": row.get("velocity_30d", 0),
+                    "signal_count": row.get("signal_count", 0),
+                    "top_signals": signals_summary,
+                    "research_status": row.get("research_status", ""),
+                    "labels": row.get("labels", ""),
+                }
+            )
+
+        csv_content = output.getvalue()
+        output.close()
+
+        return StreamingResponse(
+            io.BytesIO(csv_content.encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=signals_export.csv"},
+        )
+    finally:
+        conn.close()

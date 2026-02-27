@@ -19,8 +19,54 @@ function signalsApp() {
     pipelineRunning: false,
     pipelineStages: [],
 
+    // CSV Import/Export
+    csvUploading: false,
+
     async init() {
       await this.loadAccounts();
+    },
+
+    // --- CSV Export ---
+    exportCsv() {
+      const params = new URLSearchParams({
+        tier: this.tierFilter,
+        label: this.labelFilter,
+        q: this.search,
+      });
+      window.open(`/api/export/csv?${params}`, '_blank');
+    },
+
+    // --- CSV Import ---
+    async handleCsvUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('Please select a CSV file');
+        event.target.value = '';
+        return;
+      }
+      this.csvUploading = true;
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const resp = await fetch('/api/v1/upload/csv', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (!resp.ok) {
+          const msg = data.detail?.message || data.detail || 'Upload failed';
+          alert('Upload error: ' + msg);
+        } else {
+          const count = data.row_count || 0;
+          const errors = (data.validation_errors || []).length;
+          alert(`Imported ${count} companies (batch: ${data.batch_id})` +
+                (errors > 0 ? `\n${errors} validation warning(s)` : ''));
+          await this.loadAccounts();
+        }
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      } finally {
+        this.csvUploading = false;
+        event.target.value = '';
+      }
     },
 
     async loadAccounts() {
