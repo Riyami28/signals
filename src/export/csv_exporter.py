@@ -424,10 +424,10 @@ def export_sales_ready(
                 raw_enrich = json.loads(research.get("enrichment_json", "{}") or "{}")
                 validated = EnrichmentData.model_validate(raw_enrich)
                 enrichment = validated.model_dump()
-                
+
                 # Validation logic
                 fields_to_check = [
-                    "website", "industry", "sub_industry", "country", "city", "state", 
+                    "website", "industry", "sub_industry", "country", "city", "state",
                     "employees", "employee_range", "revenue_range", "company_linkedin_url",
                     "funding_stage", "total_funding"
                 ]
@@ -436,12 +436,12 @@ def export_sales_ready(
                     val = enrichment.get(field)
                     if val is None or val == "" or val == []:
                         missing.append(field)
-                
+
                 if missing:
                     logger.warning("Enrichment data for %s is missing fields: %s", domain, ", ".join(missing))
-                
+
                 completeness = 1.0 - (len(missing) / len(fields_to_check)) if fields_to_check else 1.0
-                
+
                 # Record ops metric
                 db.insert_ops_metric(
                     conn,

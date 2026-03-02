@@ -1,5 +1,7 @@
 import pytest
+
 from src.models import EnrichmentData
+
 
 def test_enrichment_validation_defaults():
     # Empty dict should fill with defaults

@@ -26,9 +26,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src import db
 from src.integrations.apollo import (
-    ApolloClient,
     BROAD_DEPARTMENTS,
     BROAD_SENIORITIES,
+    ApolloClient,
     find_email_via_hunter,
     search_contacts_for_account,
 )

@@ -6,13 +6,14 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 from src import db
 from src.settings import load_settings
+from src.web.app import create_app
 
 # Re-use conftest helpers
 from tests.conftest import make_account
-
 
 # ---------------------------------------------------------------------------
 # DB function tests
@@ -412,9 +413,6 @@ class TestWarmPathScoring:
 class TestDiscoverContactsAPI:
     def test_discover_no_apollo_key(self):
         """Without Apollo key, should return existing contacts or empty."""
-        from fastapi.testclient import TestClient
-        from src.web.app import create_app
-
         settings = load_settings()
         conn = db.get_connection(settings.pg_dsn)
         db.init_db(conn)
@@ -443,9 +441,6 @@ class TestDiscoverContactsAPI:
     @patch("src.web.routes.contacts.search_contacts_for_account")
     def test_discover_with_apollo(self, mock_search):
         """With Apollo, should store and return discovered contacts."""
-        from fastapi.testclient import TestClient
-        from src.web.app import create_app
-
         mock_search.return_value = [
             {
                 "first_name": "Test",
@@ -492,9 +487,6 @@ class TestEnrichContactAPI:
     @patch("src.web.routes.contacts.ApolloClient")
     def test_enrich_with_email_verification(self, mock_apollo_cls, mock_verifier_cls):
         """Enrichment should verify email and update contact."""
-        from fastapi.testclient import TestClient
-        from src.web.app import create_app
-
         settings = load_settings()
         conn = db.get_connection(settings.pg_dsn)
         db.init_db(conn)
@@ -548,9 +540,6 @@ class TestEnrichContactAPI:
 
     def test_enrich_nonexistent_contact(self):
         """Should return 404 for missing contact."""
-        from fastapi.testclient import TestClient
-        from src.web.app import create_app
-
         app = create_app()
         client = TestClient(app)
         resp = client.post("/api/contacts/nonexistent_id/enrich")
