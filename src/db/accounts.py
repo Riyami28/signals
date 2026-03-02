@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import date
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Any
 
 from src.models import Account
 from src.utils import load_csv_rows, normalize_domain, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 
 def _build_account_id(domain: str) -> str:
@@ -451,8 +454,10 @@ def upsert_single_contact(conn, contact: dict) -> str:
              email_verified, verification_status, enrichment_source,
              contact_status, semantic_role, authority_score,
              warmth_score, warm_path_reason, department,
+             employment_verified, employment_note,
              created_at, updated_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s,
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (contact_id) DO UPDATE SET
             email = COALESCE(NULLIF(EXCLUDED.email, ''), contact_research.email),
@@ -481,6 +486,10 @@ def upsert_single_contact(conn, contact: dict) -> str:
             department = CASE
                 WHEN EXCLUDED.department != '' THEN EXCLUDED.department
                 ELSE contact_research.department END,
+            employment_verified = COALESCE(EXCLUDED.employment_verified, contact_research.employment_verified),
+            employment_note = CASE
+                WHEN EXCLUDED.employment_note != '' THEN EXCLUDED.employment_note
+                ELSE contact_research.employment_note END,
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -502,6 +511,8 @@ def upsert_single_contact(conn, contact: dict) -> str:
             contact.get("warmth_score", 0.0),
             contact.get("warm_path_reason", ""),
             contact.get("department", ""),
+            contact.get("employment_verified"),       # None = not checked
+            contact.get("employment_note", ""),
         ),
     )
     conn.commit()
@@ -515,6 +526,7 @@ def update_contact_enrichment(conn, contact_id: str, updates: dict) -> bool:
         "enrichment_source", "contact_status", "linkedin_url",
         "title", "management_level", "warmth_score", "warm_path_reason",
         "semantic_role", "authority_score",
+        "employment_verified", "employment_note",  # SERP verification
     }
     set_parts = []
     values = []
@@ -571,13 +583,17 @@ def load_internal_network(conn, csv_path: str) -> int:
                 (network_id, team_member, connection_name,
                  connection_linkedin_url, connection_title,
                  connection_company, past_companies, relationship_type,
-                 imported_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                 education, imported_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (network_id) DO UPDATE SET
                 connection_title = EXCLUDED.connection_title,
                 connection_company = EXCLUDED.connection_company,
                 past_companies = EXCLUDED.past_companies,
-                relationship_type = EXCLUDED.relationship_type
+                relationship_type = EXCLUDED.relationship_type,
+                education = CASE
+                    WHEN EXCLUDED.education != '' THEN EXCLUDED.education
+                    ELSE internal_network.education
+                END
             """,
             (
                 network_id,
@@ -588,6 +604,7 @@ def load_internal_network(conn, csv_path: str) -> int:
                 row.get("connection_company", ""),
                 row.get("past_companies", ""),
                 row.get("relationship_type", "connection"),
+                row.get("education", ""),
             ),
         )
         count += 1
@@ -622,6 +639,132 @@ def find_network_matches(conn, contact_name: str, linkedin_url: str = "") -> lis
             matches.append(m)
 
     return matches
+
+
+def find_insiders_at_company(conn, domain: str, company_name: str) -> list[dict]:
+    """Tier 2: Find connections currently working at the target company.
+
+    Searches connection_company in internal_network for keywords derived from
+    the company's domain and name.  Short keywords (≤3 chars) are excluded to
+    avoid false positives (e.g. "hul" matching "Rahul").
+    """
+    # Build keywords from domain + company name, excluding short parts
+    raw_keywords: list[str] = []
+    domain_clean = (domain or "").lower().replace("www.", "").split(".")[0]
+    if len(domain_clean) > 3:
+        raw_keywords.append(domain_clean)
+
+    for word in (company_name or "").split():
+        w = word.lower().strip(".,")
+        if len(w) > 3:
+            raw_keywords.append(w)
+
+    keywords = list(dict.fromkeys(raw_keywords))  # dedup, preserve order
+    if not keywords:
+        return []
+
+    insiders: list[dict] = []
+    seen: set[str] = set()
+    for kw in keywords:
+        rows = conn.execute(
+            "SELECT * FROM internal_network WHERE LOWER(connection_company) LIKE %s",
+            (f"%{kw}%",),
+        ).fetchall()
+        for row in rows:
+            d = dict(row)
+            nid = d.get("network_id", "")
+            if nid not in seen:
+                seen.add(nid)
+                d["match_type"] = "company_insider"
+                insiders.append(d)
+
+    return insiders
+
+
+def find_education_matches(conn, contact_education: str) -> list[dict]:
+    """Tier 4: Find connections who share the same educational institution.
+
+    Args:
+        contact_education: e.g. "IIT Bombay" or "IIT Delhi"
+    """
+    if not contact_education:
+        return []
+    edu_lower = contact_education.strip().lower()
+    rows = conn.execute(
+        "SELECT * FROM internal_network WHERE education != '' AND LOWER(education) LIKE %s",
+        (f"%{edu_lower}%",),
+    ).fetchall()
+    results = []
+    for row in rows:
+        d = dict(row)
+        d["match_type"] = "education"
+        results.append(d)
+    return results
+
+
+def load_education_from_excel(conn, excel_path: str) -> int:
+    """Load IIT Bombay education flags from LinkedIn_ICP_Analysis.xlsx.
+
+    Reads the Excel file, finds rows where the 'IIT Bombay' column is '✓',
+    and updates education = 'IIT Bombay' for matching rows in internal_network
+    (matched by connection_name, case-insensitive).
+
+    Returns the number of rows updated.
+    """
+    import openpyxl  # type: ignore[import]
+
+    wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+    ws = wb.active
+
+    rows_iter = ws.iter_rows(values_only=True)
+    header_row = next(rows_iter, None)
+    if header_row is None:
+        wb.close()
+        return 0
+
+    headers = [str(h or "").strip().lower() for h in header_row]
+
+    name_idx = next((i for i, h in enumerate(headers) if "full name" in h), None)
+    iit_idx = next(
+        (i for i, h in enumerate(headers) if "iit bombay" in h or "iit" in h),
+        None,
+    )
+
+    if name_idx is None or iit_idx is None:
+        logger.warning(
+            "load_education_from_excel: could not find 'Full Name' or 'IIT Bombay' column "
+            "in headers: %s",
+            headers,
+        )
+        wb.close()
+        return 0
+
+    count = 0
+    for row in rows_iter:
+        if row is None or len(row) <= max(name_idx, iit_idx):
+            continue
+        name = str(row[name_idx] or "").strip()
+        iit_flag = str(row[iit_idx] or "").strip()
+
+        # Accept both ✓ and common ASCII equivalents
+        if not name or iit_flag not in ("✓", "v", "x", "yes", "1", "true", "y"):
+            continue
+
+        result = conn.execute(
+            """
+            UPDATE internal_network
+               SET education = 'IIT Bombay'
+             WHERE LOWER(connection_name) = LOWER(%s)
+               AND (education = '' OR education IS NULL)
+            """,
+            (name,),
+        )
+        count += result.rowcount
+
+    conn.commit()
+    wb.close()
+    logger.info("load_education_from_excel: updated education for %d connections", count)
+    return count
 
 
 def insert_contact(conn, contact: dict) -> str:

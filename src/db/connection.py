@@ -152,6 +152,11 @@ def _run_column_migrations(conn) -> None:
     _ensure_column(conn, "contact_research", "warm_path_reason", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "contact_research", "department", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "contact_research", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    # Migration 004: SERP employment verification
+    _ensure_column(conn, "contact_research", "employment_verified", "BOOLEAN")
+    _ensure_column(conn, "contact_research", "employment_note", "TEXT NOT NULL DEFAULT ''")
+    # Migration 005: warm path tiers — education on internal_network
+    _ensure_column(conn, "internal_network", "education", "TEXT NOT NULL DEFAULT ''")
 
     _ensure_column(conn, "signal_observations", "document_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "mention_id", "TEXT NOT NULL DEFAULT ''")

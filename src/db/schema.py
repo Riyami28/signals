@@ -430,6 +430,8 @@ CREATE TABLE IF NOT EXISTS contact_research (
     warmth_score        REAL NOT NULL DEFAULT 0.0,
     warm_path_reason    TEXT NOT NULL DEFAULT '',
     department          TEXT NOT NULL DEFAULT '',
+    employment_verified BOOLEAN,                        -- NULL=unchecked, TRUE=confirmed, FALSE=stale
+    employment_note     TEXT NOT NULL DEFAULT '',       -- SERP snippet / reason
     created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -445,6 +447,7 @@ CREATE TABLE IF NOT EXISTS internal_network (
     connection_title        TEXT,
     connection_company      TEXT,
     past_companies          TEXT NOT NULL DEFAULT '',
+    education               TEXT NOT NULL DEFAULT '',   -- comma-separated schools e.g. "IIT Delhi,IIM Ahmedabad"
     relationship_type       TEXT NOT NULL DEFAULT 'connection',
     imported_at             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
