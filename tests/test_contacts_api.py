@@ -419,7 +419,10 @@ class TestWarmPathScoring:
             result = compute_warm_paths(conn, contacts, "tatadigital.com")
             # Tier 3 (past colleague) → score 0.3
             assert result[0]["warmth_score"] == pytest.approx(0.3)
-            assert "tatadigital" in result[0]["warm_path_reason"].lower() or "past" in result[0]["warm_path_reason"].lower()
+            assert (
+                "tatadigital" in result[0]["warm_path_reason"].lower()
+                or "past" in result[0]["warm_path_reason"].lower()
+            )
         finally:
             conn.close()
 
