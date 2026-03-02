@@ -362,12 +362,14 @@ class TestWarmPathScoring:
                 },
             ]
             result = compute_warm_paths(conn, contacts, "example.com")
-            assert result[0]["warmth_score"] == pytest.approx(0.6)
+            # Tier 1 (direct LinkedIn match) → score 1.0
+            assert result[0]["warmth_score"] == pytest.approx(1.0)
             assert "Taran" in result[0]["warm_path_reason"]
         finally:
             conn.close()
 
-    def test_company_overlap_adds_score(self):
+    def test_past_colleague_tier3_scores(self):
+        """Tier 3 (past colleague): domain keyword found in past_companies → score 0.3."""
         settings = load_settings()
         conn = db.get_connection(settings.pg_dsn)
         db.init_db(conn)
@@ -378,8 +380,8 @@ class TestWarmPathScoring:
             network_id = stable_hash(
                 {
                     "team_member": "Sales VP",
-                    "connection_name": "Overlap DM",
-                    "linkedin": "https://linkedin.com/in/overlap",
+                    "connection_name": "Past Colleague",
+                    "linkedin": "https://linkedin.com/in/past-colleague-team",
                 },
                 prefix="net",
                 length=16,
@@ -394,8 +396,8 @@ class TestWarmPathScoring:
                 (
                     network_id,
                     "Sales VP",
-                    "Overlap DM",
-                    "https://linkedin.com/in/overlap",
+                    "Past Colleague",
+                    "https://linkedin.com/in/past-colleague-team",
                     "VP Eng",
                     "Current Co",
                     "tatadigital;infosys",
@@ -406,16 +408,18 @@ class TestWarmPathScoring:
 
             contacts = [
                 {
-                    "first_name": "Overlap",
-                    "last_name": "DM",
-                    "linkedin_url": "https://linkedin.com/in/overlap",
-                    "title": "VP Eng",
+                    "first_name": "Target",
+                    "last_name": "Person",
+                    # Different LinkedIn URL — won't match network row, so Tier 1 won't fire
+                    "linkedin_url": "https://linkedin.com/in/target-person-unrelated",
+                    "title": "Director",
                 },
             ]
-            # Domain "tatadigital.com" → first part "tatadigital" matches past_companies
+            # Domain "tatadigital.com" → keyword "tatadigital" matches past_companies → Tier 3
             result = compute_warm_paths(conn, contacts, "tatadigital.com")
-            # 0.6 (linkedin) + 0.2 (company overlap) = 0.8
-            assert result[0]["warmth_score"] == pytest.approx(0.8)
+            # Tier 3 (past colleague) → score 0.3
+            assert result[0]["warmth_score"] == pytest.approx(0.3)
+            assert "tatadigital" in result[0]["warm_path_reason"].lower() or "past" in result[0]["warm_path_reason"].lower()
         finally:
             conn.close()
 
