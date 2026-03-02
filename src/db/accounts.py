@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import date
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Any
 
 from src.models import Account
 from src.utils import load_csv_rows, normalize_domain, stable_hash, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 
 def _build_account_id(domain: str) -> str:
@@ -372,8 +375,13 @@ def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
             """
             INSERT INTO contact_research
                 (contact_id, account_id, first_name, last_name, title,
-                 email, linkedin_url, management_level, year_joined, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                 email, linkedin_url, management_level, year_joined,
+                 email_verified, verification_status, enrichment_source,
+                 contact_status, semantic_role, authority_score,
+                 warmth_score, warm_path_reason, department,
+                 created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT (contact_id) DO NOTHING
             """,
             (
@@ -386,31 +394,384 @@ def upsert_contacts(conn, account_id: str, contacts: list[dict]) -> None:
                 contact.get("linkedin_url"),
                 contact.get("management_level"),
                 contact.get("year_joined"),
+                contact.get("email_verified", False),
+                contact.get("verification_status", ""),
+                contact.get("enrichment_source", ""),
+                contact.get("contact_status", "discovered"),
+                contact.get("semantic_role", ""),
+                contact.get("authority_score", 0.0),
+                contact.get("warmth_score", 0.0),
+                contact.get("warm_path_reason", ""),
+                contact.get("department", ""),
             ),
         )
     conn.commit()
 
 
 def get_contacts_for_account(conn, account_id: str) -> list[dict]:
-    """Return all contacts for an account, ordered by management_level seniority."""
+    """Return all contacts for an account, ranked first then by seniority."""
     rows = conn.execute(
         """
-        SELECT contact_id, account_id, first_name, last_name, title,
-               email, linkedin_url, management_level, year_joined, created_at
-        FROM contact_research
+        SELECT * FROM contact_research
         WHERE account_id = %s
-        ORDER BY CASE management_level
-            WHEN 'C-Level' THEN 1
-            WHEN 'VP' THEN 2
-            WHEN 'Director' THEN 3
-            WHEN 'Manager' THEN 4
-            WHEN 'IC' THEN 5
-            ELSE 6
-        END
+        ORDER BY
+            CASE contact_status WHEN 'ranked' THEN 0 ELSE 1 END,
+            authority_score DESC,
+            warmth_score DESC,
+            CASE management_level
+                WHEN 'C-Level' THEN 1
+                WHEN 'VP' THEN 2
+                WHEN 'Director' THEN 3
+                WHEN 'Manager' THEN 4
+                WHEN 'IC' THEN 5
+                ELSE 6
+            END
         """,
         (account_id,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def upsert_single_contact(conn, contact: dict) -> str:
+    """Upsert a single contact, returning contact_id.
+
+    Uses ON CONFLICT DO UPDATE to preserve enrichment data from prior runs.
+    """
+    account_id = contact["account_id"]
+    identifier = contact.get("linkedin_url") or (contact.get("first_name", "") + contact.get("last_name", ""))
+    contact_id = stable_hash(
+        {"account_id": account_id, "identifier": identifier},
+        prefix="contact",
+        length=16,
+    )
+    conn.execute(
+        """
+        INSERT INTO contact_research
+            (contact_id, account_id, first_name, last_name, title,
+             email, linkedin_url, management_level, year_joined,
+             email_verified, verification_status, enrichment_source,
+             contact_status, semantic_role, authority_score,
+             warmth_score, warm_path_reason, department,
+             employment_verified, employment_note,
+             created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (contact_id) DO UPDATE SET
+            email = COALESCE(NULLIF(EXCLUDED.email, ''), contact_research.email),
+            title = COALESCE(NULLIF(EXCLUDED.title, ''), contact_research.title),
+            linkedin_url = COALESCE(NULLIF(EXCLUDED.linkedin_url, ''), contact_research.linkedin_url),
+            management_level = COALESCE(EXCLUDED.management_level, contact_research.management_level),
+            enrichment_source = CASE
+                WHEN EXCLUDED.enrichment_source != '' THEN EXCLUDED.enrichment_source
+                ELSE contact_research.enrichment_source END,
+            contact_status = CASE
+                WHEN EXCLUDED.contact_status IN ('ranked', 'enriched', 'verified')
+                THEN EXCLUDED.contact_status
+                ELSE contact_research.contact_status END,
+            semantic_role = CASE
+                WHEN EXCLUDED.semantic_role != '' THEN EXCLUDED.semantic_role
+                ELSE contact_research.semantic_role END,
+            authority_score = CASE
+                WHEN EXCLUDED.authority_score > 0 THEN EXCLUDED.authority_score
+                ELSE contact_research.authority_score END,
+            warmth_score = CASE
+                WHEN EXCLUDED.warmth_score > 0 THEN EXCLUDED.warmth_score
+                ELSE contact_research.warmth_score END,
+            warm_path_reason = CASE
+                WHEN EXCLUDED.warm_path_reason != '' THEN EXCLUDED.warm_path_reason
+                ELSE contact_research.warm_path_reason END,
+            department = CASE
+                WHEN EXCLUDED.department != '' THEN EXCLUDED.department
+                ELSE contact_research.department END,
+            employment_verified = COALESCE(EXCLUDED.employment_verified, contact_research.employment_verified),
+            employment_note = CASE
+                WHEN EXCLUDED.employment_note != '' THEN EXCLUDED.employment_note
+                ELSE contact_research.employment_note END,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            contact_id,
+            account_id,
+            contact.get("first_name", ""),
+            contact.get("last_name", ""),
+            contact.get("title"),
+            contact.get("email"),
+            contact.get("linkedin_url"),
+            contact.get("management_level"),
+            contact.get("year_joined"),
+            contact.get("email_verified", False),
+            contact.get("verification_status", ""),
+            contact.get("enrichment_source", ""),
+            contact.get("contact_status", "discovered"),
+            contact.get("semantic_role", ""),
+            contact.get("authority_score", 0.0),
+            contact.get("warmth_score", 0.0),
+            contact.get("warm_path_reason", ""),
+            contact.get("department", ""),
+            contact.get("employment_verified"),  # None = not checked
+            contact.get("employment_note", ""),
+        ),
+    )
+    conn.commit()
+    return contact_id
+
+
+def update_contact_enrichment(conn, contact_id: str, updates: dict) -> bool:
+    """Update specific fields on a single contact after enrichment."""
+    allowed_fields = {
+        "email",
+        "email_verified",
+        "verification_status",
+        "enrichment_source",
+        "contact_status",
+        "linkedin_url",
+        "title",
+        "management_level",
+        "warmth_score",
+        "warm_path_reason",
+        "semantic_role",
+        "authority_score",
+        "employment_verified",
+        "employment_note",  # SERP verification
+    }
+    set_parts = []
+    values = []
+    for key, val in updates.items():
+        if key in allowed_fields:
+            set_parts.append(f"{key} = %s")
+            values.append(val)
+    if not set_parts:
+        return False
+    set_parts.append("updated_at = CURRENT_TIMESTAMP")
+    values.append(contact_id)
+    conn.execute(
+        f"UPDATE contact_research SET {', '.join(set_parts)} WHERE contact_id = %s",
+        tuple(values),
+    )
+    conn.commit()
+    return True
+
+
+def get_contact_by_id(conn, contact_id: str) -> dict | None:
+    """Return a single contact by ID."""
+    row = conn.execute(
+        "SELECT * FROM contact_research WHERE contact_id = %s",
+        (contact_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def load_internal_network(conn, csv_path: str) -> int:
+    """Load internal network CSV into the internal_network table.
+
+    Returns the number of rows imported.
+    """
+    from pathlib import Path as _Path
+
+    rows = load_csv_rows(_Path(csv_path))
+    count = 0
+    for row in rows:
+        team_member = (row.get("team_member") or "").strip()
+        connection_name = (row.get("connection_name") or "").strip()
+        if not team_member or not connection_name:
+            continue
+        network_id = stable_hash(
+            {
+                "team_member": team_member,
+                "connection_name": connection_name,
+                "linkedin": row.get("connection_linkedin_url", ""),
+            },
+            prefix="net",
+            length=16,
+        )
+        conn.execute(
+            """
+            INSERT INTO internal_network
+                (network_id, team_member, connection_name,
+                 connection_linkedin_url, connection_title,
+                 connection_company, past_companies, relationship_type,
+                 education, imported_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (network_id) DO UPDATE SET
+                connection_title = EXCLUDED.connection_title,
+                connection_company = EXCLUDED.connection_company,
+                past_companies = EXCLUDED.past_companies,
+                relationship_type = EXCLUDED.relationship_type,
+                education = CASE
+                    WHEN EXCLUDED.education != '' THEN EXCLUDED.education
+                    ELSE internal_network.education
+                END
+            """,
+            (
+                network_id,
+                team_member,
+                connection_name,
+                row.get("connection_linkedin_url", ""),
+                row.get("connection_title", ""),
+                row.get("connection_company", ""),
+                row.get("past_companies", ""),
+                row.get("relationship_type", "connection"),
+                row.get("education", ""),
+            ),
+        )
+        count += 1
+    conn.commit()
+    return count
+
+
+def find_network_matches(conn, contact_name: str, linkedin_url: str = "") -> list[dict]:
+    """Find internal network matches for a contact by LinkedIn URL or name."""
+    matches = []
+
+    # Exact LinkedIn URL match (highest confidence)
+    if linkedin_url:
+        rows = conn.execute(
+            "SELECT * FROM internal_network WHERE connection_linkedin_url = %s",
+            (linkedin_url,),
+        ).fetchall()
+        for row in rows:
+            m = dict(row)
+            m["match_type"] = "linkedin"
+            matches.append(m)
+
+    # Name match (case-insensitive) — only if no LinkedIn match found
+    if contact_name and not matches:
+        rows = conn.execute(
+            "SELECT * FROM internal_network WHERE LOWER(connection_name) = LOWER(%s)",
+            (contact_name.strip(),),
+        ).fetchall()
+        for row in rows:
+            m = dict(row)
+            m["match_type"] = "name"
+            matches.append(m)
+
+    return matches
+
+
+def find_insiders_at_company(conn, domain: str, company_name: str) -> list[dict]:
+    """Tier 2: Find connections currently working at the target company.
+
+    Searches connection_company in internal_network for keywords derived from
+    the company's domain and name.  Short keywords (≤3 chars) are excluded to
+    avoid false positives (e.g. "hul" matching "Rahul").
+    """
+    # Build keywords from domain + company name, excluding short parts
+    raw_keywords: list[str] = []
+    domain_clean = (domain or "").lower().replace("www.", "").split(".")[0]
+    if len(domain_clean) > 3:
+        raw_keywords.append(domain_clean)
+
+    for word in (company_name or "").split():
+        w = word.lower().strip(".,")
+        if len(w) > 3:
+            raw_keywords.append(w)
+
+    keywords = list(dict.fromkeys(raw_keywords))  # dedup, preserve order
+    if not keywords:
+        return []
+
+    insiders: list[dict] = []
+    seen: set[str] = set()
+    for kw in keywords:
+        rows = conn.execute(
+            "SELECT * FROM internal_network WHERE LOWER(connection_company) LIKE %s",
+            (f"%{kw}%",),
+        ).fetchall()
+        for row in rows:
+            d = dict(row)
+            nid = d.get("network_id", "")
+            if nid not in seen:
+                seen.add(nid)
+                d["match_type"] = "company_insider"
+                insiders.append(d)
+
+    return insiders
+
+
+def find_education_matches(conn, contact_education: str) -> list[dict]:
+    """Tier 4: Find connections who share the same educational institution.
+
+    Args:
+        contact_education: e.g. "IIT Bombay" or "IIT Delhi"
+    """
+    if not contact_education:
+        return []
+    edu_lower = contact_education.strip().lower()
+    rows = conn.execute(
+        "SELECT * FROM internal_network WHERE education != '' AND LOWER(education) LIKE %s",
+        (f"%{edu_lower}%",),
+    ).fetchall()
+    results = []
+    for row in rows:
+        d = dict(row)
+        d["match_type"] = "education"
+        results.append(d)
+    return results
+
+
+def load_education_from_excel(conn, excel_path: str) -> int:
+    """Load IIT Bombay education flags from LinkedIn_ICP_Analysis.xlsx.
+
+    Reads the Excel file, finds rows where the 'IIT Bombay' column is '✓',
+    and updates education = 'IIT Bombay' for matching rows in internal_network
+    (matched by connection_name, case-insensitive).
+
+    Returns the number of rows updated.
+    """
+    import openpyxl  # type: ignore[import]
+
+    wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+    ws = wb.active
+
+    rows_iter = ws.iter_rows(values_only=True)
+    header_row = next(rows_iter, None)
+    if header_row is None:
+        wb.close()
+        return 0
+
+    headers = [str(h or "").strip().lower() for h in header_row]
+
+    name_idx = next((i for i, h in enumerate(headers) if "full name" in h), None)
+    iit_idx = next(
+        (i for i, h in enumerate(headers) if "iit bombay" in h or "iit" in h),
+        None,
+    )
+
+    if name_idx is None or iit_idx is None:
+        logger.warning(
+            "load_education_from_excel: could not find 'Full Name' or 'IIT Bombay' column in headers: %s",
+            headers,
+        )
+        wb.close()
+        return 0
+
+    count = 0
+    for row in rows_iter:
+        if row is None or len(row) <= max(name_idx, iit_idx):
+            continue
+        name = str(row[name_idx] or "").strip()
+        iit_flag = str(row[iit_idx] or "").strip()
+
+        # Accept both ✓ and common ASCII equivalents
+        if not name or iit_flag not in ("✓", "v", "x", "yes", "1", "true", "y"):
+            continue
+
+        result = conn.execute(
+            """
+            UPDATE internal_network
+               SET education = 'IIT Bombay'
+             WHERE LOWER(connection_name) = LOWER(%s)
+               AND (education = '' OR education IS NULL)
+            """,
+            (name,),
+        )
+        count += result.rowcount
+
+    conn.commit()
+    wb.close()
+    logger.info("load_education_from_excel: updated education for %d connections", count)
+    return count
 
 
 def insert_contact(conn, contact: dict) -> str:

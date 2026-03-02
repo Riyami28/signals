@@ -152,6 +152,8 @@ class Settings(BaseSettings):
     hunter_api_key: str = Field(default="")
     apollo_api_key: str = Field(default="")
     apollo_rate_limit: int = Field(default=50, ge=1)
+    serper_api_key: str = Field(default="")  # Serper.dev SERP API for LinkedIn verification
+    lusha_api_key: str = Field(default="")  # Lusha contact enrichment (email + phone)
 
     # --- Crunchbase firmographic enrichment ---
     crunchbase_api_key: str = Field(default="")

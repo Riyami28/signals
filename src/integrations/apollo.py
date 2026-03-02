@@ -43,6 +43,16 @@ TIER_1_ROLES = [
 ]
 TIER_2_ROLES = [TIER_1_ROLES[0]]
 
+# Broad fetch parameters — cast wide net, LLM does semantic filtering later
+BROAD_SENIORITIES = ["director", "vp", "c_suite", "owner", "founder"]
+BROAD_DEPARTMENTS = [
+    "engineering",
+    "information_technology",
+    "product_management",
+    "operations",
+    "finance",
+]
+
 
 @dataclass
 class ApolloContact:
@@ -177,6 +187,73 @@ class ApolloClient:
             logger.warning("apollo search_people failed domain=%s", domain, exc_info=True)
             return ApolloSearchResult()
 
+    def search_people_broad(
+        self,
+        domain: str,
+        departments: list[str] | None = None,
+        seniority_levels: list[str] | None = None,
+        limit: int = 50,
+    ) -> ApolloSearchResult:
+        """Broad person search by department + seniority (not exact title).
+
+        This casts a wide net (20-50 people) and returns anyone at director+
+        level in engineering/IT departments. An LLM then does the semantic
+        filtering to identify actual decision makers.
+
+        Apollo API fields used:
+          - person_seniorities: ["director", "vp", "c_suite", ...]
+          - q_organization_domains: domain
+        """
+        if not self._api_key:
+            return ApolloSearchResult()
+
+        payload: dict = {
+            "q_organization_domains": domain,
+            "page": 1,
+            "per_page": min(limit, 50),
+        }
+        if seniority_levels:
+            payload["person_seniorities"] = seniority_levels
+        if departments:
+            payload["person_departments"] = departments
+
+        try:
+            data = self._post("/v1/mixed_people/search", payload)
+            if not data:
+                return ApolloSearchResult()
+
+            people = data.get("people") or []
+            contacts: list[ApolloContact] = []
+            for person in people[:limit]:
+                email = (person.get("email") or "").strip()
+                if _is_generic_email(email):
+                    email = ""
+                # Extract department from employment_history or departments list
+                dept = ""
+                if person.get("departments"):
+                    dept = person["departments"][0] if person["departments"] else ""
+                contact = ApolloContact(
+                    first_name=(person.get("first_name") or "").strip(),
+                    last_name=(person.get("last_name") or "").strip(),
+                    title=(person.get("title") or "").strip(),
+                    email=email,
+                    linkedin_url=(person.get("linkedin_url") or "").strip(),
+                    management_level=_infer_management_level(person.get("title") or ""),
+                    enrichment_source="apollo",
+                )
+                # Attach department as a dynamic attribute for the dict conversion
+                contact._department = dept  # type: ignore[attr-defined]
+                contacts.append(contact)
+
+            return ApolloSearchResult(
+                contacts=contacts,
+                total_found=int(data.get("pagination", {}).get("total_entries", 0)),
+                api_credits_used=1,
+            )
+        except Exception:
+            logger.warning("apollo search_people_broad failed domain=%s", domain, exc_info=True)
+            return ApolloSearchResult()
+
     def enrich_person(self, email: str) -> ApolloContact | None:
         """Enrich a person by email address."""
         if not self._api_key or not email:
@@ -291,6 +368,7 @@ def search_contacts_for_account(
             "linkedin_url": c.linkedin_url,
             "management_level": c.management_level,
             "year_joined": c.year_joined,
+            "department": getattr(c, "_department", ""),
         }
         for c in contacts
         if c.first_name and c.last_name

@@ -141,6 +141,23 @@ def _run_column_migrations(conn) -> None:
     """Backfill legacy columns for databases created before SCHEMA_SQL was updated."""
     _ensure_column(conn, "accounts", "crm_status", "TEXT NOT NULL DEFAULT 'new'")
 
+    # Migration 003: contact_research enrichment + warm path columns
+    _ensure_column(conn, "contact_research", "email_verified", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _ensure_column(conn, "contact_research", "verification_status", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "contact_research", "enrichment_source", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "contact_research", "contact_status", "TEXT NOT NULL DEFAULT 'discovered'")
+    _ensure_column(conn, "contact_research", "semantic_role", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "contact_research", "authority_score", "REAL NOT NULL DEFAULT 0.0")
+    _ensure_column(conn, "contact_research", "warmth_score", "REAL NOT NULL DEFAULT 0.0")
+    _ensure_column(conn, "contact_research", "warm_path_reason", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "contact_research", "department", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "contact_research", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    # Migration 004: SERP employment verification
+    _ensure_column(conn, "contact_research", "employment_verified", "BOOLEAN")
+    _ensure_column(conn, "contact_research", "employment_note", "TEXT NOT NULL DEFAULT ''")
+    # Migration 005: warm path tiers — education on internal_network
+    _ensure_column(conn, "internal_network", "education", "TEXT NOT NULL DEFAULT ''")
+
     _ensure_column(conn, "signal_observations", "document_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "mention_id", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "signal_observations", "evidence_sentence", "TEXT NOT NULL DEFAULT ''")

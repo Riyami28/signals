@@ -161,7 +161,7 @@ async def _collect_one_account(
     for article in articles:
         title = str(article.get("title", ""))
         description = str(article.get("description", ""))
-        content = str(article.get("content", ""))
+        _content = str(article.get("content", ""))  # truncated on free tier — not used
         link = str(article.get("url", ""))
         date_str = str(article.get("publishedAt", ""))
         source_info = article.get("source", {})
