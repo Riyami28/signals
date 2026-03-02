@@ -3028,9 +3028,7 @@ def upsert_single_contact(conn, contact: dict) -> str:
     Uses ON CONFLICT DO UPDATE to preserve enrichment data from prior runs.
     """
     account_id = contact["account_id"]
-    identifier = contact.get("linkedin_url") or (
-        contact.get("first_name", "") + contact.get("last_name", "")
-    )
+    identifier = contact.get("linkedin_url") or (contact.get("first_name", "") + contact.get("last_name", ""))
     contact_id = stable_hash(
         {"account_id": account_id, "identifier": identifier},
         prefix="contact",
@@ -3104,10 +3102,18 @@ def upsert_single_contact(conn, contact: dict) -> str:
 def update_contact_enrichment(conn, contact_id: str, updates: dict) -> bool:
     """Update specific fields on a single contact after enrichment."""
     allowed_fields = {
-        "email", "email_verified", "verification_status",
-        "enrichment_source", "contact_status", "linkedin_url",
-        "title", "management_level", "warmth_score", "warm_path_reason",
-        "semantic_role", "authority_score",
+        "email",
+        "email_verified",
+        "verification_status",
+        "enrichment_source",
+        "contact_status",
+        "linkedin_url",
+        "title",
+        "management_level",
+        "warmth_score",
+        "warm_path_reason",
+        "semantic_role",
+        "authority_score",
     }
     set_parts = []
     values = []

@@ -96,9 +96,7 @@ def discover_contacts(
 
     try:
         # Verify account exists
-        row = conn.execute(
-            "SELECT * FROM accounts WHERE account_id = %s", (account_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM accounts WHERE account_id = %s", (account_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Account not found")
         account = dict(row)
@@ -121,8 +119,7 @@ def discover_contacts(
                 "contacts": db.get_contacts_for_account(conn, account_id),
                 "total_discovered": 0,
                 "message": (
-                    "No contacts found via Apollo broad search. "
-                    "Check API key configuration or try a different domain."
+                    "No contacts found via Apollo broad search. Check API key configuration or try a different domain."
                 ),
             }
 
@@ -140,14 +137,10 @@ def discover_contacts(
             db.upsert_single_contact(conn, c)
 
         # ── Step 3: Warm path scoring ──────────────────────────────────────
-        network_csv = os.path.join(
-            settings.project_root, "config", "internal_network.csv"
-        )
+        network_csv = os.path.join(settings.project_root, "config", "internal_network.csv")
         if os.path.exists(network_csv):
             db.load_internal_network(conn, network_csv)
-            raw_contacts = compute_warm_paths(
-                conn, raw_contacts, domain, company_name=company_name
-            )
+            raw_contacts = compute_warm_paths(conn, raw_contacts, domain, company_name=company_name)
             for c in raw_contacts:
                 if c.get("warmth_score", 0) > 0:
                     db.upsert_single_contact(conn, c)
@@ -156,9 +149,7 @@ def discover_contacts(
         ranked_indices: list[int] = []
         if use_llm_ranking and (settings.claude_api_key or settings.minimax_api_key):
             try:
-                ranked_indices = _llm_rank_and_persist(
-                    conn, settings, raw_contacts, domain, account_id
-                )
+                ranked_indices = _llm_rank_and_persist(conn, settings, raw_contacts, domain, account_id)
                 logger.info(
                     "contacts.discover: llm_ranked domain=%s top=%s",
                     domain,
@@ -277,7 +268,7 @@ def _broad_fetch(
                     "first_name": c.first_name,
                     "last_name": c.last_name,
                     "title": c.title,
-                    "email": "",           # SERP has no email — enrichment step fills this
+                    "email": "",  # SERP has no email — enrichment step fills this
                     "linkedin_url": c.linkedin_url,
                     "management_level": c.management_level,
                     "year_joined": None,
@@ -292,9 +283,7 @@ def _broad_fetch(
             ]
 
     # ── Option 3: Apollo title-based (legacy) ─────────────────────────────
-    logger.info(
-        "contacts._broad_fetch: falling back to title-based search domain=%s", domain
-    )
+    logger.info("contacts._broad_fetch: falling back to title-based search domain=%s", domain)
     return search_contacts_for_account(
         domain=domain,
         apollo_client=apollo_client,
@@ -304,9 +293,7 @@ def _broad_fetch(
     )
 
 
-def _llm_rank_and_persist(
-    conn, settings, contacts: list[dict], domain: str, account_id: str
-) -> list[int]:
+def _llm_rank_and_persist(conn, settings, contacts: list[dict], domain: str, account_id: str) -> list[int]:
     """Use LLM to semantically rank contacts, persist top 3.
 
     Returns list of 0-based indices of the contacts chosen as top 3.
@@ -331,8 +318,7 @@ def _llm_rank_and_persist(
 
     user_prompt = (
         f"Company domain: {domain}\n\n"
-        f"All senior contacts found ({len(contacts)} total — broad fetch):\n"
-        + "\n".join(contact_lines)
+        f"All senior contacts found ({len(contacts)} total — broad fetch):\n" + "\n".join(contact_lines)
     )
 
     response = client.research_company(_DM_RANKING_SYSTEM_PROMPT, user_prompt)
@@ -385,11 +371,7 @@ def _lusha_enrich_top_n(
         return
 
     # Pick top_n ranked contacts sorted by authority_score desc
-    candidates = [
-        (idx, raw_contacts[idx])
-        for idx in ranked_indices
-        if idx < len(raw_contacts)
-    ]
+    candidates = [(idx, raw_contacts[idx]) for idx in ranked_indices if idx < len(raw_contacts)]
     candidates.sort(
         key=lambda t: t[1].get("authority_score", 0.0),
         reverse=True,
@@ -443,9 +425,7 @@ def _lusha_enrich_top_n(
             updates: dict = {}
             if result.email:
                 updates["email"] = result.email
-                updates["enrichment_source"] = (
-                    (contact.get("enrichment_source") or "") + "+lusha"
-                ).lstrip("+")
+                updates["enrichment_source"] = ((contact.get("enrichment_source") or "") + "+lusha").lstrip("+")
             if result.phone:
                 updates["phone"] = result.phone
             if updates:
@@ -513,19 +493,27 @@ def _serp_verify_and_fallback(
 
         # Persist verification result
         contact_id = db.upsert_single_contact(conn, {**contact, "account_id": account_id})
-        db.update_contact_enrichment(conn, contact_id, {
-            "employment_verified": verify_result.employment_verified,
-            "employment_note": verify_result.note,
-        })
+        db.update_contact_enrichment(
+            conn,
+            contact_id,
+            {
+                "employment_verified": verify_result.employment_verified,
+                "employment_note": verify_result.note,
+            },
+        )
 
         if verify_result.employment_verified is False:
             # Stale — demote back to discovered, try to promote next
             stale_count += 1
-            db.update_contact_enrichment(conn, contact_id, {
-                "contact_status": "discovered",
-                "employment_verified": False,
-                "employment_note": verify_result.note,
-            })
+            db.update_contact_enrichment(
+                conn,
+                contact_id,
+                {
+                    "contact_status": "discovered",
+                    "employment_verified": False,
+                    "employment_note": verify_result.note,
+                },
+            )
             logger.warning(
                 "serp_verify: stale data flagged for %r at %s — demoted",
                 full_name,
@@ -535,14 +523,10 @@ def _serp_verify_and_fallback(
             _promote_next_contact(conn, raw_contacts, ranked_indices, account_id)
 
 
-def _promote_next_contact(
-    conn, raw_contacts: list[dict], already_ranked: list[int], account_id: str
-) -> None:
+def _promote_next_contact(conn, raw_contacts: list[dict], already_ranked: list[int], account_id: str) -> None:
     """Find the highest-authority unranked contact and promote it to 'ranked'."""
     candidates = [
-        (i, c) for i, c in enumerate(raw_contacts)
-        if i not in already_ranked
-        and c.get("contact_status") != "ranked"
+        (i, c) for i, c in enumerate(raw_contacts) if i not in already_ranked and c.get("contact_status") != "ranked"
     ]
     if not candidates:
         return
@@ -615,10 +599,14 @@ def enrich_contact(contact_id: str):
                 if lusha_result.email:
                     email = lusha_result.email
                     enrichment_source = (enrichment_source + "+lusha").lstrip("+")
-                    db.update_contact_enrichment(conn, contact_id, {
-                        "email": email,
-                        "enrichment_source": enrichment_source,
-                    })
+                    db.update_contact_enrichment(
+                        conn,
+                        contact_id,
+                        {
+                            "email": email,
+                            "enrichment_source": enrichment_source,
+                        },
+                    )
                 if lusha_result.phone and not phone:
                     phone = lusha_result.phone
                     db.update_contact_enrichment(conn, contact_id, {"phone": phone})
@@ -665,10 +653,14 @@ def enrich_contact(contact_id: str):
             if found_email:
                 email = found_email
                 enrichment_source = (enrichment_source + "+hunter").lstrip("+")
-                db.update_contact_enrichment(conn, contact_id, {
-                    "email": email,
-                    "enrichment_source": enrichment_source,
-                })
+                db.update_contact_enrichment(
+                    conn,
+                    contact_id,
+                    {
+                        "email": email,
+                        "enrichment_source": enrichment_source,
+                    },
+                )
 
         # Step 3: Email verification
         verification_status = ""
@@ -690,13 +682,17 @@ def enrich_contact(contact_id: str):
 
         # Step 4: Final DB update
         final_status = "verified" if email and email_verified else "enriched"
-        db.update_contact_enrichment(conn, contact_id, {
-            "email": email,
-            "email_verified": email_verified,
-            "verification_status": verification_status,
-            "enrichment_source": enrichment_source,
-            "contact_status": final_status,
-        })
+        db.update_contact_enrichment(
+            conn,
+            contact_id,
+            {
+                "email": email,
+                "email_verified": email_verified,
+                "verification_status": verification_status,
+                "enrichment_source": enrichment_source,
+                "contact_status": final_status,
+            },
+        )
 
         # Step 5: Return updated contact
         updated = db.get_contact_by_id(conn, contact_id)

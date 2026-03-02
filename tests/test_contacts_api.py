@@ -120,12 +120,16 @@ class TestUpdateContactEnrichment:
             contact_id = db.upsert_single_contact(conn, contact)
 
             # Update just email and status
-            result = db.update_contact_enrichment(conn, contact_id, {
-                "email": "alice@enrich.com",
-                "email_verified": True,
-                "verification_status": "valid",
-                "contact_status": "verified",
-            })
+            result = db.update_contact_enrichment(
+                conn,
+                contact_id,
+                {
+                    "email": "alice@enrich.com",
+                    "email_verified": True,
+                    "verification_status": "valid",
+                    "contact_status": "verified",
+                },
+            )
             assert result is True
 
             fetched = db.get_contact_by_id(conn, contact_id)
@@ -155,10 +159,14 @@ class TestUpdateContactEnrichment:
             contact_id = db.upsert_single_contact(conn, contact)
 
             # Try updating disallowed field
-            result = db.update_contact_enrichment(conn, contact_id, {
-                "account_id": "hacked",
-                "contact_id": "hacked",
-            })
+            result = db.update_contact_enrichment(
+                conn,
+                contact_id,
+                {
+                    "account_id": "hacked",
+                    "contact_id": "hacked",
+                },
+            )
             assert result is False
         finally:
             conn.close()
@@ -197,9 +205,7 @@ class TestLoadInternalNetwork:
             assert count == 1
 
             # Verify data
-            matches = db.find_network_matches(
-                conn, "Anjali Singh", "https://linkedin.com/in/anjali"
-            )
+            matches = db.find_network_matches(conn, "Anjali Singh", "https://linkedin.com/in/anjali")
             assert len(matches) >= 1
             assert matches[0]["match_type"] == "linkedin"
             assert matches[0]["team_member"] == "Rajesh Kumar"
@@ -232,7 +238,11 @@ class TestFindNetworkMatches:
             from src.utils import stable_hash
 
             network_id = stable_hash(
-                {"team_member": "VP Sales", "connection_name": "Target DM", "linkedin": "https://linkedin.com/in/target"},
+                {
+                    "team_member": "VP Sales",
+                    "connection_name": "Target DM",
+                    "linkedin": "https://linkedin.com/in/target",
+                },
                 prefix="net",
                 length=16,
             )
@@ -243,8 +253,16 @@ class TestFindNetworkMatches:
                      connection_title, connection_company, past_companies, relationship_type)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (network_id, "VP Sales", "Target DM", "https://linkedin.com/in/target",
-                 "CTO", "BigCorp", "acme;google", "connection"),
+                (
+                    network_id,
+                    "VP Sales",
+                    "Target DM",
+                    "https://linkedin.com/in/target",
+                    "CTO",
+                    "BigCorp",
+                    "acme;google",
+                    "connection",
+                ),
             )
             conn.commit()
 
@@ -273,8 +291,7 @@ class TestFindNetworkMatches:
                      connection_title, connection_company, past_companies, relationship_type)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (network_id, "SDR Lead", "Name Only", "",
-                 "VP Eng", "SomeCo", "", "connection"),
+                (network_id, "SDR Lead", "Name Only", "", "VP Eng", "SomeCo", "", "connection"),
             )
             conn.commit()
 
@@ -323,8 +340,16 @@ class TestWarmPathScoring:
                      connection_title, connection_company, past_companies, relationship_type)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (network_id, "Taran", "DM Person", "https://linkedin.com/in/dm",
-                 "CTO", "Target Co", "tata;google", "connection"),
+                (
+                    network_id,
+                    "Taran",
+                    "DM Person",
+                    "https://linkedin.com/in/dm",
+                    "CTO",
+                    "Target Co",
+                    "tata;google",
+                    "connection",
+                ),
             )
             conn.commit()
 
@@ -351,8 +376,11 @@ class TestWarmPathScoring:
             from src.warm_path import compute_warm_paths
 
             network_id = stable_hash(
-                {"team_member": "Sales VP", "connection_name": "Overlap DM",
-                 "linkedin": "https://linkedin.com/in/overlap"},
+                {
+                    "team_member": "Sales VP",
+                    "connection_name": "Overlap DM",
+                    "linkedin": "https://linkedin.com/in/overlap",
+                },
                 prefix="net",
                 length=16,
             )
@@ -363,8 +391,16 @@ class TestWarmPathScoring:
                      connection_title, connection_company, past_companies, relationship_type)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (network_id, "Sales VP", "Overlap DM", "https://linkedin.com/in/overlap",
-                 "VP Eng", "Current Co", "tatadigital;infosys", "connection"),
+                (
+                    network_id,
+                    "Sales VP",
+                    "Overlap DM",
+                    "https://linkedin.com/in/overlap",
+                    "VP Eng",
+                    "Current Co",
+                    "tatadigital;infosys",
+                    "connection",
+                ),
             )
             conn.commit()
 

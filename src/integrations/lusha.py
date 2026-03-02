@@ -35,11 +35,11 @@ _TIMEOUT_SECONDS = 15
 @dataclass
 class LushaResult:
     email: str = ""
-    email_type: str = ""          # "professional", "personal", etc.
+    email_type: str = ""  # "professional", "personal", etc.
     phone: str = ""
-    phone_type: str = ""          # "direct", "mobile", etc.
+    phone_type: str = ""  # "direct", "mobile", etc.
     found: bool = False
-    error: str = ""               # "rate_limited", "not_found", "http_4xx", etc.
+    error: str = ""  # "rate_limited", "not_found", "http_4xx", etc.
     raw_emails: list[dict] = field(default_factory=list)
     raw_phones: list[dict] = field(default_factory=list)
 
@@ -111,10 +111,7 @@ class LushaClient:
             return LushaResult(error="request_failed")
 
         if resp.status_code == 429:
-            logger.warning(
-                "lusha: rate limited (free plan = 10 calls/hour). "
-                "Retry after the hour window resets."
-            )
+            logger.warning("lusha: rate limited (free plan = 10 calls/hour). Retry after the hour window resets.")
             return LushaResult(error="rate_limited")
 
         if resp.status_code == 404:
@@ -160,12 +157,7 @@ class LushaClient:
         best_phone_type = ""
         for ph in raw_phones:
             t = (ph.get("type") or "").lower()
-            p = (
-                ph.get("normalizedNumber")
-                or ph.get("localNumber")
-                or ph.get("internationalNumber")
-                or ""
-            ).strip()
+            p = (ph.get("normalizedNumber") or ph.get("localNumber") or ph.get("internationalNumber") or "").strip()
             if not p:
                 continue
             if t in ("direct", "mobile") or not best_phone:

@@ -427,9 +427,18 @@ def export_sales_ready(
 
                 # Validation logic
                 fields_to_check = [
-                    "website", "industry", "sub_industry", "country", "city", "state",
-                    "employees", "employee_range", "revenue_range", "company_linkedin_url",
-                    "funding_stage", "total_funding"
+                    "website",
+                    "industry",
+                    "sub_industry",
+                    "country",
+                    "city",
+                    "state",
+                    "employees",
+                    "employee_range",
+                    "revenue_range",
+                    "company_linkedin_url",
+                    "funding_stage",
+                    "total_funding",
                 ]
                 missing = []
                 for field in fields_to_check:
@@ -445,10 +454,12 @@ def export_sales_ready(
                 # Record ops metric
                 db.insert_ops_metric(
                     conn,
-                    run_date=score_run_id.split("_")[0] if "_" in score_run_id else score_run_id, # Or use today's date if safer, but since this exports via run_id we can use it. Wait, `insert_ops_metric` expects `run_date`
+                    run_date=score_run_id.split("_")[0]
+                    if "_" in score_run_id
+                    else score_run_id,  # Or use today's date if safer, but since this exports via run_id we can use it. Wait, `insert_ops_metric` expects `run_date`
                     metric="enrichment_completeness",
                     value=completeness,
-                    meta_json=json.dumps({"account_id": account_id}, ensure_ascii=True)
+                    meta_json=json.dumps({"account_id": account_id}, ensure_ascii=True),
                 )
 
             except Exception as exc:

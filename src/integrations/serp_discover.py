@@ -262,7 +262,7 @@ class SerpDiscoverer:
         _seniority_order = {"C-Level": 0, "VP": 1, "Director": 2, "Manager": 3, "IC": 4}
         contacts.sort(
             key=lambda c: (
-                int(c.is_stale),                             # current before stale
+                int(c.is_stale),  # current before stale
                 _seniority_order.get(c.management_level, 5),
             )
         )

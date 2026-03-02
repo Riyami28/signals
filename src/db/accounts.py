@@ -438,9 +438,7 @@ def upsert_single_contact(conn, contact: dict) -> str:
     Uses ON CONFLICT DO UPDATE to preserve enrichment data from prior runs.
     """
     account_id = contact["account_id"]
-    identifier = contact.get("linkedin_url") or (
-        contact.get("first_name", "") + contact.get("last_name", "")
-    )
+    identifier = contact.get("linkedin_url") or (contact.get("first_name", "") + contact.get("last_name", ""))
     contact_id = stable_hash(
         {"account_id": account_id, "identifier": identifier},
         prefix="contact",
@@ -511,7 +509,7 @@ def upsert_single_contact(conn, contact: dict) -> str:
             contact.get("warmth_score", 0.0),
             contact.get("warm_path_reason", ""),
             contact.get("department", ""),
-            contact.get("employment_verified"),       # None = not checked
+            contact.get("employment_verified"),  # None = not checked
             contact.get("employment_note", ""),
         ),
     )
@@ -522,11 +520,20 @@ def upsert_single_contact(conn, contact: dict) -> str:
 def update_contact_enrichment(conn, contact_id: str, updates: dict) -> bool:
     """Update specific fields on a single contact after enrichment."""
     allowed_fields = {
-        "email", "email_verified", "verification_status",
-        "enrichment_source", "contact_status", "linkedin_url",
-        "title", "management_level", "warmth_score", "warm_path_reason",
-        "semantic_role", "authority_score",
-        "employment_verified", "employment_note",  # SERP verification
+        "email",
+        "email_verified",
+        "verification_status",
+        "enrichment_source",
+        "contact_status",
+        "linkedin_url",
+        "title",
+        "management_level",
+        "warmth_score",
+        "warm_path_reason",
+        "semantic_role",
+        "authority_score",
+        "employment_verified",
+        "employment_note",  # SERP verification
     }
     set_parts = []
     values = []
@@ -561,6 +568,7 @@ def load_internal_network(conn, csv_path: str) -> int:
     Returns the number of rows imported.
     """
     from pathlib import Path as _Path
+
     rows = load_csv_rows(_Path(csv_path))
     count = 0
     for row in rows:
@@ -732,8 +740,7 @@ def load_education_from_excel(conn, excel_path: str) -> int:
 
     if name_idx is None or iit_idx is None:
         logger.warning(
-            "load_education_from_excel: could not find 'Full Name' or 'IIT Bombay' column "
-            "in headers: %s",
+            "load_education_from_excel: could not find 'Full Name' or 'IIT Bombay' column in headers: %s",
             headers,
         )
         wb.close()

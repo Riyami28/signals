@@ -10,6 +10,7 @@ def test_enrichment_validation_defaults():
     assert data.employees is None
     assert data.tech_stack == []
 
+
 def test_enrichment_validation_partial():
     # Only some fields populated
     partial = {"website": "example.com", "employees": 50}
@@ -17,6 +18,7 @@ def test_enrichment_validation_partial():
     assert data.website == "example.com"
     assert data.employees == 50
     assert data.industry == ""
+
 
 def test_enrichment_validation_dump():
     data = EnrichmentData.model_validate({"website": "test.com"})

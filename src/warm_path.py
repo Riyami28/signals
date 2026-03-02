@@ -30,10 +30,10 @@ from src import db
 logger = logging.getLogger(__name__)
 
 # ── Tier scores ───────────────────────────────────────────────────────────────
-_TIER1_DIRECT_SCORE = 1.0    # Direct 1st-degree LinkedIn connection
-_TIER2_INSIDER_SCORE = 0.6   # Connection currently works at target company
+_TIER1_DIRECT_SCORE = 1.0  # Direct 1st-degree LinkedIn connection
+_TIER2_INSIDER_SCORE = 0.6  # Connection currently works at target company
 _TIER3_PAST_COL_SCORE = 0.3  # Connection previously worked at target company
-_TIER4_EDUCATION_SCORE = 0.2 # Shared educational institution
+_TIER4_EDUCATION_SCORE = 0.2  # Shared educational institution
 
 
 def compute_warm_paths(
@@ -82,9 +82,7 @@ def compute_warm_paths(
         warmth = 0.0
         reasons: list[str] = []
 
-        full_name = (
-            f"{contact.get('first_name', '')} {contact.get('last_name', '')}".strip()
-        )
+        full_name = f"{contact.get('first_name', '')} {contact.get('last_name', '')}".strip()
         linkedin_url = (contact.get("linkedin_url") or "").strip()
 
         # ── Tier 1: Direct connection ─────────────────────────────────────
@@ -107,9 +105,7 @@ def compute_warm_paths(
             team_member = insider.get("team_member", "Talvinder")
             insider_name = insider.get("connection_name", "")
             warmth = max(warmth, _TIER2_INSIDER_SCORE)
-            reasons.append(
-                f"🏢 Insider: {team_member} → {insider_name} works at {company_name or account_domain}"
-            )
+            reasons.append(f"🏢 Insider: {team_member} → {insider_name} works at {company_name or account_domain}")
 
         # ── Tier 3: Past colleague ────────────────────────────────────────
         if domain_keyword and warmth < _TIER3_PAST_COL_SCORE:
@@ -127,9 +123,7 @@ def compute_warm_paths(
                 team_member = m.get("team_member", "Talvinder")
                 conn_name = m.get("connection_name", "")
                 warmth = max(warmth, _TIER3_PAST_COL_SCORE)
-                reasons.append(
-                    f"👥 Past colleague: {conn_name} ({team_member}) previously at {account_domain}"
-                )
+                reasons.append(f"👥 Past colleague: {conn_name} ({team_member}) previously at {account_domain}")
                 break  # one reason is enough per tier
 
         # ── Tier 4: Education overlap ─────────────────────────────────────
@@ -141,9 +135,7 @@ def compute_warm_paths(
                 team_member = m.get("team_member", "Talvinder")
                 conn_name = m.get("connection_name", "")
                 warmth = max(warmth, _TIER4_EDUCATION_SCORE)
-                reasons.append(
-                    f"🎓 Alumni: {conn_name} ({team_member}) also {contact_education}"
-                )
+                reasons.append(f"🎓 Alumni: {conn_name} ({team_member}) also {contact_education}")
 
         contact["warmth_score"] = min(warmth, 1.0)
         contact["warm_path_reason"] = " | ".join(reasons)
