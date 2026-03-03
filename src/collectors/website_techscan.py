@@ -47,20 +47,30 @@ _HTML_TECH_PATTERNS: list[tuple[str, str, str, float]] = [
     # Kubernetes / container — strong DevOps signal
     (r"kubernetes|k8s\.io", "Kubernetes", "kubernetes_detected", 0.80),
     (r"docker\.com|docker\.io", "Docker", "kubernetes_detected", 0.55),
-    # IaC / GitOps — strong platform engineering signal
+    # IaC / GitOps — only real GitOps tools, NOT GitHub/GitLab links (every company has those)
     (r"terraform|hashicorp", "Terraform/HashiCorp", "terraform_detected", 0.75),
-    (r"gitlab\.com", "GitLab", "gitops_detected", 0.50),
-    (r"jenkins", "Jenkins", "gitops_detected", 0.55),
     (r"argocd|argo-cd|argoproj", "ArgoCD", "gitops_detected", 0.75),
     (r"fluxcd|flux-system", "FluxCD", "gitops_detected", 0.70),
-    # Observability sprawl — signals tool consolidation opportunity
-    (r"datadog|dd-rum|datadoghq", "Datadog", "tooling_sprawl_detected", 0.65),
-    (r"newrelic|new-relic|nr-data", "New Relic", "tooling_sprawl_detected", 0.60),
-    (r"sentry\.io|sentry-cdn", "Sentry", "tooling_sprawl_detected", 0.50),
+    (r"jenkins", "Jenkins", "gitops_detected", 0.55),
+    # NOTE: monitoring tools are in _MONITORING_PATTERNS, NOT here.
+    # tooling_sprawl_detected requires 2+ monitoring tools on same site.
 ]
 
 # Meta generator patterns — CMS detection is NOT a buying signal, disabled.
 _META_GENERATOR_PATTERNS: list[tuple[str, str, str, float]] = []
+
+# Monitoring tools — only emit tooling_sprawl_detected if 2+ found on same site.
+# A single monitoring tool is normal; sprawl means overlapping tools.
+_MONITORING_PATTERNS: list[tuple[str, str]] = [
+    (r"datadog|dd-rum|datadoghq", "Datadog"),
+    (r"newrelic|new-relic|nr-data", "New Relic"),
+    (r"sentry\.io|sentry-cdn", "Sentry"),
+    (r"dynatrace", "Dynatrace"),
+    (r"splunk|signalfx", "Splunk"),
+    (r"elastic\.co|kibana", "Elastic/Kibana"),
+    (r"grafana", "Grafana"),
+    (r"prometheus", "Prometheus"),
+]
 
 
 def _build_observation(
@@ -191,6 +201,14 @@ async def _scan_website(
         if re.search(pattern, html_lower):
             detected.append((tech_name, signal_code, confidence))
             seen_signals.add(signal_code)
+
+    # 4. Monitoring tool sprawl — only emit if 2+ tools found (1 tool = normal)
+    monitoring_found: list[str] = []
+    for pattern, tool_name in _MONITORING_PATTERNS:
+        if re.search(pattern, html_lower):
+            monitoring_found.append(tool_name)
+    if len(monitoring_found) >= 2 and "tooling_sprawl_detected" not in seen_signals:
+        detected.append((f"Monitoring sprawl: {', '.join(monitoring_found)}", "tooling_sprawl_detected", 0.70))
 
     result["technologies"] = detected
     return result
