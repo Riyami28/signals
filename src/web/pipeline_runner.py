@@ -111,25 +111,41 @@ def _run_pipeline_sync(
                     )
 
                 # Legacy HTTP collectors (jobs, news, technographics) — run only if enabled
-                # These crawl actual websites and are slow, so skip quickly if disabled
-                legacy_collectors = [
-                    ("jobs_pages", "jobs", "Job"),
-                    ("news_rss", "news", "News"),
-                    ("technographics", "technographics", "Technographics"),
-                ]
-                for policy_key, module_name, label in legacy_collectors:
-                    if _collector_enabled(policy_key):
-                        _emit(queue, {"type": "log", "stage": "ingest", "message": f"Collecting {label} signals..."})
-                        import importlib
+                # These crawl actual websites and are slow, so skip quickly if disabled.
+                # SKIP for single-account runs: legacy collectors cannot filter by account_ids
+                # and process ALL accounts, making them extremely slow for targeted runs.
+                # The external collectors (serper_news, serper_jobs, website_techscan) already
+                # cover the same signal types and support account_ids filtering.
+                if account_ids:
+                    _emit(
+                        queue,
+                        {
+                            "type": "log",
+                            "stage": "ingest",
+                            "message": f"Skipping legacy collectors for targeted run ({len(account_ids)} accounts)",
+                        },
+                    )
+                else:
+                    legacy_collectors = [
+                        ("jobs_pages", "jobs", "Job"),
+                        ("news_rss", "news", "News"),
+                        ("technographics", "technographics", "Technographics"),
+                    ]
+                    for policy_key, module_name, label in legacy_collectors:
+                        if _collector_enabled(policy_key):
+                            _emit(
+                                queue, {"type": "log", "stage": "ingest", "message": f"Collecting {label} signals..."}
+                            )
+                            import importlib
 
-                        mod = importlib.import_module(f"src.collectors.{module_name}")
-                        c_result = _asyncio.run(mod.collect(conn, settings, keyword_lexicon, source_registry))
-                        ins = c_result.get("inserted", 0)
-                        total_inserted += ins
-                        _emit(
-                            queue,
-                            {"type": "log", "stage": "ingest", "message": f"{label}: {ins} signals"},
-                        )
+                            mod = importlib.import_module(f"src.collectors.{module_name}")
+                            c_result = _asyncio.run(mod.collect(conn, settings, keyword_lexicon, source_registry))
+                            ins = c_result.get("inserted", 0)
+                            total_inserted += ins
+                            _emit(
+                                queue,
+                                {"type": "log", "stage": "ingest", "message": f"{label}: {ins} signals"},
+                            )
 
                 # --- ALL external collectors in PARALLEL ---
                 # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional)
@@ -293,10 +309,10 @@ def _run_pipeline_sync(
                 observations = db.fetch_observations_for_scoring(conn, run_date)
                 obs_list = [dict(row) for row in observations]
 
-                # For batch runs, filter observations to batch accounts only
-                if batch_id and account_ids:
-                    batch_account_set = set(account_ids)
-                    obs_list = [o for o in obs_list if o.get("account_id") in batch_account_set]
+                # Filter observations to target accounts (single-account or batch runs)
+                if account_ids:
+                    target_set = set(account_ids)
+                    obs_list = [o for o in obs_list if o.get("account_id") in target_set]
 
                 _emit(queue, {"type": "log", "stage": "score", "message": f"Scoring {len(obs_list)} observations..."})
 
@@ -314,8 +330,8 @@ def _run_pipeline_sync(
                 # Ensure all target accounts have scores
                 existing_scores = {(s.account_id, s.product) for s in result.account_scores}
 
-                if batch_id and account_ids:
-                    # Batch-scoped: only backfill batch accounts
+                if account_ids:
+                    # Targeted run: only backfill selected accounts
                     target_account_ids = account_ids
                 else:
                     # Full run: backfill all accounts
