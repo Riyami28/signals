@@ -188,30 +188,8 @@ async def _collect_one_account(
                 )
                 if db.insert_signal_observation(conn, observation, commit=False):
                     inserted += 1
-        else:
-            # Even without keyword match, insert as general news signal
-            # so we at least capture real company mentions
-            seen += 1
-            observed_at = _parse_serper_date(date_str)
-            observation = _build_observation(
-                account_id=account_id,
-                signal_code="company_news_mention",
-                source="serper_news",
-                observed_at=observed_at,
-                confidence=0.5,
-                source_reliability=source_reliability,
-                evidence_url=link,
-                evidence_text=text,
-                payload={
-                    "title": title,
-                    "snippet": snippet,
-                    "link": link,
-                    "date": date_str,
-                    "news_source": source_name_item,
-                },
-            )
-            if db.insert_signal_observation(conn, observation, commit=False):
-                inserted += 1
+        # Skip articles that don't match any keyword — general company news
+        # without a specific signal is noise, not a buying signal.
 
     db.record_crawl_attempt(
         conn,

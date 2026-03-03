@@ -32,97 +32,35 @@ logger = logging.getLogger(__name__)
 # ─── Technology detection patterns ─────────────────────────────────────
 # Each pattern: (regex_or_string, tech_name, signal_code, confidence)
 
-# HTTP header patterns
+# HTTP header patterns — ONLY real DevOps/infra signals, NOT generic hosting
 _HEADER_PATTERNS: list[tuple[str, str, str, float]] = [
-    ("cloudflare", "Cloudflare CDN", "cloud_platform_messaging", 0.55),
-    ("amazons3", "Amazon S3", "cloud_platform_messaging", 0.65),
-    ("cloudfront", "Amazon CloudFront", "cloud_platform_messaging", 0.65),
-    ("gws", "Google Web Server", "cloud_platform_messaging", 0.55),
-    ("microsoft-azure", "Microsoft Azure", "cloud_platform_messaging", 0.65),
-    ("azure", "Microsoft Azure", "cloud_platform_messaging", 0.60),
-    ("nginx", "Nginx", "cloud_platform_messaging", 0.40),
-    ("apache", "Apache", "cloud_platform_messaging", 0.35),
-    ("akamai", "Akamai CDN", "cloud_platform_messaging", 0.50),
-    ("fastly", "Fastly CDN", "cloud_platform_messaging", 0.50),
-    ("vercel", "Vercel", "cloud_platform_messaging", 0.55),
-    ("netlify", "Netlify", "cloud_platform_messaging", 0.50),
-    ("wp engine", "WP Engine", "enterprise_modernization_program", 0.35),
+    # Intentionally empty — HTTP headers (nginx, apache, cloudflare, etc.)
+    # do NOT indicate buying intent. Every company uses some web server.
 ]
 
 # Script/link patterns to detect from HTML source
+# ONLY patterns that indicate real DevOps/infra maturity or buying intent.
+# Removed: generic cloud hosting (AWS, Azure, GCP), frontend frameworks (React, Angular),
+# CMS (WordPress, Shopify), marketing tools (HubSpot, Marketo), tag managers, chat widgets.
+# These are noise — every company uses some combination of them.
 _HTML_TECH_PATTERNS: list[tuple[str, str, str, float]] = [
-    # Cloud / Infrastructure
-    (r"amazonaws\.com", "AWS", "cloud_platform_messaging", 0.70),
-    (r"cloudfront\.net", "CloudFront (AWS)", "cloud_platform_messaging", 0.65),
-    (r"azure\.com|azureedge\.net|azure\.net", "Microsoft Azure", "cloud_platform_messaging", 0.65),
-    (r"googleapis\.com|gstatic\.com", "Google Cloud", "cloud_platform_messaging", 0.55),
-    (r"storage\.googleapis\.com", "Google Cloud Storage", "cloud_platform_messaging", 0.65),
-    (r"firebaseapp\.com|firebase\.google", "Firebase (Google)", "cloud_platform_messaging", 0.60),
-    # Frontend frameworks (signals tech maturity)
-    (r"react|reactdom|react-dom", "React.js", "enterprise_modernization_program", 0.40),
-    (r"angular|ng-version", "Angular", "enterprise_modernization_program", 0.45),
-    (r"vue\.js|vuejs|vue\.min", "Vue.js", "enterprise_modernization_program", 0.40),
-    (r"next\.js|nextjs|_next/", "Next.js", "enterprise_modernization_program", 0.45),
-    # SaaS / Marketing (signals enterprise tooling adoption)
-    (r"hubspot\.com|hs-scripts\.com|hbspt", "HubSpot", "enterprise_modernization_program", 0.55),
-    (r"salesforce\.com|force\.com|pardot", "Salesforce", "enterprise_modernization_program", 0.65),
-    (r"marketo\.com|marketo\.net|munchkin", "Marketo", "enterprise_modernization_program", 0.60),
-    (r"eloqua\.com", "Oracle Eloqua", "erp_s4_migration_milestone", 0.55),
-    (r"sap\.com|sapbydesign|sap-ariba", "SAP", "erp_s4_migration_milestone", 0.70),
-    (r"oracle\.com|oraclecloud", "Oracle Cloud", "erp_s4_migration_milestone", 0.60),
-    (r"workday\.com", "Workday", "enterprise_modernization_program", 0.60),
-    (r"servicenow\.com", "ServiceNow", "enterprise_modernization_program", 0.60),
-    # Analytics / monitoring (signals tooling maturity)
-    (r"datadog|dd-rum|datadoghq", "Datadog", "tooling_sprawl_detected", 0.65),
-    (r"newrelic|new-relic|nr-data", "New Relic", "tooling_sprawl_detected", 0.60),
-    (r"segment\.com|segment\.io|analytics\.js", "Segment", "tooling_sprawl_detected", 0.50),
-    (r"mixpanel\.com", "Mixpanel", "tooling_sprawl_detected", 0.45),
-    (r"amplitude\.com", "Amplitude", "tooling_sprawl_detected", 0.45),
-    (r"pendo\.io", "Pendo", "tooling_sprawl_detected", 0.50),
-    (r"fullstory\.com", "FullStory", "tooling_sprawl_detected", 0.45),
-    (r"hotjar\.com", "Hotjar", "tooling_sprawl_detected", 0.40),
-    (r"sentry\.io|sentry-cdn", "Sentry", "tooling_sprawl_detected", 0.50),
-    # DevOps / CI-CD indicators
-    (r"github\.com|github\.io", "GitHub", "gitops_detected", 0.40),
-    (r"gitlab\.com", "GitLab", "gitops_detected", 0.50),
-    (r"atlassian\.com|bitbucket", "Atlassian/Bitbucket", "gitops_detected", 0.45),
-    (r"jira\.com|jira-", "Jira", "tooling_sprawl_detected", 0.50),
-    (r"jenkins", "Jenkins", "gitops_detected", 0.55),
-    # Communication / productivity
-    (r"intercom\.com|intercomcdn", "Intercom", "enterprise_modernization_program", 0.45),
-    (r"drift\.com", "Drift", "enterprise_modernization_program", 0.40),
-    (r"zendesk\.com|zdassets", "Zendesk", "enterprise_modernization_program", 0.45),
-    (r"freshdesk|freshworks", "Freshworks", "enterprise_modernization_program", 0.40),
-    (r"slack\.com|slack-edge", "Slack", "enterprise_modernization_program", 0.40),
-    # Kubernetes / container (rare on public sites but sometimes in docs/blogs)
+    # Kubernetes / container — strong DevOps signal
     (r"kubernetes|k8s\.io", "Kubernetes", "kubernetes_detected", 0.80),
     (r"docker\.com|docker\.io", "Docker", "kubernetes_detected", 0.55),
+    # IaC / GitOps — strong platform engineering signal
     (r"terraform|hashicorp", "Terraform/HashiCorp", "terraform_detected", 0.75),
-    # CMS (signals digital maturity)
-    (r"wp-content|wordpress", "WordPress", "enterprise_modernization_program", 0.30),
-    (r"drupal", "Drupal", "enterprise_modernization_program", 0.35),
-    (r"shopify\.com|cdn\.shopify", "Shopify", "enterprise_modernization_program", 0.40),
-    (r"contentful\.com", "Contentful", "enterprise_modernization_program", 0.50),
-    (r"sanity\.io", "Sanity CMS", "enterprise_modernization_program", 0.45),
-    # Tag managers / data layer (signals data maturity)
-    (r"googletagmanager|gtm\.js", "Google Tag Manager", "enterprise_modernization_program", 0.35),
-    (r"tealium", "Tealium", "enterprise_modernization_program", 0.50),
-    (r"ensighten", "Ensighten", "enterprise_modernization_program", 0.45),
-    (r"launch\.adobe|adobedtm", "Adobe Launch", "enterprise_modernization_program", 0.55),
+    (r"gitlab\.com", "GitLab", "gitops_detected", 0.50),
+    (r"jenkins", "Jenkins", "gitops_detected", 0.55),
+    (r"argocd|argo-cd|argoproj", "ArgoCD", "gitops_detected", 0.75),
+    (r"fluxcd|flux-system", "FluxCD", "gitops_detected", 0.70),
+    # Observability sprawl — signals tool consolidation opportunity
+    (r"datadog|dd-rum|datadoghq", "Datadog", "tooling_sprawl_detected", 0.65),
+    (r"newrelic|new-relic|nr-data", "New Relic", "tooling_sprawl_detected", 0.60),
+    (r"sentry\.io|sentry-cdn", "Sentry", "tooling_sprawl_detected", 0.50),
 ]
 
-# Meta generator patterns
-_META_GENERATOR_PATTERNS: list[tuple[str, str, str, float]] = [
-    (r"wordpress", "WordPress", "enterprise_modernization_program", 0.30),
-    (r"drupal", "Drupal", "enterprise_modernization_program", 0.35),
-    (r"joomla", "Joomla", "enterprise_modernization_program", 0.30),
-    (r"hubspot", "HubSpot CMS", "enterprise_modernization_program", 0.55),
-    (r"wix\.com", "Wix", "enterprise_modernization_program", 0.25),
-    (r"squarespace", "Squarespace", "enterprise_modernization_program", 0.25),
-    (r"adobe experience", "Adobe Experience Manager", "enterprise_modernization_program", 0.65),
-    (r"sitecore", "Sitecore", "enterprise_modernization_program", 0.60),
-    (r"contentful", "Contentful", "enterprise_modernization_program", 0.50),
-]
+# Meta generator patterns — CMS detection is NOT a buying signal, disabled.
+_META_GENERATOR_PATTERNS: list[tuple[str, str, str, float]] = []
 
 
 def _build_observation(

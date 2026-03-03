@@ -284,27 +284,8 @@ async def _collect_one_account(
                     )
                     if db.insert_signal_observation(conn, observation, commit=False):
                         inserted += 1
-                elif is_job_source:
-                    # 3. Fallback: general hiring activity for confirmed job sources
-                    seen += 1
-                    observation = _build_observation(
-                        account_id=account_id,
-                        signal_code="general_hiring_activity",
-                        source="serper_jobs",
-                        observed_at=utc_now_iso(),
-                        confidence=0.5,
-                        source_reliability=source_reliability,
-                        evidence_url=link,
-                        evidence_text=text,
-                        payload={
-                            "title": title,
-                            "snippet": snippet,
-                            "link": link,
-                            "query": query[:100],
-                        },
-                    )
-                    if db.insert_signal_observation(conn, observation, commit=False):
-                        inserted += 1
+                # Skip non-DevOps/Platform/FinOps job postings — generic hiring
+                # (Financial Auditor, Marketing Manager, etc.) is not a buying signal.
 
         # Brief pause between queries for same account
         await asyncio.sleep(0.05)
