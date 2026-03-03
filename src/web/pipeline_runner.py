@@ -146,13 +146,14 @@ def _run_pipeline_sync(
                             )
 
                 # --- ALL external collectors in PARALLEL ---
-                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional)
+                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + GitHub Stargazers
                 serper_news_enabled = _collector_enabled("serper_news") and settings.serper_api_key
                 serper_jobs_enabled = _collector_enabled("serper_jobs") and settings.serper_api_key
                 techscan_enabled = _collector_enabled("website_techscan")
                 gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
+                stargazer_enabled = _collector_enabled("github_stargazers")
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled
+                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled
 
                 if any_external:
                     active_sources = []
@@ -242,6 +243,20 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("gnews")
+
+                        # --- GitHub Stargazers (FREE — tracks repo stars) ---
+                        if stargazer_enabled:
+                            from src.collectors import github_stargazers
+
+                            tasks.append(
+                                github_stargazers.collect(
+                                    conn,
+                                    settings,
+                                    source_reliability=source_registry.get("github_stargazers", 0.60),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("github_stargazers")
 
                         results = await asyncio.gather(*tasks, return_exceptions=True)
                         return list(zip(task_labels, results))

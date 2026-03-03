@@ -138,6 +138,10 @@ class Settings(BaseSettings):
     gnews_api_key: str = Field(default="")
     gnews_max_accounts: int = Field(default=80, ge=1)
 
+    # --- GitHub Stargazers (FREE — unauthenticated 60 req/hr, with token 5000 req/hr) ---
+    github_token: str = Field(default="")
+    github_repos: tuple[str, ...] = Field(default=("zopdev/zop-api", "zopdev/zop-cli", "zopdev/zopdev"))
+
     # --- connection pooling ---
     db_pool_min_size: int = Field(default=4, ge=1)
     db_pool_max_size: int = Field(default=32, ge=1)
