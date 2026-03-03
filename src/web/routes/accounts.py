@@ -28,6 +28,38 @@ def _get_conn():
     return conn
 
 
+# Cache signal registry metadata for timeline enrichment
+_signal_meta_cache: dict[str, dict] | None = None
+
+
+def _get_signal_meta() -> dict[str, dict]:
+    """Load signal registry as a lookup: signal_code → {dimension, category, base_weight}."""
+    global _signal_meta_cache  # noqa: PLW0603
+    if _signal_meta_cache is not None:
+        return _signal_meta_cache
+
+    settings = load_settings()
+    meta: dict[str, dict] = {}
+    path = settings.signal_registry_path
+    if path.exists():
+        with path.open("r", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                code = (row.get("signal_code") or "").strip()
+                if not code:
+                    continue
+                try:
+                    weight = int(row.get("base_weight", 0))
+                except (ValueError, TypeError):
+                    weight = 0
+                meta[code] = {
+                    "dimension": (row.get("dimension") or "").strip(),
+                    "category": (row.get("category") or "").strip(),
+                    "base_weight": weight,
+                }
+    _signal_meta_cache = meta
+    return meta
+
+
 def _sanitize_search(q: str) -> str:
     """Strip control characters and truncate to max length."""
     cleaned = re.sub(r"[\x00-\x1f\x7f]", "", q).strip()
@@ -155,11 +187,22 @@ def get_account_timeline(
     date_from: str = Query(""),
     date_to: str = Query(""),
 ):
-    """Return paginated signal timeline for an account with optional filters."""
+    """Return enriched scored timeline for an account.
+
+    Each observation is enriched with scoring context:
+    - ``dimension``: scoring dimension (trigger_intent, tech_fit, etc.)
+    - ``category``: signal category (trigger_events, hiring, etc.)
+    - ``base_weight``: signal importance weight from registry
+    - ``component_score``: actual contribution to account score
+    """
     conn = _get_conn()
     try:
         if not db.account_exists(conn, account_id):
             return {"error": "not found"}, 404
+
+        # Load signal registry for enrichment
+        signal_meta = _get_signal_meta()
+
         items, total = db.get_signal_timeline(
             conn,
             account_id,
@@ -170,6 +213,15 @@ def get_account_timeline(
             date_from=date_from,
             date_to=date_to,
         )
+
+        # Enrich each item with dimension/category/weight from registry
+        for item in items:
+            code = item.get("signal_code", "")
+            meta = signal_meta.get(code, {})
+            item["dimension"] = meta.get("dimension", "")
+            item["category"] = meta.get("category", "")
+            item["base_weight"] = meta.get("base_weight", 0)
+
         _serialize_dates(items)
         return {
             "items": items,
@@ -249,9 +301,7 @@ def export_accounts_csv(
                     signal_list = detail["signals"]
                     # Filter out internal:// signals
                     real_signals = [
-                        s
-                        for s in signal_list
-                        if not str(s.get("evidence_url", "")).startswith("internal://")
+                        s for s in signal_list if not str(s.get("evidence_url", "")).startswith("internal://")
                     ]
                     signal_codes = [s.get("signal_code", "") for s in real_signals[:5]]
                     signals_summary = "; ".join(signal_codes)

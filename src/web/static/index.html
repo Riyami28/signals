@@ -210,7 +210,7 @@
                     </div>
                     <template x-if="timelineItems && timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://')).length > 0">
                       <div>
-                        <template x-for="item in timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://'))" :key="item.observed_at + item.signal_code">
+                        <template x-for="(item, idx) in timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://'))" :key="idx + '_' + item.observed_at + item.signal_code">
                           <div class="signal-card">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
                               <span class="signal-code" x-text="item.signal_code"></span>

@@ -58,13 +58,11 @@ _HTML_TECH_PATTERNS: list[tuple[str, str, str, float]] = [
     (r"googleapis\.com|gstatic\.com", "Google Cloud", "cloud_platform_messaging", 0.55),
     (r"storage\.googleapis\.com", "Google Cloud Storage", "cloud_platform_messaging", 0.65),
     (r"firebaseapp\.com|firebase\.google", "Firebase (Google)", "cloud_platform_messaging", 0.60),
-
     # Frontend frameworks (signals tech maturity)
     (r"react|reactdom|react-dom", "React.js", "enterprise_modernization_program", 0.40),
     (r"angular|ng-version", "Angular", "enterprise_modernization_program", 0.45),
     (r"vue\.js|vuejs|vue\.min", "Vue.js", "enterprise_modernization_program", 0.40),
     (r"next\.js|nextjs|_next/", "Next.js", "enterprise_modernization_program", 0.45),
-
     # SaaS / Marketing (signals enterprise tooling adoption)
     (r"hubspot\.com|hs-scripts\.com|hbspt", "HubSpot", "enterprise_modernization_program", 0.55),
     (r"salesforce\.com|force\.com|pardot", "Salesforce", "enterprise_modernization_program", 0.65),
@@ -74,7 +72,6 @@ _HTML_TECH_PATTERNS: list[tuple[str, str, str, float]] = [
     (r"oracle\.com|oraclecloud", "Oracle Cloud", "erp_s4_migration_milestone", 0.60),
     (r"workday\.com", "Workday", "enterprise_modernization_program", 0.60),
     (r"servicenow\.com", "ServiceNow", "enterprise_modernization_program", 0.60),
-
     # Analytics / monitoring (signals tooling maturity)
     (r"datadog|dd-rum|datadoghq", "Datadog", "tooling_sprawl_detected", 0.65),
     (r"newrelic|new-relic|nr-data", "New Relic", "tooling_sprawl_detected", 0.60),
@@ -85,33 +82,28 @@ _HTML_TECH_PATTERNS: list[tuple[str, str, str, float]] = [
     (r"fullstory\.com", "FullStory", "tooling_sprawl_detected", 0.45),
     (r"hotjar\.com", "Hotjar", "tooling_sprawl_detected", 0.40),
     (r"sentry\.io|sentry-cdn", "Sentry", "tooling_sprawl_detected", 0.50),
-
     # DevOps / CI-CD indicators
     (r"github\.com|github\.io", "GitHub", "gitops_detected", 0.40),
     (r"gitlab\.com", "GitLab", "gitops_detected", 0.50),
     (r"atlassian\.com|bitbucket", "Atlassian/Bitbucket", "gitops_detected", 0.45),
     (r"jira\.com|jira-", "Jira", "tooling_sprawl_detected", 0.50),
     (r"jenkins", "Jenkins", "gitops_detected", 0.55),
-
     # Communication / productivity
     (r"intercom\.com|intercomcdn", "Intercom", "enterprise_modernization_program", 0.45),
     (r"drift\.com", "Drift", "enterprise_modernization_program", 0.40),
     (r"zendesk\.com|zdassets", "Zendesk", "enterprise_modernization_program", 0.45),
     (r"freshdesk|freshworks", "Freshworks", "enterprise_modernization_program", 0.40),
     (r"slack\.com|slack-edge", "Slack", "enterprise_modernization_program", 0.40),
-
     # Kubernetes / container (rare on public sites but sometimes in docs/blogs)
     (r"kubernetes|k8s\.io", "Kubernetes", "kubernetes_detected", 0.80),
     (r"docker\.com|docker\.io", "Docker", "kubernetes_detected", 0.55),
     (r"terraform|hashicorp", "Terraform/HashiCorp", "terraform_detected", 0.75),
-
     # CMS (signals digital maturity)
     (r"wp-content|wordpress", "WordPress", "enterprise_modernization_program", 0.30),
     (r"drupal", "Drupal", "enterprise_modernization_program", 0.35),
     (r"shopify\.com|cdn\.shopify", "Shopify", "enterprise_modernization_program", 0.40),
     (r"contentful\.com", "Contentful", "enterprise_modernization_program", 0.50),
     (r"sanity\.io", "Sanity CMS", "enterprise_modernization_program", 0.45),
-
     # Tag managers / data layer (signals data maturity)
     (r"googletagmanager|gtm\.js", "Google Tag Manager", "enterprise_modernization_program", 0.35),
     (r"tealium", "Tealium", "enterprise_modernization_program", 0.50),
@@ -435,15 +427,27 @@ async def collect(
 
         async def _run_one(account: dict) -> tuple[int, int]:
             async with semaphore:
-                result = await _collect_one_account(
-                    conn=conn,
-                    client=client,
-                    account=account,
-                    source_reliability=source_reliability,
-                )
-                # Small delay to be polite
-                await asyncio.sleep(0.1)
-                return result
+                # Use SAVEPOINT so one account's DB error doesn't abort the whole batch
+                try:
+                    conn.execute("SAVEPOINT techscan_worker")
+                    result = await _collect_one_account(
+                        conn=conn,
+                        client=client,
+                        account=account,
+                        source_reliability=source_reliability,
+                    )
+                    conn.execute("RELEASE SAVEPOINT techscan_worker")
+                    # Small delay to be polite
+                    await asyncio.sleep(0.1)
+                    return result
+                except Exception as exc:
+                    try:
+                        conn.execute("ROLLBACK TO SAVEPOINT techscan_worker")
+                    except Exception:
+                        pass
+                    logger.warning("website_techscan_worker_error: %s", exc)
+                    await asyncio.sleep(0.1)
+                    return 0, 0
 
         tasks = [_run_one(acct) for acct in accounts]
         results = await asyncio.gather(*tasks, return_exceptions=True)

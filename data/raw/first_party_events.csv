@@ -39,3 +39,37 @@ Tata Digital,tatadigital.com,shared,repo_added_deploy_attempted,first_party_csv,
 Tata Digital,tatadigital.com,shared,teammate_invited,first_party_csv,internal://product/tatadigital/team-invite,buyer invited cross functional operators to workspace,0.83,2026-02-17T00:00:00Z
 Tata Digital,tatadigital.com,zopday,devops_bottleneck_language,first_party_csv,internal://cs/tatadigital/devops-friction,platform teams reported deployment toil and bottlenecks,0.78,2026-02-17T00:00:00Z
 Tata Digital,tatadigital.com,zopnight,cost_reduction_mandate,first_party_csv,internal://finance/tatadigital/efficiency-mandate,leadership issued mandate to reduce cloud spend,0.87,2026-02-17T00:00:00Z
+Coca-Cola India,coca-colaindia.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/cocacola/employee-count,Employee count: 2500 (FMCG MNC India operations),0.85,2026-02-17T00:00:00Z
+Coca-Cola India,coca-colaindia.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/cocacola/growth,Employee growth: 12% YoY driven by digital transformation hiring,0.75,2026-02-17T00:00:00Z
+Diageo India,diageoindia.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/diageo/employee-count,Employee count: 3200 (spirits & beverages India operations),0.85,2026-02-17T00:00:00Z
+Diageo India,diageoindia.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/diageo/growth,Employee growth: 15% YoY driven by premiumization strategy,0.75,2026-02-17T00:00:00Z
+Tata Consumer Products,tataconsumer.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/tataconsumer/employee-count,Employee count: 4000 (FMCG conglomerate with digital push),0.85,2026-02-17T00:00:00Z
+Tata Consumer Products,tataconsumer.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/tataconsumer/growth,Employee growth: 18% YoY driven by D2C expansion,0.75,2026-02-17T00:00:00Z
+Tata Digital,tatadigital.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/tatadigital/employee-count,Employee count: 1500 (super app and digital commerce),0.85,2026-02-17T00:00:00Z
+Tata Digital,tatadigital.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/tatadigital/growth,Employee growth: 25% YoY driven by Tata Neu platform scale,0.75,2026-02-17T00:00:00Z
+Tata Digital,tatadigital.com,shared,recent_funding_event,first_party_csv,internal://firmographic/tatadigital/funding,Recent funding: Tata Group internal investment round for Tata Neu,0.80,2026-02-17T00:00:00Z
+Conde Nast,condenast.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/condenast/employee-count,Employee count: 6000 (global media and publishing),0.85,2026-02-17T00:00:00Z
+Conde Nast,condenast.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/condenast/growth,Employee growth: 11% YoY driven by digital content platform,0.75,2026-02-17T00:00:00Z
+Instacart,instacart.com,shared,funding_stage_series_b_plus,first_party_csv,internal://firmographic/instacart/funding-stage,Funding stage: IPO (went public Sept 2023),0.90,2026-02-17T00:00:00Z
+Instacart,instacart.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/instacart/employee-count,Employee count: 3200 (grocery delivery platform),0.85,2026-02-17T00:00:00Z
+Procter & Gamble,pg.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/pg/employee-count,Employee count: global enterprise with 100k+ employees,0.85,2026-02-17T00:00:00Z
+Reckitt,reckitt.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/reckitt/employee-count,Employee count: 40000 (global consumer health and hygiene),0.85,2026-02-17T00:00:00Z
+Hormel,hormel.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/hormel/employee-count,Employee count: 20000 (food processing multinational),0.85,2026-02-17T00:00:00Z
+Hormel,hormel.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/hormel/growth,Employee growth: 14% YoY driven by Planters acquisition integration,0.75,2026-02-17T00:00:00Z
+Archer Daniels Midland,adm.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/adm/employee-count,Employee count: 40000 (global food processing and commodities),0.85,2026-02-17T00:00:00Z
+McCormick & Company,mccormickcorporation.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/mccormick/employee-count,Employee count: 14000 (global spice and flavoring company),0.85,2026-02-17T00:00:00Z
+Marico,marico.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/marico/employee-count,Employee count: 3000 (Indian FMCG with beauty and wellness brands),0.85,2026-02-17T00:00:00Z
+Marico,marico.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/marico/growth,Employee growth: 13% YoY driven by digital-first distribution,0.75,2026-02-17T00:00:00Z
+Amul,amul.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/amul/employee-count,Employee count: 5000 (India largest dairy cooperative),0.85,2026-02-17T00:00:00Z
+Godfrey Phillips India,godfreyphillips.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/gpi/employee-count,Employee count: 3500 (tobacco and FMCG conglomerate),0.85,2026-02-17T00:00:00Z
+Virgin Group,virgin.com,shared,employee_count_in_range,first_party_csv,internal://firmographic/virgin/employee-count,Employee count: 70000 (global conglomerate across industries),0.85,2026-02-17T00:00:00Z
+Prose Beauty,prose.com,shared,funding_stage_series_b_plus,first_party_csv,internal://firmographic/prose/funding-stage,Funding stage: Series C ($100M raised for personalized beauty),0.85,2026-02-17T00:00:00Z
+Prose Beauty,prose.com,shared,recent_funding_event,first_party_csv,internal://firmographic/prose/funding,Recent funding: Series C round closed at $100M,0.80,2026-02-17T00:00:00Z
+Prose Beauty,prose.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/prose/growth,Employee growth: 30% YoY driven by DTC subscription growth,0.75,2026-02-17T00:00:00Z
+Cirkul,drinkcirkul.com,shared,funding_stage_series_b_plus,first_party_csv,internal://firmographic/cirkul/funding-stage,Funding stage: Series B ($70M raised for flavored water platform),0.85,2026-02-17T00:00:00Z
+Cirkul,drinkcirkul.com,shared,recent_funding_event,first_party_csv,internal://firmographic/cirkul/funding,Recent funding: Series B round closed,0.80,2026-02-17T00:00:00Z
+Cirkul,drinkcirkul.com,shared,employee_growth_positive,first_party_csv,internal://firmographic/cirkul/growth,Employee growth: 50% YoY driven by rapid DTC scaling,0.75,2026-02-17T00:00:00Z
+GoodDot,gooddot.in,shared,funding_stage_series_a,first_party_csv,internal://firmographic/gooddot/funding-stage,Funding stage: Series A (plant-based food startup India),0.85,2026-02-17T00:00:00Z
+GoodDot,gooddot.in,shared,employee_growth_positive,first_party_csv,internal://firmographic/gooddot/growth,Employee growth: 40% YoY driven by plant-protein market expansion,0.75,2026-02-17T00:00:00Z
+Tomorrow Farms,tomorrowfarms.co,shared,funding_stage_series_a,first_party_csv,internal://firmographic/tomorrowfarms/funding-stage,Funding stage: Series A (plant-based dairy alternative India),0.85,2026-02-17T00:00:00Z
+Tomorrow Farms,tomorrowfarms.co,shared,employee_growth_positive,first_party_csv,internal://firmographic/tomorrowfarms/growth,Employee growth: 35% YoY driven by oat milk market entry,0.75,2026-02-17T00:00:00Z

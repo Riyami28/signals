@@ -1151,27 +1151,33 @@ def get_signal_timeline(
     date_from: str = "",
     date_to: str = "",
 ) -> tuple[list[dict], int]:
-    """Return paginated signal observations for an account with optional filters."""
-    where_parts = ["account_id = %s"]
+    """Return enriched scored timeline for an account.
+
+    Unlike the raw signals list on the detail endpoint, the timeline
+    enriches each observation with scoring context from the latest run:
+    - ``component_score``: what this signal actually contributed to the score
+    This lets the UI show *why* each signal mattered and how much it weighed.
+    """
+    where_parts = ["so.account_id = %s"]
     params: list = [account_id]
 
     if signal_code:
-        where_parts.append("signal_code = %s")
+        where_parts.append("so.signal_code = %s")
         params.append(signal_code)
     if source:
-        where_parts.append("source = %s")
+        where_parts.append("so.source = %s")
         params.append(source)
     if date_from:
-        where_parts.append("observed_at >= %s")
+        where_parts.append("so.observed_at >= %s")
         params.append(date_from)
     if date_to:
-        where_parts.append("observed_at <= %s")
+        where_parts.append("so.observed_at <= %s")
         params.append(date_to)
 
     where_sql = " AND ".join(where_parts)
 
     count_row = conn.execute(
-        f"SELECT COUNT(*) AS total FROM signal_observations WHERE {where_sql}",
+        f"SELECT COUNT(*) AS total FROM signal_observations so WHERE {where_sql}",
         params,
     ).fetchone()
     total = int(count_row["total"]) if count_row else 0
@@ -1179,11 +1185,25 @@ def get_signal_timeline(
     data_params = list(params) + [max(1, min(limit, 200)), max(0, offset)]
     rows = conn.execute(
         f"""
-        SELECT signal_code, source, evidence_url, evidence_text, observed_at,
-               confidence, source_reliability, product
-        FROM signal_observations
+        SELECT so.signal_code, so.source, so.evidence_url, so.evidence_text,
+               so.observed_at, so.confidence, so.source_reliability, so.product,
+               sc.component_score
+        FROM signal_observations so
+        LEFT JOIN LATERAL (
+            SELECT sc2.component_score
+            FROM score_components sc2
+            WHERE sc2.account_id = so.account_id
+              AND sc2.signal_code = so.signal_code
+              AND sc2.run_id = (
+                  SELECT run_id FROM score_runs
+                  WHERE status = 'completed'
+                  ORDER BY started_at DESC LIMIT 1
+              )
+            ORDER BY sc2.component_score DESC
+            LIMIT 1
+        ) sc ON true
         WHERE {where_sql}
-        ORDER BY observed_at DESC
+        ORDER BY so.observed_at DESC
         LIMIT %s OFFSET %s
         """,
         data_params,
