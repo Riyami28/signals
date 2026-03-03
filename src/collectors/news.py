@@ -322,6 +322,7 @@ async def collect(
     lexicon_by_source: dict[str, list[dict[str, str]]],
     source_reliability: dict[str, float],
     db_pool=None,
+    account_ids: list[str] | None = None,
 ) -> dict[str, int]:
     inserted = 0
     seen = 0
@@ -422,6 +423,7 @@ async def collect(
             source=google_source,
             limit=settings.live_max_accounts,
             include_domains=list(settings.live_target_domains),
+            include_account_ids=account_ids,
         )
         _emit_progress(
             f"collector=news_live status=started accounts={len(accounts)} workers={settings.live_workers_per_source}"

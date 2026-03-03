@@ -256,10 +256,10 @@ def export_accounts_csv(
     label: str = Query(""),
     q: str = Query(""),
 ):
-    """Export all scored accounts as a downloadable CSV file.
+    """Export all scored accounts as a comprehensive CSV file.
 
-    Includes: company_name, domain, score, tier, velocity_7d, velocity_14d,
-    top signals, dimension breakdown, and research status.
+    Includes: account info, scores, signals with evidence, contacts,
+    research brief, conversation starters, and labels.
     """
     conn = _get_conn()
     try:
@@ -277,34 +277,115 @@ def export_accounts_csv(
         # Build CSV in memory
         output = io.StringIO()
         fieldnames = [
+            # Account info
             "company_name",
             "domain",
+            "industry",
+            "country",
+            "employees",
+            "revenue_range",
+            "linkedin_url",
+            # Scoring
             "score",
             "tier",
             "velocity_7d",
             "velocity_14d",
             "velocity_30d",
+            # Signals
             "signal_count",
-            "top_signals",
+            "signals",
+            "evidence_urls",
+            # Research
+            "research_brief",
+            "conversation_starters",
             "research_status",
+            # Contacts
+            "contact_1",
+            "contact_2",
+            "contact_3",
+            # Labels
             "labels",
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
 
         for row in rows:
-            # Get signal details for this account
+            account_id = str(row.get("account_id", ""))
+
+            # --- Signals ---
             signals_summary = ""
+            evidence_urls = ""
             try:
-                detail = db.get_account_detail(conn, str(row.get("account_id", "")))
+                detail = db.get_account_detail(conn, account_id)
                 if detail and detail.get("signals"):
                     signal_list = detail["signals"]
-                    # Filter out internal:// signals
                     real_signals = [
                         s for s in signal_list if not str(s.get("evidence_url", "")).startswith("internal://")
                     ]
-                    signal_codes = [s.get("signal_code", "") for s in real_signals[:5]]
+                    signal_codes = [s.get("signal_code", "") for s in real_signals[:10]]
                     signals_summary = "; ".join(signal_codes)
+                    urls = []
+                    seen_urls: set[str] = set()
+                    for s in real_signals[:10]:
+                        url = str(s.get("evidence_url", "")).strip()
+                        if url and url not in seen_urls:
+                            seen_urls.add(url)
+                            urls.append(url)
+                    evidence_urls = "; ".join(urls)
+            except Exception:
+                pass
+
+            # --- Research ---
+            research_brief = ""
+            conversation_starters = ""
+            research_status = str(row.get("research_status", "") or "")
+            industry = ""
+            country = ""
+            employees = ""
+            revenue_range = ""
+            linkedin_url = ""
+            try:
+                research = db.get_company_research(conn, account_id)
+                if research:
+                    research_brief = str(research.get("research_brief", "") or "")[:500]
+                    research_status = str(research.get("research_status", "") or research_status)
+                    enrich_raw = research.get("enrichment_json", "") or "{}"
+                    enrichment = json.loads(enrich_raw) if isinstance(enrich_raw, str) else enrich_raw
+                    industry = str(enrichment.get("industry", "") or "")
+                    country = str(enrichment.get("country", "") or "")
+                    employees = str(enrichment.get("employees", "") or enrichment.get("employee_range", "") or "")
+                    revenue_range = str(enrichment.get("revenue_range", "") or "")
+                    linkedin_url = str(enrichment.get("company_linkedin_url", "") or "")
+                    # Conversation starters from research_profile
+                    profile_raw = research.get("research_profile", "") or ""
+                    if profile_raw:
+                        try:
+                            profile = json.loads(profile_raw) if isinstance(profile_raw, str) else profile_raw
+                            starters = profile.get("conversation_starters", []) if isinstance(profile, dict) else []
+                            if starters:
+                                conversation_starters = " | ".join(str(s) for s in starters[:3])
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+            except Exception:
+                pass
+
+            # --- Contacts (top 3) ---
+            contact_lines = ["", "", ""]
+            try:
+                contacts = db.get_contacts_for_account(conn, account_id)
+                for i, c in enumerate(contacts[:3]):
+                    name = f"{c.get('first_name', '')} {c.get('last_name', '')}".strip()
+                    title = c.get("title", "")
+                    email = c.get("email", "")
+                    li = c.get("linkedin_url", "")
+                    parts = [name]
+                    if title:
+                        parts.append(title)
+                    if email:
+                        parts.append(email)
+                    if li:
+                        parts.append(li)
+                    contact_lines[i] = " | ".join(parts)
             except Exception:
                 pass
 
@@ -312,14 +393,25 @@ def export_accounts_csv(
                 {
                     "company_name": row.get("company_name", ""),
                     "domain": row.get("domain", ""),
+                    "industry": industry,
+                    "country": country,
+                    "employees": employees,
+                    "revenue_range": revenue_range,
+                    "linkedin_url": linkedin_url,
                     "score": row.get("score", 0),
                     "tier": row.get("tier", ""),
                     "velocity_7d": row.get("velocity_7d", 0),
                     "velocity_14d": row.get("velocity_14d", 0),
                     "velocity_30d": row.get("velocity_30d", 0),
                     "signal_count": row.get("signal_count", 0),
-                    "top_signals": signals_summary,
-                    "research_status": row.get("research_status", ""),
+                    "signals": signals_summary,
+                    "evidence_urls": evidence_urls,
+                    "research_brief": research_brief,
+                    "conversation_starters": conversation_starters,
+                    "research_status": research_status,
+                    "contact_1": contact_lines[0],
+                    "contact_2": contact_lines[1],
+                    "contact_3": contact_lines[2],
                     "labels": row.get("labels", ""),
                 }
             )

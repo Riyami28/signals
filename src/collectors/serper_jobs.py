@@ -24,20 +24,19 @@ _JOB_SEARCH_SUFFIXES = [
     "finops OR cloud cost OR infrastructure engineer",
 ]
 
-# Direct title-to-signal mapping (mirrors jobs.py FALLBACK_ROLE_SIGNALS)
+# Direct title-to-signal mapping — TITLE ONLY, no snippet matching.
+# Only match explicit DevOps/Platform/FinOps role titles.
 _ROLE_SIGNAL_MAP = {
     "finops": "finops_role_open",
     "cloud cost": "finops_role_open",
-    "cost management": "finops_role_open",
+    "cost optimization": "finops_role_open",
     "platform engineer": "platform_role_open",
-    "platform": "platform_role_open",
-    "internal developer": "platform_role_open",
+    "internal developer platform": "platform_role_open",
     "devops": "devops_role_open",
     "sre": "devops_role_open",
     "site reliability": "devops_role_open",
     "cloud engineer": "devops_role_open",
     "infrastructure engineer": "devops_role_open",
-    "kubernetes": "devops_role_open",
 }
 
 # Domains that are known job board sites
@@ -105,13 +104,16 @@ def _is_job_url(link: str) -> bool:
 
 
 def _match_role_signal(title: str, snippet: str) -> tuple[str, float] | None:
-    """Try to match job title/snippet to a specific signal code.
+    """Try to match job TITLE to a specific signal code.
+
+    Only checks the job title — snippet is ignored to avoid false positives
+    where a generic dev role mentions DevOps/K8s keywords in the description.
 
     Returns (signal_code, confidence) or None.
     """
-    text_lower = f"{title} {snippet}".lower()
+    title_lower = title.lower()
     for keyword, signal_code in _ROLE_SIGNAL_MAP.items():
-        if keyword in text_lower:
+        if keyword in title_lower:
             return signal_code, 0.65
     return None
 

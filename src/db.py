@@ -1440,6 +1440,7 @@ def select_accounts_for_live_crawl(
     source: str,
     limit: int,
     include_domains: list[str] | tuple[str, ...] | None = None,
+    include_account_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     bounded_limit = max(1, int(limit))
     domain_filters: list[str] = []
@@ -1455,6 +1456,10 @@ def select_accounts_for_live_crawl(
         "LOWER(a.domain) NOT LIKE %s",
     ]
     params: list[Any] = [str(source).strip(), "%.example"]
+    if include_account_ids:
+        placeholders = ", ".join("%s" for _ in include_account_ids)
+        where_clauses.append(f"a.account_id IN ({placeholders})")
+        params.extend(include_account_ids)
     if domain_filters:
         placeholders = ", ".join("%s" for _ in domain_filters)
         where_clauses.append(f"LOWER(a.domain) IN ({placeholders})")

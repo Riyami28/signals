@@ -111,11 +111,9 @@ def _run_pipeline_sync(
                     )
 
                 # Legacy HTTP collectors (jobs, news, technographics) — run only if enabled
-                # These crawl actual websites and are slow, so skip quickly if disabled.
-                # SKIP for single-account runs: legacy collectors cannot filter by account_ids
-                # and process ALL accounts, making them extremely slow for targeted runs.
-                # The external collectors (serper_news, serper_jobs, website_techscan) already
-                # cover the same signal types and support account_ids filtering.
+                # SKIP for targeted runs: legacy collectors process ALL accounts.
+                # The external collectors (serper_news, serper_jobs, website_techscan)
+                # already cover the same signal types and support account_ids filtering.
                 if account_ids:
                     _emit(
                         queue,
