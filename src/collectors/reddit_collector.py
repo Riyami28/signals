@@ -431,25 +431,24 @@ async def _collect_account(
 async def collect(
     conn,
     settings: Settings,
-    lexicon_rows: list[dict[str, str]] | None = None,
-    source_reliability: float = 0.65,
-    account_ids: list[str] | None = None,
     lexicon_by_source: dict[str, list[dict[str, str]]] | None = None,
-    source_reliability_dict: dict[str, float] | None = None,
+    source_reliability: dict[str, float] | float = 0.65,
+    account_ids: list[str] | None = None,
     db_pool=None,
 ) -> dict[str, int]:
     """Main entry point for the Reddit Data Collector."""
-    # Handle both old and new calling conventions
     if lexicon_by_source is None:
         lexicon_by_source = {}
-    if source_reliability_dict is not None:
-        source_reliability = source_reliability_dict.get("reddit_api", 0.65)
-    if lexicon_rows is None:
-        lexicon_rows = lexicon_by_source.get("community", [])
+    # Resolve reliability: accept both dict (standard) and float (legacy)
+    if isinstance(source_reliability, dict):
+        reliability_float = source_reliability.get("reddit_api", 0.65)
+    else:
+        reliability_float = float(source_reliability)
+    lexicon_rows = lexicon_by_source.get("community", [])
 
     logger.info(
         f"reddit_collector.collect() starting: enable_live_crawl={settings.enable_live_crawl}, "
-        f"source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
+        f"source_reliability={reliability_float}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
     )
 
     if not settings.enable_live_crawl:
@@ -458,8 +457,8 @@ async def collect(
 
     source_name = "reddit_api"
 
-    if source_reliability <= 0:
-        logger.info(f"reddit_collector: source_reliability={source_reliability} <= 0, returning early")
+    if reliability_float <= 0:
+        logger.info(f"reddit_collector: source_reliability={reliability_float} <= 0, returning early")
         return {"inserted": 0, "seen": 0}
 
     # Get accounts - use provided account_ids or fetch all accounts
@@ -513,7 +512,7 @@ async def collect(
                 account_index=i,
                 handles=handles,
                 source_name=source_name,
-                reliability=source_reliability,
+                reliability=reliability_float,
             )
 
     tasks = [_run_account(i, acct) for i, acct in enumerate(accounts, start=1)]
