@@ -9,9 +9,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any
-import time
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -32,6 +32,7 @@ REDDIT_USER_AGENT = "browser:zopdev-signals-collector:v1.0 (by /u/zopdev)"
 
 class RedditPost(BaseModel):
     """Pydantic model for validating raw Reddit API data."""
+
     title: str
     selftext: str
     url: str
@@ -43,11 +44,7 @@ class RedditPost(BaseModel):
 
 
 def _build_observation(
-    account_id: str,
-    post: RedditPost,
-    signal_code: str,
-    confidence: float,
-    reliability: float
+    account_id: str, post: RedditPost, signal_code: str, confidence: float, reliability: float
 ) -> SignalObservation:
     """Transforms a Reddit post into a SignalObservation."""
     payload = post.model_dump()
@@ -76,20 +73,12 @@ def _build_observation(
         evidence_text=f"[{post.subreddit}] {post.title}: {post.selftext[:300]}",
         confidence=confidence,
         source_reliability=reliability,
-        raw_payload_hash=raw_hash
+        raw_payload_hash=raw_hash,
     )
 
 
-@retry(
-    stop=stop_after_attempt(2),
-    wait=wait_exponential(multiplier=2, min=5, max=15),
-    reraise=True
-)
-async def _fetch_official_subreddit(
-    subreddit: str,
-    settings: Settings,
-    client: httpx.AsyncClient
-) -> dict[str, Any]:
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=2, min=5, max=15), reraise=True)
+async def _fetch_official_subreddit(subreddit: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches recent posts from an official company subreddit."""
     reddit_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://old.reddit.com")
 
@@ -127,7 +116,9 @@ async def collect(
     if lexicon_rows is None:
         lexicon_rows = lexicon_by_source.get("community", [])
 
-    logger.info(f"reddit_official.collect() starting: source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}")
+    logger.info(
+        f"reddit_official.collect() starting: source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
+    )
 
     if not settings.enable_live_crawl:
         logger.info("reddit_official: live_crawl disabled, returning early")
@@ -154,7 +145,6 @@ async def collect(
         "Nykaa": "nykaa",
     }
 
-    source_name = "reddit_official"
     inserted_total = 0
     seen_total = 0
     accounts_processed = 0
@@ -162,11 +152,15 @@ async def collect(
     # Get accounts - use provided account_ids or fetch all accounts
     if account_ids:
         cursor = conn.cursor()
-        cursor.execute("SELECT account_id, company_name, domain FROM signals.accounts WHERE account_id = ANY(%s)", (account_ids,))
+        cursor.execute(
+            "SELECT account_id, company_name, domain FROM signals.accounts WHERE account_id = ANY(%s)", (account_ids,)
+        )
         accounts = [dict(row) for row in cursor.fetchall()]
     else:
         cursor = conn.cursor()
-        cursor.execute("SELECT account_id, company_name, domain FROM signals.accounts LIMIT %s", (settings.live_max_accounts,))
+        cursor.execute(
+            "SELECT account_id, company_name, domain FROM signals.accounts LIMIT %s", (settings.live_max_accounts,)
+        )
         accounts = [dict(row) for row in cursor.fetchall()]
 
     if not accounts:
@@ -185,11 +179,9 @@ async def collect(
         follow_redirects=True,
         timeout=settings.http_timeout_seconds,
     ) as client:
-
         for account_index, account in enumerate(accounts, 1):
             account_id = str(account["account_id"])
             company_name = str(account["company_name"] or account["domain"])
-            domain = str(account["domain"])
 
             # Check if this company has an official subreddit
             subreddit = official_subreddits.get(company_name)
@@ -233,7 +225,7 @@ async def collect(
                             author=item.get("author", ""),
                             created_utc=float(item.get("created_utc", 0.0)),
                             score=int(item.get("score", 0)),
-                            num_comments=int(item.get("num_comments", 0))
+                            num_comments=int(item.get("num_comments", 0)),
                         )
 
                         # Classify the post
@@ -251,7 +243,7 @@ async def collect(
                                 post=post,
                                 signal_code=signal_code,
                                 confidence=confidence,
-                                reliability=source_reliability
+                                reliability=source_reliability,
                             )
 
                             if db.insert_signal_observation(conn, obs, commit=False):
@@ -275,15 +267,15 @@ async def collect(
                 await asyncio.sleep(2)
 
             except Exception as exc:
-                logger.error(f"reddit_official #{account_index}: {company_name} - exception: {type(exc).__name__}: {exc}")
+                logger.error(
+                    f"reddit_official #{account_index}: {company_name} - exception: {type(exc).__name__}: {exc}"
+                )
                 accounts_processed += 1
                 continue
 
     conn.commit()
-    logger.info(f"reddit_official: completed - inserted={inserted_total}, seen={seen_total}, accounts_processed={accounts_processed}")
+    logger.info(
+        f"reddit_official: completed - inserted={inserted_total}, seen={seen_total}, accounts_processed={accounts_processed}"
+    )
 
-    return {
-        "inserted": inserted_total,
-        "seen": seen_total,
-        "accounts_processed": accounts_processed
-    }
+    return {"inserted": inserted_total, "seen": seen_total, "accounts_processed": accounts_processed}

@@ -24,9 +24,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import db
-from src.models import SignalObservation, Account
+from src.models import Account, SignalObservation
 from src.settings import Settings
-from src.utils import utc_now_iso, stable_hash
+from src.utils import stable_hash, utc_now_iso
 
 
 def print_header():
@@ -64,7 +64,7 @@ def test_settings():
 
         # Check key settings
         if settings.pg_dsn:
-            print_pass(f"SIGNALS_PG_DSN set")
+            print_pass("SIGNALS_PG_DSN set")
         else:
             print_fail("SIGNALS_PG_DSN not set")
             return False
@@ -112,7 +112,7 @@ def test_postgres():
         if schema_row:
             schema = schema_row.get('current_schema') if isinstance(schema_row, dict) else schema_row[0]
             if schema == "signals":
-                print_pass(f"Default schema: signals")
+                print_pass("Default schema: signals")
             else:
                 print_warn(f"Schema: {schema}")
         else:
@@ -236,7 +236,7 @@ async def test_playwright():
             title = await page.title()
 
             if title:
-                print_pass(f"Navigated to https://example.com")
+                print_pass("Navigated to https://example.com")
                 print_pass(f"Page title: {title}")
             else:
                 print_warn("Could not get page title")
