@@ -537,4 +537,4 @@ async def collect(
         f"reddit_collector: completed with inserted={inserted_total}, seen={seen_total}, accounts_processed={accounts_processed}"
     )
     conn.commit()
-    return {"inserted": inserted_total, "seen": seen_total, "accounts_processed": accounts_processed}
+    return {"inserted": inserted_total, "seen": seen_total}

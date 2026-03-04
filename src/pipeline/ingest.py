@@ -70,10 +70,7 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     )
     results["reddit_official"] = (
         await reddit_official.collect(
-            conn=conn,
-            settings=settings,
-            lexicon_rows=lexicon.get("community", []),
-            source_reliability=source_reliability.get("reddit_official", 0.75),
+            conn=conn, settings=settings, lexicon_by_source=lexicon, source_reliability_dict=source_reliability
         )
         if _collector_enabled("reddit_official")
         else {"inserted": 0, "seen": 0}

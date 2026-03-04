@@ -274,4 +274,4 @@ async def collect(
         f"reddit_official: completed - inserted={inserted_total}, seen={seen_total}, accounts_processed={accounts_processed}"
     )
 
-    return {"inserted": inserted_total, "seen": seen_total, "accounts_processed": accounts_processed}
+    return {"inserted": inserted_total, "seen": seen_total}
