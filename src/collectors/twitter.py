@@ -672,7 +672,7 @@ async def collect(
 
         if api_reliability <= 0:
             conn.commit()
-            return {"inserted": inserted, "seen": seen}
+            return {"inserted": inserted, "seen": seen, "accounts_processed": accounts_processed}
 
         backend = "rapidapi" if rapidapi_key else "official"
         if account_ids:

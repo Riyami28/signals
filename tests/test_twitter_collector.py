@@ -228,7 +228,7 @@ class TestCollectFunction:
             lexicon_by_source={},
             source_reliability={},
         )
-        assert result == {"inserted": 0, "seen": 0}
+        assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     @pytest.mark.asyncio
     async def test_collect_live_skipped_without_bearer_token(self, tmp_path, caplog):
@@ -254,5 +254,5 @@ class TestCollectFunction:
                 source_reliability={},
             )
 
-        assert result == {"inserted": 0, "seen": 0}
+        assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
         assert any("no_api_key" in r.message for r in caplog.records)

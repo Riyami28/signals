@@ -127,7 +127,7 @@ class TestSys01NoInputNoOutput:
         conn.commit()
         conn.close()
 
-        assert result == {"inserted": 0, "seen": 0}
+        assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
 
 # ---------------------------------------------------------------------------
