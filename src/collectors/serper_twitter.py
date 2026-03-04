@@ -32,11 +32,15 @@ logger = logging.getLogger(__name__)
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 SOURCE_NAME = "serper_twitter"
 
-# DevOps / FinOps / Platform Eng signal terms — mirrors twitter.py DEFAULT_TWITTER_TERMS
+# Broad signal terms covering all high-value signal categories
 _TWITTER_SIGNAL_TERMS = (
-    "devops OR kubernetes OR terraform OR finops OR \"cloud cost\" "
-    "OR \"platform engineering\" OR soc2 OR compliance "
-    "OR \"cost reduction\" OR \"cost optimization\""
+    "hiring OR devops OR kubernetes OR terraform OR finops "
+    "OR \"cloud cost\" OR \"cloud migration\" OR \"digital transformation\" "
+    "OR compliance OR soc2 OR \"cost reduction\" OR \"cost optimization\" "
+    "OR \"funding round\" OR \"series a\" OR \"series b\" "
+    "OR \"product launch\" OR \"supply chain\" OR \"vendor consolidation\" "
+    "OR \"security audit\" OR outage OR ERP OR SAP "
+    "OR \"platform engineering\" OR modernization"
 )
 
 

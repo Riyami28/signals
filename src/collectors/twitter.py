@@ -38,9 +38,14 @@ def load_twitter_handles(path) -> dict[str, str]:
 
 TWITTER_OFFICIAL_SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent"
 DEFAULT_TWITTER_TERMS = (
-    "(devops OR kubernetes OR terraform OR finops OR \"cloud cost\" "
-    "OR \"platform engineering\" OR soc2 OR compliance "
-    "OR \"cost reduction\" OR \"cost optimization\") -is:retweet lang:en"
+    "(hiring OR \"we're hiring\" OR devops OR kubernetes OR terraform OR finops "
+    "OR \"cloud cost\" OR \"cloud migration\" OR \"digital transformation\" "
+    "OR compliance OR soc2 OR \"cost reduction\" OR \"cost optimization\" "
+    "OR \"funding round\" OR \"series a\" OR \"series b\" "
+    "OR \"product launch\" OR \"supply chain\" OR \"vendor consolidation\" "
+    "OR \"security audit\" OR outage OR ERP OR SAP "
+    "OR \"platform engineering\" OR \"tool consolidation\" "
+    "OR \"growing team\" OR modernization) -is:retweet lang:en"
 )
 _LIVE_PROGRESS_COMMIT_EVERY = 25
 _VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -320,7 +325,6 @@ async def _collect_live_twitter_account(
     # Check CSV/cache for known official Twitter handle
     official_handle = twitter_handles.get(domain, "").strip()
 
-    # RELEVANT KEYWORDS: Always filter tweets by DevOps/FinOps/Platform Eng terms
     search_keywords = DEFAULT_TWITTER_TERMS
 
     # Load incremental cursor — only fetch tweets newer than last seen
@@ -331,10 +335,10 @@ async def _collect_live_twitter_account(
     lookback_days = getattr(settings, "twitter_lookback_days", 7)
     if use_rapidapi:
         if official_handle:
-            # ✓ Known handle → search OFFICIAL tweets FROM that account with keywords
-            query = f"from:{official_handle} {search_keywords}"
+            # ✓ Known handle → get ALL tweets from official account, let lexicon classify
+            query = f"from:{official_handle} -is:retweet lang:en"
         else:
-            # No known handle → search company name + domain WITH relevant keywords
+            # No known handle → search company name + domain WITH signal keywords
             query = f'("{company_name}" OR "{domain}") {search_keywords}'
 
         # Validate query length — Twitter API rejects > 512 chars with cryptic error
@@ -344,14 +348,15 @@ async def _collect_live_twitter_account(
 
         if official_handle:
             search_url = _rapidapi_search_url(
-                rapidapi_host, search_keywords, from_handle=official_handle, since_id=since_id
+                rapidapi_host, f"-is:retweet lang:en", from_handle=official_handle, since_id=since_id
             )
         else:
             search_url = _rapidapi_search_url(rapidapi_host, query, since_id=since_id)
         req_headers = _rapidapi_headers(rapidapi_key, rapidapi_host)
     else:
         if official_handle:
-            full_query = f"from:{official_handle} {search_keywords}"
+            # ✓ Known handle → get ALL tweets, lexicon will classify
+            full_query = f"from:{official_handle} -is:retweet lang:en"
         else:
             full_query = f'("{company_name}" OR "{domain}") {search_keywords}'
 
