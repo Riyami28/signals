@@ -134,7 +134,7 @@ def discover_contacts(
                 "department": c.department,
                 "enrichment_source": c.enrichment_source,
                 "employment_verified": False if c.is_stale else None,
-                "employment_note": f"Stale contact detected" if c.is_stale else "",
+                "employment_note": "Stale contact detected" if c.is_stale else "",
             }
             for c in discovery_result.contacts
         ]
