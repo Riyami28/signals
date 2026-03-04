@@ -93,7 +93,13 @@ def _make_settings(tmp_path: Path, enable_live: bool = False) -> Settings:
 
 
 def _get_conn():
-    return db.get_connection("postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test")
+    import os
+
+    dsn = os.getenv(
+        "SIGNALS_TEST_PG_DSN",
+        "postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test",
+    )
+    return db.get_connection(dsn)
 
 
 # ---------------------------------------------------------------------------

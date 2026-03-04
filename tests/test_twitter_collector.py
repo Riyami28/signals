@@ -11,10 +11,13 @@ import pytest
 # Override the global autouse postgres fixture — these are pure unit tests with no DB.
 @pytest.fixture(autouse=True)
 def postgres_test_isolation(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv(
-        "SIGNALS_PG_DSN",
+    import os
+
+    test_dsn = os.getenv(
+        "SIGNALS_TEST_PG_DSN",
         "postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test",
     )
+    monkeypatch.setenv("SIGNALS_PG_DSN", test_dsn)
     yield
 
 
