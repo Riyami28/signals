@@ -3430,7 +3430,9 @@ def get_account_detail(conn, account_id: str) -> dict | None:
 
     signals = conn.execute(
         """SELECT signal_code, source, evidence_url, evidence_text, observed_at
-           FROM signal_observations WHERE account_id = %s ORDER BY observed_at DESC LIMIT 50""",
+           FROM signal_observations WHERE account_id = %s
+           AND observed_at::timestamptz >= NOW() - INTERVAL '14 days'
+           ORDER BY observed_at DESC LIMIT 50""",
         (account_id,),
     ).fetchall()
     result["signals"] = [dict(r) for r in signals]
