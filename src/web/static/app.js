@@ -30,6 +30,34 @@ function signalsApp() {
       // Apply saved theme
       this._applyTheme(this.theme);
       await this.loadAccounts();
+      // Wait for Alpine to render the x-for loop
+      await this._waitForDomReady();
+      console.log('Calling loadFromHash, hash is:', window.location.hash);
+      this.loadFromHash();
+      console.log('After loadFromHash, expandedId is:', this.expandedId);
+      // Listen for hash changes (back button, direct URL)
+      window.addEventListener('hashchange', () => {
+        this.loadFromHash();
+      });
+    },
+
+    async _waitForDomReady() {
+      // Wait for Alpine to finish rendering the x-for loop
+      return new Promise(resolve => {
+        let attempts = 0;
+        const checkDom = () => {
+          attempts++;
+          // Check if accounts are rendered in DOM
+          const firstBodyRow = document.querySelector('tbody[data-account-id]');
+          if (firstBodyRow || this.accounts.length === 0 || attempts > 50) {
+            console.log('DOM ready after', attempts, 'attempts, found tbody:', !!firstBodyRow);
+            resolve();
+          } else {
+            setTimeout(checkDom, 100);
+          }
+        };
+        checkDom();
+      });
     },
 
     toggleTheme() {
@@ -155,7 +183,36 @@ function signalsApp() {
     },
 
     toggleExpand(id) {
-      this.expandedId = this.expandedId === id ? null : id;
+      if (this.expandedId === id) {
+        this.expandedId = null;
+        window.location.hash = '';
+      } else {
+        this.expandedId = id;
+        window.location.hash = `account/${id}`;
+      }
+    },
+
+    loadFromHash() {
+      console.log('loadFromHash called, hash:', window.location.hash);
+      if (window.location.hash.startsWith('#account/')) {
+        const id = window.location.hash.substring(9);
+        console.log('Extracted account ID:', id);
+        if (id && id.length > 0) {
+          console.log('Setting expandedId to:', id);
+          this.expandedId = id;
+          console.log('After setting, expandedId is:', this.expandedId);
+          // Auto-scroll to the row after a short delay for rendering
+          setTimeout(() => {
+            const el = document.querySelector(`tbody[data-account-id="${id}"]`);
+            console.log('Looking for element with data-account-id:', id, 'found:', el);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 100);
+        }
+      } else {
+        this.expandedId = null;
+      }
     },
 
     async applyBulkLabel() {

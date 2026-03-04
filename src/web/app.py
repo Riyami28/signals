@@ -92,3 +92,11 @@ def create_app() -> FastAPI:
         return FileResponse(str(_STATIC_DIR / "index.html"))
 
     return app
+
+
+# Create and export app for uvicorn/gunicorn
+app = create_app()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8788)
