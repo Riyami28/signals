@@ -7,7 +7,7 @@ import logging
 from datetime import date
 
 from src import db
-from src.collectors import community, first_party, gnews_collector, jobs, news, technographics, website_techscan
+from src.collectors import community, first_party, gnews_collector, jobs, news, serper_twitter, technographics, twitter, website_techscan
 from src.integrations.crunchbase import CrunchbaseClient, enrich_firmographics, evaluate_firmographic_signals
 from src.models import SignalObservation
 from src.pipeline.helpers import bootstrap
@@ -78,6 +78,20 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
         )
     else:
         results["gnews"] = {"inserted": 0, "seen": 0}
+
+    # Twitter API (RapidAPI / official — incremental with since_id cursor)
+    results["twitter"] = (
+        await twitter.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("twitter_api")
+        else {"inserted": 0, "seen": 0}
+    )
+
+    # Serper Twitter (Google-indexed Twitter content — complements RapidAPI coverage)
+    results["serper_twitter"] = (
+        await serper_twitter.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("serper_twitter")
+        else {"inserted": 0, "seen": 0}
+    )
 
     # Crunchbase firmographic enrichment (paid API — skipped when no key)
     results["crunchbase"] = _collect_crunchbase(conn, settings, source_reliability)

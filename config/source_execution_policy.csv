@@ -19,3 +19,5 @@ serper_jobs,5,2.5,15,2,2,50,true
 website_techscan,10,5.0,12,2,1,100,true
 gnews,3,1.0,15,2,2,80,false
 github_stargazers,5,2.0,15,2,2,50,true
+twitter_api,1,0.067,20,2,15,10,true
+serper_twitter,6,3.0,15,2,2,50,true

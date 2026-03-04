@@ -181,3 +181,286 @@ g2,competitor_dissatisfaction,low rating competitor,0.75
 g2,competitor_dissatisfaction,negative review competitor,0.70
 g2,competitor_dissatisfaction,switching from,0.80
 g2,competitor_dissatisfaction,looking for alternative,0.75
+twitter,devops_role_open,devops engineer,0.65
+twitter,devops_role_open,hiring devops,0.65
+twitter,devops_role_open,site reliability engineer,0.65
+twitter,platform_role_open,platform engineer,0.65
+twitter,platform_role_open,platform engineering,0.65
+twitter,platform_role_open,internal developer platform,0.72
+twitter,finops_role_open,finops,0.70
+twitter,finops_role_open,cloud cost management,0.70
+twitter,compliance_initiative,soc 2,0.72
+twitter,compliance_initiative,iso 27001,0.72
+twitter,compliance_initiative,hipaa compliance,0.72
+twitter,cost_reduction_mandate,reduce cloud cost,0.75
+twitter,cost_reduction_mandate,cloud cost optimization,0.72
+twitter,cost_reduction_mandate,cloud bill,0.60
+twitter,kubernetes_detected,kubernetes,0.70
+twitter,kubernetes_detected,#kubernetes,0.72
+twitter,kubernetes_detected,k8s,0.68
+twitter,terraform_detected,terraform,0.70
+twitter,terraform_detected,#terraform,0.72
+twitter,gitops_detected,gitops,0.70
+twitter,gitops_detected,#gitops,0.72
+twitter,tooling_sprawl_detected,tool sprawl,0.70
+twitter,tooling_sprawl_detected,too many tools,0.65
+twitter,cloud_migration_intent,cloud migration,0.65
+twitter,cloud_migration_intent,migrating to cloud,0.68
+twitter,governance_enforcement_need,policy enforcement,0.70
+twitter,high_intent_phrase_devops_toil,devops toil,0.75
+twitter,high_intent_phrase_cost_control,cost is out of control,0.75
+twitter,high_intent_phrase_cost_control,cloud spending,0.60
+twitter,company_news_mention,funding round,0.55
+twitter,company_news_mention,raises series,0.55
+twitter,general_hiring_activity,we're hiring,0.50
+twitter,general_hiring_activity,join our team,0.50
+twitter,general_hiring_activity,open positions,0.50
+twitter,cost_reduction_mandate,AWS spending,0.70
+twitter,cost_reduction_mandate,Azure spending,0.70
+twitter,cost_reduction_mandate,GCP spending,0.70
+twitter,cost_reduction_mandate,infrastructure spend,0.68
+twitter,cost_reduction_mandate,IT spending,0.65
+twitter,cost_reduction_mandate,cloud spending reduction,0.72
+twitter,cloud_migration_intent,digital transformation,0.65
+twitter,cloud_migration_intent,AWS migration,0.70
+twitter,cloud_migration_intent,Azure migration,0.70
+twitter,cloud_migration_intent,infrastructure modernization,0.68
+twitter,cloud_migration_intent,legacy modernization,0.65
+twitter,kubernetes_detected,containerization,0.65
+twitter,kubernetes_detected,microservices,0.60
+twitter,kubernetes_detected,container orchestration,0.68
+twitter,compliance_initiative,data privacy,0.65
+twitter,compliance_initiative,compliance,0.60
+twitter,general_hiring_activity,hiring engineers,0.55
+twitter,general_hiring_activity,tech jobs,0.50
+twitter,high_intent_phrase_cost_control,infrastructure costs,0.70
+twitter,high_intent_phrase_cost_control,IT costs,0.65
+twitter,high_intent_phrase_cost_control,operational costs,0.60
+twitter,cloud_migration_intent,digital transformation,0.65
+twitter,cloud_migration_intent,supply chain,0.60
+twitter,cloud_migration_intent,operational efficiency,0.65
+twitter,high_intent_phrase_cost_control,efficiency,0.55
+twitter,high_intent_phrase_cost_control,optimization,0.55
+twitter,high_intent_phrase_cost_control,modernization,0.60
+twitter,general_hiring_activity,technology team,0.55
+twitter,general_hiring_activity,IT professionals,0.55
+twitter,devops_bottleneck_language,automation,0.60
+twitter,devops_bottleneck_language,system scalability,0.58
+twitter,cloud_migration_intent,infrastructure investment,0.65
+twitter,compliance_initiative,security,0.58
+twitter,compliance_initiative,data protection,0.60
+twitter,tooling_sprawl_detected,system integration,0.55
+twitter,tooling_sprawl_detected,platform consolidation,0.58
+serper_twitter,devops_role_open,devops engineer,0.65
+serper_twitter,devops_role_open,hiring devops,0.65
+serper_twitter,devops_role_open,site reliability engineer,0.65
+serper_twitter,platform_role_open,platform engineer,0.65
+serper_twitter,platform_role_open,platform engineering,0.65
+serper_twitter,platform_role_open,internal developer platform,0.72
+serper_twitter,finops_role_open,finops,0.7
+serper_twitter,finops_role_open,cloud cost management,0.7
+serper_twitter,compliance_initiative,soc 2,0.72
+serper_twitter,compliance_initiative,iso 27001,0.72
+serper_twitter,compliance_initiative,hipaa compliance,0.72
+serper_twitter,cost_reduction_mandate,reduce cloud cost,0.75
+serper_twitter,cost_reduction_mandate,cloud cost optimization,0.72
+serper_twitter,cost_reduction_mandate,cloud bill,0.6
+serper_twitter,kubernetes_detected,kubernetes,0.7
+serper_twitter,kubernetes_detected,#kubernetes,0.72
+serper_twitter,kubernetes_detected,k8s,0.68
+serper_twitter,terraform_detected,terraform,0.7
+serper_twitter,terraform_detected,#terraform,0.72
+serper_twitter,gitops_detected,gitops,0.7
+serper_twitter,gitops_detected,#gitops,0.72
+serper_twitter,tooling_sprawl_detected,tool sprawl,0.7
+serper_twitter,tooling_sprawl_detected,too many tools,0.65
+serper_twitter,cloud_migration_intent,cloud migration,0.65
+serper_twitter,cloud_migration_intent,migrating to cloud,0.68
+serper_twitter,governance_enforcement_need,policy enforcement,0.7
+serper_twitter,high_intent_phrase_devops_toil,devops toil,0.75
+serper_twitter,high_intent_phrase_cost_control,cost is out of control,0.75
+serper_twitter,high_intent_phrase_cost_control,cloud spending,0.6
+serper_twitter,company_news_mention,funding round,0.55
+serper_twitter,company_news_mention,raises series,0.55
+serper_twitter,general_hiring_activity,we're hiring,0.5
+serper_twitter,general_hiring_activity,join our team,0.5
+serper_twitter,general_hiring_activity,open positions,0.5
+twitter,audit_date_announced,compliance audit,0.75
+twitter,audit_date_announced,security audit,0.72
+twitter,audit_date_announced,audit readiness,0.70
+twitter,audit_date_announced,passed soc2,0.78
+twitter,audit_date_announced,soc2 certified,0.78
+twitter,cloud_cost_spike,cloud bill,0.65
+twitter,cloud_cost_spike,aws costs,0.65
+twitter,cloud_cost_spike,cloud spend out of control,0.80
+twitter,cloud_cost_spike,cloud bill shock,0.78
+twitter,cloud_cost_spike,gcp invoice,0.62
+twitter,cloud_platform_messaging,cloud native,0.62
+twitter,cloud_platform_messaging,cloud infrastructure,0.60
+twitter,cloud_platform_messaging,cloud first,0.58
+twitter,compliance_governance_messaging,data governance,0.70
+twitter,compliance_governance_messaging,regulatory compliance,0.68
+twitter,compliance_governance_messaging,audit readiness,0.70
+twitter,compliance_governance_messaging,security compliance,0.68
+twitter,cost_optimization,cost optimization,0.68
+twitter,cost_optimization,reduce infrastructure costs,0.72
+twitter,cost_optimization,cloud efficiency,0.65
+twitter,cost_optimization,lower cloud costs,0.72
+twitter,data_platform_initiative,data platform,0.62
+twitter,data_platform_initiative,data lakehouse,0.68
+twitter,data_platform_initiative,data mesh,0.65
+twitter,data_platform_initiative,data engineering,0.60
+twitter,employee_growth_positive,growing team,0.55
+twitter,employee_growth_positive,team expansion,0.55
+twitter,employee_growth_positive,headcount growth,0.58
+twitter,enterprise_modernization_program,digital transformation,0.55
+twitter,enterprise_modernization_program,it modernization,0.62
+twitter,enterprise_modernization_program,legacy modernization,0.65
+twitter,enterprise_modernization_program,technology modernization,0.62
+twitter,env_spinup_requests,ephemeral environments,0.72
+twitter,env_spinup_requests,dev environments,0.65
+twitter,env_spinup_requests,environment spinup,0.70
+twitter,finops_tool_eval,evaluating finops,0.75
+twitter,finops_tool_eval,cloud cost tool,0.70
+twitter,finops_tool_eval,finops platform,0.72
+twitter,finops_tool_eval,cloud spend visibility,0.68
+twitter,funding_stage_series_a,series a,0.70
+twitter,funding_stage_series_a,raised series a,0.75
+twitter,funding_stage_series_a,seed funding,0.65
+twitter,funding_stage_series_b_plus,series b,0.72
+twitter,funding_stage_series_b_plus,series c,0.72
+twitter,funding_stage_series_b_plus,series d,0.72
+twitter,funding_stage_series_b_plus,raised series b,0.75
+twitter,high_intent_phrase_production_fast,production ready,0.68
+twitter,high_intent_phrase_production_fast,deploy faster,0.70
+twitter,high_intent_phrase_production_fast,faster to production,0.72
+twitter,high_intent_phrase_production_fast,ship to prod,0.68
+twitter,hiring_devops,devops engineer opening,0.65
+twitter,hiring_devops,looking for sre,0.68
+twitter,hiring_devops,cloud engineer role,0.65
+twitter,hiring_devops,infrastructure engineer,0.62
+twitter,idp_golden_path_initiative,golden path,0.75
+twitter,idp_golden_path_initiative,developer portal,0.70
+twitter,idp_golden_path_initiative,backstage,0.68
+twitter,idp_golden_path_initiative,internal developer platform,0.72
+twitter,launch_or_scale_event,new product launch,0.62
+twitter,launch_or_scale_event,scaling our platform,0.65
+twitter,launch_or_scale_event,going global,0.58
+twitter,launch_or_scale_event,expanding to new markets,0.60
+twitter,media_traffic_reliability_pressure,traffic spike,0.65
+twitter,media_traffic_reliability_pressure,reliability issues,0.65
+twitter,media_traffic_reliability_pressure,uptime,0.55
+twitter,media_traffic_reliability_pressure,outage,0.62
+twitter,media_traffic_reliability_pressure,high traffic,0.58
+twitter,multi_cloud_strategy,multi-cloud,0.68
+twitter,multi_cloud_strategy,multicloud,0.68
+twitter,multi_cloud_strategy,cloud agnostic,0.65
+twitter,multi_cloud_strategy,hybrid cloud,0.62
+twitter,recent_funding_event,raised funding,0.65
+twitter,recent_funding_event,funding announcement,0.65
+twitter,recent_funding_event,investment round,0.62
+twitter,recent_funding_event,backed by,0.55
+twitter,security_baseline_as_default,devsecops,0.72
+twitter,security_baseline_as_default,shift left security,0.75
+twitter,security_baseline_as_default,zero trust,0.68
+twitter,security_baseline_as_default,security by default,0.72
+twitter,security_review_started,security review,0.65
+twitter,security_review_started,penetration testing,0.70
+twitter,security_review_started,pen test,0.68
+twitter,security_review_started,security assessment,0.65
+twitter,vendor_consolidation_program,consolidating tools,0.72
+twitter,vendor_consolidation_program,vendor consolidation,0.75
+twitter,vendor_consolidation_program,tool rationalization,0.72
+twitter,vendor_consolidation_program,reducing tooling,0.68
+serper_twitter,audit_date_announced,compliance audit,0.75
+serper_twitter,audit_date_announced,security audit,0.72
+serper_twitter,audit_date_announced,audit readiness,0.70
+serper_twitter,audit_date_announced,passed soc2,0.78
+serper_twitter,audit_date_announced,soc2 certified,0.78
+serper_twitter,cloud_cost_spike,cloud bill,0.65
+serper_twitter,cloud_cost_spike,aws costs,0.65
+serper_twitter,cloud_cost_spike,cloud spend out of control,0.80
+serper_twitter,cloud_cost_spike,cloud bill shock,0.78
+serper_twitter,cloud_cost_spike,gcp invoice,0.62
+serper_twitter,cloud_platform_messaging,cloud native,0.62
+serper_twitter,cloud_platform_messaging,cloud infrastructure,0.60
+serper_twitter,cloud_platform_messaging,cloud first,0.58
+serper_twitter,compliance_governance_messaging,data governance,0.70
+serper_twitter,compliance_governance_messaging,regulatory compliance,0.68
+serper_twitter,compliance_governance_messaging,audit readiness,0.70
+serper_twitter,compliance_governance_messaging,security compliance,0.68
+serper_twitter,cost_optimization,cost optimization,0.68
+serper_twitter,cost_optimization,reduce infrastructure costs,0.72
+serper_twitter,cost_optimization,cloud efficiency,0.65
+serper_twitter,cost_optimization,lower cloud costs,0.72
+serper_twitter,data_platform_initiative,data platform,0.62
+serper_twitter,data_platform_initiative,data lakehouse,0.68
+serper_twitter,data_platform_initiative,data mesh,0.65
+serper_twitter,data_platform_initiative,data engineering,0.60
+serper_twitter,employee_growth_positive,growing team,0.55
+serper_twitter,employee_growth_positive,team expansion,0.55
+serper_twitter,employee_growth_positive,headcount growth,0.58
+serper_twitter,enterprise_modernization_program,digital transformation,0.55
+serper_twitter,enterprise_modernization_program,it modernization,0.62
+serper_twitter,enterprise_modernization_program,legacy modernization,0.65
+serper_twitter,enterprise_modernization_program,technology modernization,0.62
+serper_twitter,env_spinup_requests,ephemeral environments,0.72
+serper_twitter,env_spinup_requests,dev environments,0.65
+serper_twitter,env_spinup_requests,environment spinup,0.70
+serper_twitter,finops_tool_eval,evaluating finops,0.75
+serper_twitter,finops_tool_eval,cloud cost tool,0.70
+serper_twitter,finops_tool_eval,finops platform,0.72
+serper_twitter,finops_tool_eval,cloud spend visibility,0.68
+serper_twitter,funding_stage_series_a,series a,0.70
+serper_twitter,funding_stage_series_a,raised series a,0.75
+serper_twitter,funding_stage_series_a,seed funding,0.65
+serper_twitter,funding_stage_series_b_plus,series b,0.72
+serper_twitter,funding_stage_series_b_plus,series c,0.72
+serper_twitter,funding_stage_series_b_plus,series d,0.72
+serper_twitter,funding_stage_series_b_plus,raised series b,0.75
+serper_twitter,high_intent_phrase_production_fast,production ready,0.68
+serper_twitter,high_intent_phrase_production_fast,deploy faster,0.70
+serper_twitter,high_intent_phrase_production_fast,faster to production,0.72
+serper_twitter,high_intent_phrase_production_fast,ship to prod,0.68
+serper_twitter,hiring_devops,devops engineer opening,0.65
+serper_twitter,hiring_devops,looking for sre,0.68
+serper_twitter,hiring_devops,cloud engineer role,0.65
+serper_twitter,hiring_devops,infrastructure engineer,0.62
+serper_twitter,idp_golden_path_initiative,golden path,0.75
+serper_twitter,idp_golden_path_initiative,developer portal,0.70
+serper_twitter,idp_golden_path_initiative,backstage,0.68
+serper_twitter,idp_golden_path_initiative,internal developer platform,0.72
+serper_twitter,launch_or_scale_event,new product launch,0.62
+serper_twitter,launch_or_scale_event,scaling our platform,0.65
+serper_twitter,launch_or_scale_event,going global,0.58
+serper_twitter,launch_or_scale_event,expanding to new markets,0.60
+serper_twitter,media_traffic_reliability_pressure,traffic spike,0.65
+serper_twitter,media_traffic_reliability_pressure,reliability issues,0.65
+serper_twitter,media_traffic_reliability_pressure,uptime,0.55
+serper_twitter,media_traffic_reliability_pressure,outage,0.62
+serper_twitter,media_traffic_reliability_pressure,high traffic,0.58
+serper_twitter,multi_cloud_strategy,multi-cloud,0.68
+serper_twitter,multi_cloud_strategy,multicloud,0.68
+serper_twitter,multi_cloud_strategy,cloud agnostic,0.65
+serper_twitter,multi_cloud_strategy,hybrid cloud,0.62
+serper_twitter,recent_funding_event,raised funding,0.65
+serper_twitter,recent_funding_event,funding announcement,0.65
+serper_twitter,recent_funding_event,investment round,0.62
+serper_twitter,recent_funding_event,backed by,0.55
+serper_twitter,security_baseline_as_default,devsecops,0.72
+serper_twitter,security_baseline_as_default,shift left security,0.75
+serper_twitter,security_baseline_as_default,zero trust,0.68
+serper_twitter,security_baseline_as_default,security by default,0.72
+serper_twitter,security_review_started,security review,0.65
+serper_twitter,security_review_started,penetration testing,0.70
+serper_twitter,security_review_started,pen test,0.68
+serper_twitter,security_review_started,security assessment,0.65
+serper_twitter,vendor_consolidation_program,consolidating tools,0.72
+serper_twitter,vendor_consolidation_program,vendor consolidation,0.75
+serper_twitter,vendor_consolidation_program,tool rationalization,0.72
+serper_twitter,vendor_consolidation_program,reducing tooling,0.68
+serper_twitter,devops_bottleneck_language,automation,0.60
+serper_twitter,devops_bottleneck_language,system scalability,0.58
+serper_twitter,devops_bottleneck_language,deployment bottleneck,0.65
+serper_twitter,devops_bottleneck_language,slow deployments,0.68
+serper_twitter,devops_bottleneck_language,manual process,0.60

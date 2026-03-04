@@ -24,3 +24,6 @@ serper_jobs,0.80,true
 website_techscan,0.70,true
 gnews,0.78,true
 crunchbase,0.82,true
+twitter_csv,0.70,true
+twitter_api,0.75,true
+serper_twitter,0.60,true
