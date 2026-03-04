@@ -75,6 +75,7 @@ def list_accounts(
     tier: str = Query(""),
     label: str = Query(""),
     q: str = Query(""),
+    source: str = Query(""),
 ):
     if sort not in _ALLOWED_SORT_FIELDS:
         raise HTTPException(status_code=400, detail=f"invalid sort field, allowed: {sorted(_ALLOWED_SORT_FIELDS)}")
@@ -85,6 +86,7 @@ def list_accounts(
 
     safe_search = _sanitize_search(q)
     safe_label = label.strip()[:100]
+    safe_source = source.strip()[:50]
 
     conn = _get_conn()
     try:
@@ -97,6 +99,7 @@ def list_accounts(
             tier_filter=tier,
             label_filter=safe_label,
             search=safe_search,
+            source_filter=safe_source,
         )
         # Serialize datetimes
         for r in rows:
@@ -120,6 +123,24 @@ def get_account(account_id: str):
         detail = db.get_account_detail(conn, account_id)
         if not detail:
             return {"error": "not found"}, 404
+
+        # Enrich signals with impact metadata from registry
+        signal_meta = _get_signal_meta()
+        if detail.get("signals") and isinstance(detail["signals"], list):
+            for sig in detail["signals"]:
+                code = sig.get("signal_code", "")
+                meta = signal_meta.get(code, {})
+                weight = meta.get("base_weight", 0)
+                sig["base_weight"] = weight
+                sig["dimension"] = meta.get("dimension", "")
+                sig["category"] = meta.get("category", "")
+                sig["impact"] = "high" if weight >= 18 else "medium" if weight >= 10 else "low"
+            # Sort by weight DESC, then observed_at DESC
+            detail["signals"].sort(
+                key=lambda s: (s.get("base_weight", 0), s.get("observed_at", "")),
+                reverse=True,
+            )
+
         # Serialize datetimes
         _serialize_dates(detail)
         return detail
@@ -255,6 +276,7 @@ def export_accounts_csv(
     tier: str = Query(""),
     label: str = Query(""),
     q: str = Query(""),
+    source: str = Query(""),
 ):
     """Export all scored accounts as a comprehensive CSV file.
 
@@ -272,6 +294,7 @@ def export_accounts_csv(
             tier_filter=tier,
             label_filter=label.strip()[:100],
             search=_sanitize_search(q) if q else "",
+            source_filter=source.strip()[:50],
         )
 
         # Build CSV in memory

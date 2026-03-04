@@ -912,6 +912,7 @@ def get_accounts_paginated(
     tier_filter: str = "",
     label_filter: str = "",
     search: str = "",
+    source_filter: str = "",
 ) -> tuple[list[dict], int]:
     """Return paginated accounts joined with latest scores and labels."""
     where_parts = []
@@ -930,6 +931,12 @@ def get_accounts_paginated(
             "EXISTS (SELECT 1 FROM account_labels al WHERE al.account_id = a.account_id AND al.label = %s)"
         )
         params.append(label_filter)
+
+    if source_filter:
+        where_parts.append(
+            "EXISTS (SELECT 1 FROM signal_observations so WHERE so.account_id = a.account_id AND so.source = %s)"
+        )
+        params.append(source_filter)
 
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
@@ -1021,7 +1028,9 @@ def get_account_detail(conn, account_id: str) -> dict | None:
 
     signals = conn.execute(
         """SELECT signal_code, source, evidence_url, evidence_text, observed_at
-           FROM signal_observations WHERE account_id = %s ORDER BY observed_at DESC LIMIT 50""",
+           FROM signal_observations WHERE account_id = %s
+           AND observed_at::timestamptz >= NOW() - INTERVAL '14 days'
+           ORDER BY observed_at DESC LIMIT 50""",
         (account_id,),
     ).fetchall()
     result["signals"] = [dict(r) for r in signals]
@@ -1040,10 +1049,12 @@ def get_account_detail(conn, account_id: str) -> dict | None:
 
 
 def get_dimension_scores(conn, account_id: str) -> dict:
-    """Merge dimension scores across all products (take MAX per dimension) from the latest completed run.
+    """Merge dimension scores across all products (take MAX per dimension) from the latest completed run that includes this account.
 
     This gives the most complete picture of an account's strength across
     all dimensions, regardless of which product the signal was scored under.
+    Uses the latest run that actually contains scores for the given account,
+    not just the latest global run (which may be a partial/targeted run).
     """
     rows = conn.execute(
         """
@@ -1051,12 +1062,15 @@ def get_dimension_scores(conn, account_id: str) -> dict:
         FROM account_scores s
         WHERE s.account_id = %s
           AND s.run_id = (
-              SELECT run_id FROM score_runs
-              WHERE status = 'completed'
-              ORDER BY started_at DESC LIMIT 1
+              SELECT s2.run_id
+              FROM account_scores s2
+              JOIN score_runs r ON s2.run_id = r.run_id
+              WHERE s2.account_id = %s
+                AND r.status = 'completed'
+              ORDER BY r.started_at DESC LIMIT 1
           )
         """,
-        (account_id,),
+        (account_id, account_id),
     ).fetchall()
     if not rows:
         return {}
