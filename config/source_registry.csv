@@ -29,3 +29,5 @@ twitter_api,0.75,true
 serper_twitter,0.60,true
 reddit_api,0.65,true
 reddit_official,0.75,true
+builtwith_free,0.75,true
+firmographic_google,0.80,true

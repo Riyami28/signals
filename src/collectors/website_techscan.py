@@ -174,7 +174,13 @@ async def _scan_website(
 
         # Capture headers
         result["headers"] = dict(resp.headers)
-        html = resp.text[:200_000]  # Limit to 200KB to avoid memory issues
+        # Scan first 200KB (CSS/CDN/head) + last 200KB (script tags at bottom)
+        # Modern SPA sites (React/Next.js) put framework refs at the end of HTML
+        full_text = resp.text
+        if len(full_text) > 400_000:
+            html = full_text[:200_000] + "\n" + full_text[-200_000:]
+        else:
+            html = full_text
 
     except httpx.ConnectError:
         result["error"] = "connect_error"
@@ -267,7 +273,7 @@ async def _collect_one_account(
             source=source_name,
             account_id=account_id,
             endpoint=endpoint,
-            status="error",
+            status="exception",
             error_summary=str(scan["error"])[:200],
             commit=False,
         )
@@ -304,8 +310,8 @@ async def _collect_one_account(
             observed_at=utc_now_iso(),
             confidence=confidence,
             source_reliability=source_reliability,
-            evidence_url=f"https://{domain}",
-            evidence_text=f"Technology detected on {domain}: {tech_name}. Full stack: {tech_summary}",
+            evidence_url="",
+            evidence_text=f"Tech Stack: {tech_summary}",
             payload={
                 "domain": domain,
                 "detected_tech": tech_name,

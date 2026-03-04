@@ -158,6 +158,8 @@ def _run_pipeline_sync(
                 twitter_live_enabled = _collector_enabled("twitter_api") and (
                     getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", "")
                 )
+                builtwith_enabled = _collector_enabled("builtwith_free") and settings.builtwith_api_key
+                firmographic_enabled = _collector_enabled("firmographic_google") and settings.serper_api_key and getattr(settings, "minimax_api_key", "")
 
                 any_external = (
                     serper_news_enabled
@@ -169,6 +171,8 @@ def _run_pipeline_sync(
                     or reddit_enabled
                     or reddit_official_enabled
                     or twitter_live_enabled
+                    or builtwith_enabled
+                    or firmographic_enabled
                 )
 
                 if any_external:
@@ -189,6 +193,10 @@ def _run_pipeline_sync(
                         active_sources.append("reddit_official")
                     if twitter_live_enabled:
                         active_sources.append("twitter_live")
+                    if builtwith_enabled:
+                        active_sources.append("builtwith")
+                    if firmographic_enabled:
+                        active_sources.append("firmographic")
 
                     _emit(
                         queue,
@@ -327,6 +335,33 @@ def _run_pipeline_sync(
                             )
                             task_labels.append("twitter_live")
 
+                        # --- BuiltWith Free API (tech stack from builtwith.com) ---
+                        if builtwith_enabled:
+                            from src.collectors import builtwith
+
+                            tasks.append(
+                                builtwith.collect(
+                                    conn,
+                                    settings,
+                                    source_reliability=source_registry.get("builtwith_free", 0.75),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("builtwith")
+
+                        # --- Firmographic Google (Serper + MiniMax LLM) ---
+                        if firmographic_enabled:
+                            from src.collectors import firmographic_google
+
+                            tasks.append(
+                                firmographic_google.collect(
+                                    conn,
+                                    settings,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("firmographic_google")
+
                         # --- GitHub Stargazers (FREE — tracks repo stars) ---
                         if stargazer_enabled:
                             from src.collectors import github_stargazers
@@ -348,23 +383,47 @@ def _run_pipeline_sync(
 
                     for label, result in external_results:
                         if isinstance(result, Exception):
-                            logger.warning("collector_error collector=%s error=%s", label, result)
+                            err_msg = str(result)[:200]
+                            logger.warning("collector_error collector=%s error=%s", label, result, exc_info=result)
                             _emit(
                                 queue,
-                                {"type": "log", "stage": "ingest", "message": f"{label}: failed ({result})"},
+                                {"type": "log", "stage": "ingest", "message": f"⚠️ {label}: error — {err_msg}"},
                             )
                             continue
+
+                        # Firmographic collector returns enriched/skipped/errors instead of inserted/seen
+                        if label == "firmographic_google":
+                            enriched = result.get("enriched", 0)
+                            accts = result.get("accounts_processed", 0)
+                            errs = result.get("errors", 0)
+                            msg = f"{label}: {enriched} enriched from {accts} accounts"
+                            if errs:
+                                msg += f" ({errs} errors)"
+                            _emit(queue, {"type": "log", "stage": "ingest", "message": msg})
+                            continue
+
                         ins = result.get("inserted", 0)
+                        seen = result.get("seen", 0)
                         accts = result.get("accounts_processed", 0)
                         total_inserted += ins
-                        _emit(
-                            queue,
-                            {
-                                "type": "log",
-                                "stage": "ingest",
-                                "message": f"{label}: {ins} signals from {accts} accounts",
-                            },
-                        )
+                        if ins == 0 and accts == 0:
+                            _emit(
+                                queue,
+                                {
+                                    "type": "log",
+                                    "stage": "ingest",
+                                    "message": f"{label}: 0 signals (collector may not have run — check API keys/config)",
+                                },
+                            )
+                        else:
+                            _emit(
+                                queue,
+                                {
+                                    "type": "log",
+                                    "stage": "ingest",
+                                    "message": f"{label}: {ins} signals from {accts} accounts ({seen} matches)",
+                                },
+                            )
 
                 dt = time.monotonic() - t0
                 _emit(
