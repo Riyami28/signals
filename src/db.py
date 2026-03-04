@@ -560,6 +560,12 @@ CREATE TABLE IF NOT EXISTS crm_push_log (
 CREATE INDEX IF NOT EXISTS idx_crm_push_log_account ON crm_push_log(account_id);
 CREATE INDEX IF NOT EXISTS idx_crm_push_log_status ON crm_push_log(status);
 CREATE INDEX IF NOT EXISTS idx_crm_push_log_run ON crm_push_log(run_id);
+
+CREATE TABLE IF NOT EXISTS twitter_cursors (
+    account_id      TEXT PRIMARY KEY,
+    since_tweet_id  TEXT NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 
@@ -1401,6 +1407,35 @@ def record_crawl_attempt(
         VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (source, account_id, endpoint, utc_now_iso(), status, (error_summary or "")[:500]),
+    )
+    if commit:
+        conn.commit()
+
+
+def get_twitter_since_id(conn: Any, account_id: str) -> str:
+    """Return the latest tweet_id seen for this account, or '' if never fetched."""
+    cur = conn.execute(
+        "SELECT since_tweet_id FROM twitter_cursors WHERE account_id = %s",
+        (account_id,),
+    )
+    row = cur.fetchone()
+    return str(row["since_tweet_id"]) if row else ""
+
+
+def save_twitter_since_id(conn: Any, account_id: str, tweet_id: str, commit: bool = False) -> None:
+    """Upsert the latest tweet_id for an account so next fetch skips already-seen tweets."""
+    if not tweet_id:
+        return
+    conn.execute(
+        """
+        INSERT INTO twitter_cursors (account_id, since_tweet_id, updated_at)
+        VALUES (%s, %s, now())
+        ON CONFLICT (account_id) DO UPDATE
+            SET since_tweet_id = EXCLUDED.since_tweet_id,
+                updated_at     = now()
+        WHERE twitter_cursors.since_tweet_id < EXCLUDED.since_tweet_id
+        """,
+        (account_id, tweet_id),
     )
     if commit:
         conn.commit()

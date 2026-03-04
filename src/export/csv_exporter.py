@@ -543,3 +543,88 @@ def export_sales_ready(
     write_csv_rows(output_path, export_rows, fieldnames=_SALES_READY_COLUMNS)
     logger.info("export_sales_ready rows=%d path=%s", len(export_rows), output_path)
     return len(export_rows)
+
+
+def export_twitter_signals(conn, output_path: Path) -> int:
+    """Export all Twitter signals to CSV and display summary."""
+    query = """
+        SELECT
+            a.domain,
+            a.company_name,
+            so.signal_code,
+            so.source,
+            so.confidence,
+            so.evidence_text,
+            so.evidence_url,
+            so.observed_at
+        FROM public.signal_observations so
+        JOIN public.accounts a ON so.account_id = a.account_id
+        WHERE so.source LIKE 'twitter%'
+        ORDER BY a.domain, so.signal_code, so.observed_at DESC
+    """
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            rows = cur.fetchall()
+    except Exception as e:
+        logger.warning("twitter_signals_query_failed error=%s", e)
+        return 0
+
+    if not rows:
+        logger.info("twitter_signals rows=0")
+        return 0
+
+    # Create export data
+    export_rows = []
+    for row in rows:
+        conf_val = float(row.get('confidence', 0) or 0)
+        export_rows.append({
+            'domain': row.get('domain', ''),
+            'company_name': row.get('company_name', ''),
+            'signal_code': row.get('signal_code', ''),
+            'source': row.get('source', ''),
+            'confidence': f"{conf_val:.2f}",
+            'evidence_text': row.get('evidence_text', '') or '',
+            'evidence_url': row.get('evidence_url', '') or '',
+            'observed_at': row.get('observed_at', '') or '',
+        })
+
+    # Write to CSV
+    fieldnames = ['domain', 'company_name', 'signal_code', 'source', 'confidence', 'evidence_text', 'evidence_url', 'observed_at']
+    write_csv_rows(output_path, export_rows, fieldnames=fieldnames)
+
+    # Log summary with details
+    logger.info("export_twitter_signals rows=%d path=%s", len(export_rows), output_path)
+
+    summary_lines = ["\n📱 TWITTER SIGNALS SUMMARY (total=%d)" % len(export_rows)]
+    summary_lines.append("=" * 120)
+
+    current_domain = None
+    for row in rows:
+        domain = row.get('domain', '')
+        company = row.get('company_name', '')
+        signal_code = row.get('signal_code', '')
+        source = row.get('source', '')
+        confidence = row.get('confidence', 0)
+        text = row.get('evidence_text', '')
+        url = row.get('evidence_url', '')
+
+        if domain != current_domain:
+            current_domain = domain
+            summary_lines.append(f"\n🏢 {company} ({domain})")
+            summary_lines.append("-" * 120)
+
+        text_preview = (text[:80] + "...") if text and len(text) > 80 else (text or "")
+        conf_val = float(confidence or 0)
+        summary_lines.append(f"  {signal_code:30s} | {source:12s} | confidence: {conf_val:.2f} | {text_preview}")
+        if url:
+            summary_lines.append(f"     └─ {url}")
+
+    summary_lines.append("=" * 120)
+    summary_lines.append(f"✅ Exported to {output_path}\n")
+
+    for line in summary_lines:
+        logger.info(line)
+
+    return len(export_rows)

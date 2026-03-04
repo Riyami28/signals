@@ -96,6 +96,35 @@ def fetch_latest_crawl_failures(conn: Any, run_date: str, limit: int = 10) -> li
     return list(cur.fetchall())
 
 
+def get_twitter_since_id(conn: Any, account_id: str) -> str:
+    """Return the latest tweet_id seen for this account, or '' if never fetched."""
+    cur = conn.execute(
+        "SELECT since_tweet_id FROM twitter_cursors WHERE account_id = %s",
+        (account_id,),
+    )
+    row = cur.fetchone()
+    return str(row["since_tweet_id"]) if row else ""
+
+
+def save_twitter_since_id(conn: Any, account_id: str, tweet_id: str, commit: bool = False) -> None:
+    """Upsert the latest tweet_id for an account so next fetch skips already-seen tweets."""
+    if not tweet_id:
+        return
+    conn.execute(
+        """
+        INSERT INTO twitter_cursors (account_id, since_tweet_id, updated_at)
+        VALUES (%s, %s, now())
+        ON CONFLICT (account_id) DO UPDATE
+            SET since_tweet_id = EXCLUDED.since_tweet_id,
+                updated_at     = now()
+        WHERE twitter_cursors.since_tweet_id < EXCLUDED.since_tweet_id
+        """,
+        (account_id, tweet_id),
+    )
+    if commit:
+        conn.commit()
+
+
 def select_accounts_for_live_crawl(
     conn: Any,
     source: str,

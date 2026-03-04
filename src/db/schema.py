@@ -547,4 +547,10 @@ CREATE TABLE IF NOT EXISTS batch_companies (
 );
 
 CREATE INDEX IF NOT EXISTS idx_batch_companies_batch ON batch_companies(batch_id);
+
+CREATE TABLE IF NOT EXISTS twitter_cursors (
+    account_id      TEXT PRIMARY KEY,
+    since_tweet_id  TEXT NOT NULL,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """

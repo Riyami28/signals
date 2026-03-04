@@ -110,12 +110,13 @@ def _run_pipeline_sync(
                         },
                     )
 
-                # Legacy HTTP collectors (jobs, news, technographics) — run only if enabled
+                # Legacy HTTP collectors (jobs, news, technographics, twitter) — run only if enabled
                 # These crawl actual websites and are slow, so skip quickly if disabled
                 legacy_collectors = [
                     ("jobs_pages", "jobs", "Job"),
                     ("news_rss", "news", "News"),
                     ("technographics", "technographics", "Technographics"),
+                    ("twitter_api", "twitter", "Twitter"),
                 ]
                 for policy_key, module_name, label in legacy_collectors:
                     if _collector_enabled(policy_key):

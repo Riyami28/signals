@@ -34,15 +34,21 @@ def run_exports(conn, settings: Settings, run_date: date, run_id: str) -> dict[s
     readiness_rows = quality.compute_promotion_readiness(conn, run_date)
     readiness_count = csv_exporter.export_promotion_readiness(readiness_rows, paths["promotion_readiness"])
 
+    # Export Twitter signals with detailed summary
+    twitter_signals_path = settings.out_dir / f"twitter_signals_{run_date.strftime('%Y%m%d')}.csv"
+    twitter_count = csv_exporter.export_twitter_signals(conn, twitter_signals_path)
+
     return {
         "review_queue": queue_count,
         "daily_scores": score_count,
         "source_quality": quality_rows,
         "promotion_readiness": readiness_count,
+        "twitter_signals": twitter_count,
         "review_queue_path": str(paths["review_queue"]),
         "daily_scores_path": str(paths["daily_scores"]),
         "source_quality_path": str(paths["source_quality"]),
         "promotion_readiness_path": str(paths["promotion_readiness"]),
+        "twitter_signals_path": str(twitter_signals_path),
     }
 
 
