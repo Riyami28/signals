@@ -1,9 +1,1 @@
 company_name,domain,text,url,observed_at,signal_code,confidence
-Netflix,netflix.com,"We're migrating our infrastructure to Kubernetes for better container orchestration and scaling. Using Terraform for IaC.",https://reddit.com/r/devops/comments/example1,2026-03-02T14:30:00Z,infrastructure_modernization,0.8
-Stripe,stripe.com,"Just rolled out our new FinOps initiative to reduce cloud spending by 30% using cost optimization tooling.",https://reddit.com/r/finops/comments/example2,2026-03-02T15:45:00Z,cost_reduction_mandate,0.75
-Airbnb,airbnb.com,"Announcing our platform engineering team's new deployment pipeline using GitOps and observability stack.",https://reddit.com/r/platformengineering/comments/example3,2026-03-02T16:20:00Z,platform_modernization,0.7
-Figma,figma.com,"Our DevOps bottleneck: Python became our bottleneck in microservices. Evaluating Go and Rust for performance.",https://reddit.com/r/golang/comments/example4,2026-03-02T17:00:00Z,devops_bottleneck_language,0.65
-Notion,notion.com,"Enterprise modernization program: Moving from monolith to event-driven architecture with Kafka and gRPC.",https://reddit.com/r/softwaredeveloper/comments/example5,2026-03-02T17:30:00Z,enterprise_modernization_program,0.72
-Datadog,datadog.com,"Supply chain platform rollout for vendor consolidation. Integrating multiple SaaS tools into single pane of glass.",https://reddit.com/r/devops/comments/example6,2026-03-02T18:15:00Z,supply_chain_platform_rollout,0.78
-PagerDuty,pagerduty.com,"Data platform initiative: Building central analytics infrastructure with dbt, Airflow, and Snowflake.",https://reddit.com/r/dataengineering/comments/example7,2026-03-02T18:45:00Z,data_platform_initiative,0.68
-GitHub,github.com,"Adopting IDP (Internal Developer Platform) golden path initiative to reduce developer toil and improve velocity.",https://reddit.com/r/platformengineering/comments/example8,2026-03-02T19:20:00Z,idp_golden_path_initiative,0.74
