@@ -79,7 +79,8 @@ def _rapidapi_search_url(
     If since_id is provided, only returns tweets newer than that tweet ID (incremental fetch).
     """
     if from_handle:
-        search_query = f"from:{from_handle} ({query})"
+        bare_handle = from_handle.lstrip("@")  # Twitter from: operator requires no @ prefix
+        search_query = f"from:{bare_handle} ({query})"
     else:
         search_query = query
 
@@ -122,7 +123,8 @@ def _parse_rapidapi_tweets(data: dict[str, Any]) -> list[dict[str, Any]]:
                     if inner.get("__typename") != "TimelineTweet":
                         continue
                     result = inner.get("tweet_results", {}).get("result", {})
-                    details = result.get("details", {})
+                    # API may use 'details' (twitter241 custom) or 'legacy' (standard GraphQL)
+                    details = result.get("details") or result.get("legacy") or {}
                     text = str(details.get("full_text") or details.get("text") or "").strip()
                     tweet_id = str(result.get("rest_id") or "")
                     created_at_ms = details.get("created_at_ms")
@@ -131,7 +133,14 @@ def _parse_rapidapi_tweets(data: dict[str, Any]) -> list[dict[str, Any]]:
                             int(created_at_ms) / 1000, tz=timezone.utc
                         ).isoformat()
                     else:
-                        created_at = ""
+                        # Standard Twitter date string: "Mon Mar 04 12:00:00 +0000 2026"
+                        created_at_str = details.get("created_at", "")
+                        try:
+                            created_at = datetime.strptime(
+                                created_at_str, "%a %b %d %H:%M:%S +0000 %Y"
+                            ).replace(tzinfo=timezone.utc).isoformat() if created_at_str else ""
+                        except Exception:
+                            created_at = created_at_str
                     if text:
                         tweets.append({"id": tweet_id, "text": text, "created_at": created_at})
             return tweets
@@ -324,6 +333,8 @@ async def _collect_live_twitter_account(
 
     # Check CSV/cache for known official Twitter handle
     official_handle = twitter_handles.get(domain, "").strip()
+    # Twitter from: operator requires handle WITHOUT @ (e.g. from:netflix not from:@netflix)
+    handle_bare = official_handle.lstrip("@")
 
     search_keywords = DEFAULT_TWITTER_TERMS
 
@@ -336,7 +347,7 @@ async def _collect_live_twitter_account(
     if use_rapidapi:
         if official_handle:
             # ✓ Known handle → get ALL tweets from official account, let lexicon classify
-            query = f"from:{official_handle} -is:retweet lang:en"
+            query = f"from:{handle_bare} -is:retweet lang:en"
         else:
             # No known handle → search company name + domain WITH signal keywords
             query = f'("{company_name}" OR "{domain}") {search_keywords}'
@@ -348,7 +359,7 @@ async def _collect_live_twitter_account(
 
         if official_handle:
             search_url = _rapidapi_search_url(
-                rapidapi_host, "-is:retweet lang:en", from_handle=official_handle, since_id=since_id
+                rapidapi_host, "-is:retweet lang:en", from_handle=handle_bare, since_id=since_id
             )
         else:
             search_url = _rapidapi_search_url(rapidapi_host, query, since_id=since_id)
@@ -356,7 +367,7 @@ async def _collect_live_twitter_account(
     else:
         if official_handle:
             # ✓ Known handle → get ALL tweets, lexicon will classify
-            full_query = f"from:{official_handle} -is:retweet lang:en"
+            full_query = f"from:{handle_bare} -is:retweet lang:en"
         else:
             full_query = f'("{company_name}" OR "{domain}") {search_keywords}'
 
