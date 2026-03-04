@@ -147,14 +147,15 @@ def _run_pipeline_sync(
                             )
 
                 # --- ALL external collectors in PARALLEL ---
-                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + GitHub Stargazers
+                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + GitHub Stargazers + Serper Twitter
                 serper_news_enabled = _collector_enabled("serper_news") and settings.serper_api_key
                 serper_jobs_enabled = _collector_enabled("serper_jobs") and settings.serper_api_key
                 techscan_enabled = _collector_enabled("website_techscan")
                 gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
                 stargazer_enabled = _collector_enabled("github_stargazers")
+                serper_twitter_enabled = _collector_enabled("serper_twitter") and settings.serper_api_key
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled
+                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled or serper_twitter_enabled
 
                 if any_external:
                     active_sources = []
@@ -166,6 +167,8 @@ def _run_pipeline_sync(
                         active_sources.append("website_techscan")
                     if gnews_enabled:
                         active_sources.append("gnews")
+                    if serper_twitter_enabled:
+                        active_sources.append("serper_twitter")
 
                     _emit(
                         queue,
@@ -244,6 +247,20 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("gnews")
+
+                        # --- Serper Twitter (Google-indexed tweets — uses Serper API key) ---
+                        if serper_twitter_enabled:
+                            from src.collectors import serper_twitter
+
+                            tasks.append(
+                                serper_twitter.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry,
+                                )
+                            )
+                            task_labels.append("serper_twitter")
 
                         # --- GitHub Stargazers (FREE — tracks repo stars) ---
                         if stargazer_enabled:
