@@ -240,6 +240,7 @@ async def collect(
     settings: Settings,
     lexicon_by_source: dict[str, list[dict[str, str]]],
     source_reliability: dict[str, float],
+    account_ids: list[str] | None = None,
     db_pool=None,
 ) -> dict[str, int]:
     """Main entry point for serper_twitter collector.
@@ -274,16 +275,26 @@ async def collect(
     # Align time window with twitter_lookback_days (default 7 → qdr:w = past week)
     lookback_days = getattr(settings, "twitter_lookback_days", 7)
 
-    accounts = [
-        dict(r)
-        for r in conn.execute(
-            "SELECT account_id, company_name, domain FROM accounts ORDER BY company_name LIMIT %s",
-            (max_accounts,),
-        ).fetchall()
-    ]
+    if account_ids:
+        placeholders = ",".join(["%s"] * len(account_ids))
+        accounts = [
+            dict(r)
+            for r in conn.execute(
+                f"SELECT account_id, company_name, domain FROM accounts WHERE account_id IN ({placeholders})",
+                tuple(account_ids),
+            ).fetchall()
+        ]
+    else:
+        accounts = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT account_id, company_name, domain FROM accounts ORDER BY company_name LIMIT %s",
+                (max_accounts,),
+            ).fetchall()
+        ]
 
     if not accounts:
-        return {"inserted": 0, "seen": 0}
+        return {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     logger.info(
         "serper_twitter starting accounts=%d max_results_per=%d",
@@ -337,4 +348,4 @@ async def collect(
         dt,
     )
 
-    return {"inserted": total_inserted, "seen": total_seen}
+    return {"inserted": total_inserted, "seen": total_seen, "accounts_processed": len(accounts)}
