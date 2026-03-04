@@ -942,26 +942,32 @@ def get_accounts_paginated(
     order_col = sort_map.get(sort_by, "COALESCE(best.score, 0)")
     order_dir = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
-    # Use latest completed score run to avoid scanning all runs
-    latest_run_cte = """
-        WITH latest_run AS (
-            SELECT run_id FROM score_runs
-            WHERE status = 'completed'
-            ORDER BY started_at DESC LIMIT 1
+    # Use the latest FULL run (500+ scores) as the authoritative score source.
+    # This avoids two problems:
+    # 1. Targeted runs (3-78 accounts) overriding full-run scores with partial data
+    # 2. Old pre-cleanup runs having inflated scores from garbage signals
+    _full_run_cte = """
+        WITH full_run AS (
+            SELECT r.run_id
+            FROM score_runs r
+            JOIN account_scores s ON s.run_id = r.run_id
+            WHERE r.status = 'completed'
+            GROUP BY r.run_id, r.started_at
+            HAVING count(*) > 500
+            ORDER BY r.started_at DESC
+            LIMIT 1
         )
     """
 
     count_sql = f"""
-        {latest_run_cte}
+        {_full_run_cte}
         SELECT COUNT(*) as total FROM (
             SELECT a.account_id
             FROM accounts a
-            LEFT JOIN LATERAL (
-                SELECT score, tier FROM account_scores
-                WHERE account_id = a.account_id
-                  AND run_id = (SELECT run_id FROM latest_run)
-                ORDER BY score DESC LIMIT 1
-            ) best ON true
+            LEFT JOIN account_scores best
+                ON best.account_id = a.account_id
+                AND best.run_id = (SELECT run_id FROM full_run)
+                AND best.product = 'zopdev'
             {where_sql}
         ) sub
     """
@@ -970,7 +976,7 @@ def get_accounts_paginated(
     offset = (page - 1) * per_page
     data_params = list(params) + [per_page, offset]
     data_sql = f"""
-        {latest_run_cte}
+        {_full_run_cte}
         SELECT
             a.account_id, a.company_name, a.domain, a.source_type,
             COALESCE(best.score, 0) AS score,
@@ -978,13 +984,10 @@ def get_accounts_paginated(
             cr.research_status,
             (SELECT string_agg(al.label, ',') FROM account_labels al WHERE al.account_id = a.account_id) AS labels
         FROM accounts a
-        LEFT JOIN LATERAL (
-            SELECT score, tier
-            FROM account_scores
-            WHERE account_id = a.account_id
-              AND run_id = (SELECT run_id FROM latest_run)
-            ORDER BY score DESC LIMIT 1
-        ) best ON true
+        LEFT JOIN account_scores best
+            ON best.account_id = a.account_id
+            AND best.run_id = (SELECT run_id FROM full_run)
+            AND best.product = 'zopdev'
         LEFT JOIN company_research cr ON cr.account_id = a.account_id
         {where_sql}
         ORDER BY {order_col} {order_dir}
@@ -1001,19 +1004,16 @@ def get_account_detail(conn, account_id: str) -> dict | None:
         return None
     result = dict(account)
 
-    # Only return scores from the latest score run to avoid duplicates across runs
+    # Get the most recent score per product across all completed runs.
+    # Uses DISTINCT ON to pick the latest score per product, so single-account
+    # pipeline runs don't hide scores from prior full runs.
     scores = conn.execute(
         """
-        SELECT s.product, s.score, s.tier, s.dimension_scores_json
+        SELECT DISTINCT ON (s.product) s.product, s.score, s.tier, s.dimension_scores_json
         FROM account_scores s
         JOIN score_runs r ON s.run_id = r.run_id
-        WHERE s.account_id = %s
-          AND r.run_id = (
-              SELECT run_id FROM score_runs
-              WHERE status = 'completed'
-              ORDER BY started_at DESC LIMIT 1
-          )
-        ORDER BY s.score DESC
+        WHERE s.account_id = %s AND r.status = 'completed'
+        ORDER BY s.product, r.started_at DESC
         """,
         (account_id,),
     ).fetchall()

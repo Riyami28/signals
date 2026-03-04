@@ -133,7 +133,6 @@
                   <div class="tabs">
                     <div class="tab" :class="{'active': dtab==='dimensions'}" @click="dtab='dimensions'">Dimensions</div>
                     <div class="tab" :class="{'active': dtab==='signals'}" @click="dtab='signals'">Signals</div>
-                    <div class="tab" :class="{'active': dtab==='timeline'}" @click="dtab='timeline'; loadTimeline(acc.account_id)">Timeline</div>
                     <div class="tab" :class="{'active': dtab==='research'}" @click="dtab='research'; loadResearch(acc.account_id)">Research</div>
                     <div class="tab" :class="{'active': dtab==='contacts'}" @click="dtab='contacts'">Contacts</div>
                     <div class="tab" :class="{'active': dtab==='labels'}" @click="dtab='labels'; loadLabels(acc.account_id)">Labels</div>
@@ -197,41 +196,6 @@
                       </div>
                     </template>
                     <div x-show="!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0" class="empty">No real signals detected. Run pipeline to collect signals via Serper.</div>
-                  </div>
-
-                  <!-- Timeline Tab -->
-                  <div x-show="dtab==='timeline'">
-                    <div class="timeline-filters" style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-                      <input type="text" class="search-input" style="flex:0 0 160px;min-width:120px" placeholder="Signal code..." x-model="timelineSignalCode">
-                      <input type="text" class="search-input" style="flex:0 0 140px;min-width:100px" placeholder="Source..." x-model="timelineSource">
-                      <button class="btn btn-blue btn-sm" @click="loadTimeline(acc.account_id)">Filter</button>
-                      <button class="btn btn-sm" @click="timelineSignalCode=''; timelineSource=''; loadTimeline(acc.account_id)">Clear</button>
-                      <span class="timeline-total" style="font-size:12px;color:var(--text-muted)" x-text="'Total: ' + timelineTotal"></span>
-                    </div>
-                    <template x-if="timelineItems && timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://')).length > 0">
-                      <div>
-                        <template x-for="(item, idx) in timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://'))" :key="idx + '_' + item.observed_at + item.signal_code">
-                          <div class="signal-card">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                              <span class="signal-code" x-text="item.signal_code"></span>
-                              <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="item.source"></span>
-                              <span style="font-size:11px;color:var(--text-muted)" x-text="(item.observed_at || '').substring(0,10)"></span>
-                              <span style="font-size:11px;color:var(--text-muted)" x-text="'conf: ' + Number(item.confidence || 0).toFixed(2)"></span>
-                            </div>
-                            <div class="signal-evidence" x-text="item.evidence_text"></div>
-                            <template x-if="item.evidence_url">
-                              <div style="margin-top:4px">
-                                <a class="signal-url" :href="item.evidence_url" target="_blank" x-text="(item.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
-                              </div>
-                            </template>
-                          </div>
-                        </template>
-                        <div style="margin-top:12px;display:flex;gap:8px;justify-content:center" x-show="timelineTotal > timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://')).length">
-                          <button class="btn btn-sm" @click="timelineOffset += 50; loadTimeline(acc.account_id, true)">Load More</button>
-                        </div>
-                      </div>
-                    </template>
-                    <div x-show="!timelineItems || timelineItems.filter(i => !i.evidence_url || !i.evidence_url.startsWith('internal://')).length === 0" class="empty">No real signal observations found.</div>
                   </div>
 
                   <!-- Research Tab -->

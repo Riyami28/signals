@@ -131,13 +131,9 @@ news,compliance_initiative,regulatory compliance,0.65
 news,erp_s4_migration_milestone,sap,0.55
 news,erp_s4_migration_milestone,erp,0.55
 news,erp_s4_migration_milestone,oracle cloud,0.6
-news,launch_or_scale_event,acquisition,0.55
-news,launch_or_scale_event,acquires,0.6
-news,launch_or_scale_event,merger,0.55
-news,launch_or_scale_event,new factory,0.6
-news,launch_or_scale_event,new plant,0.6
-news,launch_or_scale_event,expansion,0.5
-news,launch_or_scale_event,new market,0.55
+news,launch_or_scale_event,product launch,0.70
+news,launch_or_scale_event,platform launch,0.75
+news,launch_or_scale_event,service launch,0.65
 news,supply_chain_platform_rollout,supply chain,0.55
 news,supply_chain_platform_rollout,logistics platform,0.65
 news,supply_chain_platform_rollout,warehouse automation,0.7
