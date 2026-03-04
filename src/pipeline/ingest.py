@@ -42,39 +42,39 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
 
     results: dict[str, dict[str, int]] = {}
     results["jobs"] = (
-        await jobs.collect(conn, settings, lexicon, source_reliability)
+        await jobs.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("jobs_pages")
         else {"inserted": 0, "seen": 0}
     )
     results["news"] = (
-        await news.collect(conn, settings, lexicon, source_reliability)
+        await news.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("news_rss")
         else {"inserted": 0, "seen": 0}
     )
     results["technographics"] = (
-        await technographics.collect(conn, settings, lexicon, source_reliability)
+        await technographics.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("technographics")
         else {"inserted": 0, "seen": 0}
     )
     results["community"] = (
-        await community.collect(conn, settings, lexicon, source_reliability)
+        await community.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("reddit_api")
         else {"inserted": 0, "seen": 0}
     )
     results["reddit"] = (
         await reddit_collector.collect(
-            conn, settings, lexicon_by_source=lexicon, source_reliability_dict=source_reliability
+            conn=conn, settings=settings, lexicon_by_source=lexicon, source_reliability_dict=source_reliability
         )
         if _collector_enabled("reddit_api")
         else {"inserted": 0, "seen": 0}
     )
     results["reddit_official"] = (
-        await reddit_official.collect(conn, settings, lexicon, source_reliability)
+        await reddit_official.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("reddit_official")
         else {"inserted": 0, "seen": 0}
     )
     results["first_party"] = (
-        first_party.collect(conn, settings, lexicon, source_reliability)
+        first_party.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("first_party_csv")
         else {"inserted": 0, "seen": 0}
     )
@@ -82,8 +82,8 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     # Website tech scan (FREE — no API key needed)
     if _collector_enabled("website_techscan"):
         results["website_techscan"] = await website_techscan.collect(
-            conn,
-            settings,
+            conn=conn,
+            settings=settings,
             source_reliability=source_reliability.get("website_techscan", 0.70),
         )
     else:
@@ -95,8 +95,8 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
         for source_key in ("news", "technographics", "community"):
             all_news_lexicon.extend(r for r in lexicon.get(source_key, []) if r.get("keyword"))
         results["gnews"] = await gnews_collector.collect(
-            conn,
-            settings,
+            conn=conn,
+            settings=settings,
             lexicon_rows=all_news_lexicon,
             source_reliability=source_reliability.get("gnews", 0.78),
         )
@@ -105,14 +105,14 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
 
     # Twitter API (RapidAPI / official — incremental with since_id cursor)
     results["twitter"] = (
-        await twitter.collect(conn, settings, lexicon, source_reliability)
+        await twitter.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("twitter_api")
         else {"inserted": 0, "seen": 0}
     )
 
     # Serper Twitter (Google-indexed Twitter content — complements RapidAPI coverage)
     results["serper_twitter"] = (
-        await serper_twitter.collect(conn, settings, lexicon, source_reliability)
+        await serper_twitter.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
         if _collector_enabled("serper_twitter")
         else {"inserted": 0, "seen": 0}
     )

@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     discovery_thresholds_path: Path = Field(default=Path(""))
     discovery_blocklist_path: Path = Field(default=Path(""))
     promotion_policy_path: Path = Field(default=Path(""))
+    subreddit_mapping_path: Path = Field(default=Path(""))
 
     # --- Google Sheets ---
     google_sheet_id: Optional[str] = Field(default=None, alias="GOOGLE_SHEETS_SPREADSHEET_ID")
@@ -164,8 +165,8 @@ class Settings(BaseSettings):
     crunchbase_rate_limit: int = Field(default=50, ge=1)
 
     # --- Twitter signal collection ---
-    twitter_bearer_token: str = Field(default="")  # Official Twitter API v2 Bearer Token
-    twitter_rapidapi_key: str = Field(default="")  # RapidAPI key (twitter-api45 / Twitter v2)
+    twitter_bearer_token: str = Field(default="")        # Official Twitter API v2 Bearer Token
+    twitter_rapidapi_key: str = Field(default="")        # RapidAPI key (twitter-api45 / Twitter v2)
     twitter_rapidapi_host: str = Field(default="twitter-api45.p.rapidapi.com")
     twitter_lookback_days: int = Field(default=7, ge=1, le=7)  # free tier = 7 days; Basic/Pro = up to 30
 
@@ -234,6 +235,8 @@ class Settings(BaseSettings):
             self.discovery_blocklist_path = cd / "discovery_blocklist.csv"
         if self.promotion_policy_path == Path(""):
             self.promotion_policy_path = cd / "promotion_policy.csv"
+        if self.subreddit_mapping_path == Path(""):
+            self.subreddit_mapping_path = cd / "subreddit_mapping.csv"
 
         # Normalize empty google_sheet_id to None.
         if self.google_sheet_id is not None and not self.google_sheet_id.strip():

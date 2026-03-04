@@ -1,1 +1,11 @@
 company_name,domain,text,url,observed_at,signal_code,confidence
+Coca-Cola India,coca-colaindia.com,Engineering team reports infra is the bottleneck for deployment velocity and release cadence,internal://community/cocacola/devops-friction,2026-02-17T00:00:00Z,high_intent_phrase_devops_toil,0.82
+Coca-Cola India,coca-colaindia.com,Cloud spend cost is out of control across multi-account AWS footprint,internal://community/cocacola/cost-pressure,2026-02-17T00:00:00Z,high_intent_phrase_cost_control,0.80
+Tata Digital,tatadigital.com,Platform teams need to spin up staging and preview environments faster for feature branches,internal://community/tatadigital/env-spinup,2026-02-17T00:00:00Z,env_spinup_requests,0.78
+Tata Digital,tatadigital.com,Engineering leadership exploring golden paths to standardize developer workflows,internal://community/tatadigital/golden-paths,2026-02-17T00:00:00Z,idp_golden_path_initiative,0.80
+Conde Nast,condenast.com,Need production-ready fast deployment pipelines for media content delivery at scale,internal://community/condenast/production-speed,2026-02-17T00:00:00Z,high_intent_phrase_production_fast,0.82
+Conde Nast,condenast.com,Looking at tool consolidation to reduce CI/CD sprawl and monitoring fragmentation,internal://community/condenast/tool-consolidation,2026-02-17T00:00:00Z,vendor_consolidation_program,0.78
+Diageo India,diageoindia.com,DevOps is becoming a ticketing system instead of enabling self-service infrastructure,internal://community/diageo/devops-friction,2026-02-17T00:00:00Z,high_intent_phrase_devops_toil,0.80
+Diageo India,diageoindia.com,Need continuous enforcement of security policies across cloud environments,internal://community/diageo/governance,2026-02-17T00:00:00Z,governance_enforcement_need,0.82
+Tata Consumer Products,tataconsumer.com,Exploring new cluster provisioning and preview environments for development teams,internal://community/tataconsumer/env-speed,2026-02-17T00:00:00Z,env_spinup_requests,0.75
+Tata Consumer Products,tataconsumer.com,Evaluating single control plane approach to reduce operational overhead,internal://community/tataconsumer/consolidation,2026-02-17T00:00:00Z,vendor_consolidation_program,0.78

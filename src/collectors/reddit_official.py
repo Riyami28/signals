@@ -22,6 +22,7 @@ from src.models import SignalObservation
 from src.settings import Settings
 from src.utils import (
     classify_text,
+    load_csv_rows,
     stable_hash,
 )
 
@@ -124,26 +125,9 @@ async def collect(
         logger.info("reddit_official: live_crawl disabled, returning early")
         return {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
-    # Load official subreddit mappings
-    official_subreddits = {
-        "Notion Labs": "notion",
-        "GitHub Inc": "github",
-        "Stripe Inc": "stripe",
-        "Figma Inc": "figma",
-        "Instacart": "instacart",
-        "Datadog Inc": "datadog",
-        "Reckitt": "reckitt",
-        "Hormel": "hormel",
-        "Amul": "amul",
-        "Archer Daniels Midland": "adm",
-        "Prose Beauty": "prose",
-        "Cirkul": "cirkul",
-        "Virgin Group": "virgin",
-        "Zomato": "zomato",
-        "Swiggy": "swiggy",
-        "BigBasket": "bigbasket",
-        "Nykaa": "nykaa",
-    }
+    # Load official subreddit mappings from CSV
+    subreddit_rows = load_csv_rows(settings.subreddit_mapping_path)
+    official_subreddits = {row["company_name"]: row["subreddit_name"] for row in subreddit_rows}
 
     inserted_total = 0
     seen_total = 0
