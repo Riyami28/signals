@@ -88,40 +88,64 @@ def _build_observation(
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
 async def _fetch_reddit_search_json(query: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches search results from Reddit JSON API with retries."""
-    # Support mock API for development (use SIGNALS_REDDIT_API_BASE_URL env var)
-    reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
-
-    if reddit_api_base.startswith("http://"):  # Mock API - use httpx directly, skip robots.txt
-        search_url = f"{reddit_api_base}/search?q={quote_plus(query)}&sort=new&limit=25"
-        response = await client.get(search_url, timeout=15)
+    # Use RapidAPI if key is provided, otherwise use public API
+    if settings.reddit_rapidapi_key and settings.reddit_use_rapidapi:
+        search_url = f"https://{settings.reddit_rapidapi_host}/search?q={quote_plus(query)}&sort=new&limit=25"
+        headers = {
+            "x-rapidapi-key": settings.reddit_rapidapi_key,
+            "x-rapidapi-host": settings.reddit_rapidapi_host,
+        }
+        logger.debug(f"_fetch_reddit_search_json: fetching from RapidAPI: {search_url}")
+        response = await client.get(search_url, headers=headers, timeout=settings.http_timeout_seconds)
         response.raise_for_status()
         return response.json()
-    else:  # Real Reddit API
-        # NOTE: Reddit's robots.txt blocks /search.json for crawlers, but this is a legitimate use case
-        # (public signal collection from community discussions about companies).
-        # We use httpx directly instead of async_get to bypass robots.txt checking.
-        search_url = f"{reddit_api_base}/search.json?q={quote_plus(query)}&sort=new&limit=25&t=month"
+    else:
+        # Support mock API for development (use SIGNALS_REDDIT_API_BASE_URL env var)
+        reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
 
-        logger.debug(f"_fetch_reddit_search_json: fetching {search_url}")
-        response = await client.get(search_url, timeout=settings.http_timeout_seconds)
-        response.raise_for_status()
-        return response.json()
+        if reddit_api_base.startswith("http://"):  # Mock API - use httpx directly, skip robots.txt
+            search_url = f"{reddit_api_base}/search?q={quote_plus(query)}&sort=new&limit=25"
+            response = await client.get(search_url, timeout=15)
+            response.raise_for_status()
+            return response.json()
+        else:  # Real Reddit API
+            # NOTE: Reddit's robots.txt blocks /search.json for crawlers, but this is a legitimate use case
+            # (public signal collection from community discussions about companies).
+            # We use httpx directly instead of async_get to bypass robots.txt checking.
+            search_url = f"{reddit_api_base}/search.json?q={quote_plus(query)}&sort=new&limit=25&t=month"
+
+            logger.debug(f"_fetch_reddit_search_json: fetching {search_url}")
+            response = await client.get(search_url, timeout=settings.http_timeout_seconds)
+            response.raise_for_status()
+            return response.json()
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
 async def _fetch_reddit_subreddit_json(subreddit: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches recent posts from a specific subreddit."""
-    reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
+    # Use RapidAPI if key is provided, otherwise use public API
+    if settings.reddit_rapidapi_key and settings.reddit_use_rapidapi:
+        subreddit_url = f"https://{settings.reddit_rapidapi_host}/r/{subreddit}/new?limit=25"
+        headers = {
+            "x-rapidapi-key": settings.reddit_rapidapi_key,
+            "x-rapidapi-host": settings.reddit_rapidapi_host,
+        }
+        logger.debug(f"_fetch_reddit_subreddit_json: fetching from RapidAPI: {subreddit_url}")
+        response = await client.get(subreddit_url, headers=headers, timeout=settings.http_timeout_seconds)
+        response.raise_for_status()
+        return response.json()
+    else:
+        reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
 
-    if reddit_api_base.startswith("http://"):  # Mock API
-        subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
-    else:  # Real Reddit API
-        subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
+        if reddit_api_base.startswith("http://"):  # Mock API
+            subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
+        else:  # Real Reddit API
+            subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
 
-    logger.debug(f"_fetch_reddit_subreddit_json: fetching {subreddit_url}")
-    response = await client.get(subreddit_url, timeout=settings.http_timeout_seconds)
-    response.raise_for_status()
-    return response.json()
+        logger.debug(f"_fetch_reddit_subreddit_json: fetching {subreddit_url}")
+        response = await client.get(subreddit_url, timeout=settings.http_timeout_seconds)
+        response.raise_for_status()
+        return response.json()
 
 
 async def _collect_account(

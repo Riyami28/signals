@@ -170,6 +170,11 @@ class Settings(BaseSettings):
     twitter_rapidapi_host: str = Field(default="twitter-api45.p.rapidapi.com")
     twitter_lookback_days: int = Field(default=7, ge=1, le=7)  # free tier = 7 days; Basic/Pro = up to 30
 
+    # --- Reddit signal collection (RapidAPI) ---
+    reddit_rapidapi_key: str = Field(default="")         # RapidAPI key for Reddit API
+    reddit_rapidapi_host: str = Field(default="reddit-api45.p.rapidapi.com")
+    reddit_use_rapidapi: bool = Field(default=False)     # Use RapidAPI instead of public API
+
     # --- G2 review intelligence ---
     g2_api_key: str = Field(default="")
     g2_api_base_url: str = Field(default="https://data.g2.com/api/v1")
