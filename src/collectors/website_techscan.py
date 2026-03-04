@@ -32,32 +32,59 @@ logger = logging.getLogger(__name__)
 # ─── Technology detection patterns ─────────────────────────────────────
 # Each pattern: (regex_or_string, tech_name, signal_code, confidence)
 
-# HTTP header patterns — ONLY real DevOps/infra signals, NOT generic hosting
+# HTTP header patterns — detect infra from response headers
 _HEADER_PATTERNS: list[tuple[str, str, str, float]] = [
-    # Intentionally empty — HTTP headers (nginx, apache, cloudflare, etc.)
-    # do NOT indicate buying intent. Every company uses some web server.
+    ("cloudfront", "AWS CloudFront", "cloud_infrastructure_detected", 0.65),
+    ("akamai", "Akamai CDN", "cloud_infrastructure_detected", 0.60),
+    ("cloudflare", "Cloudflare", "cloud_infrastructure_detected", 0.55),
+    ("x-vercel", "Vercel", "modern_stack_detected", 0.65),
+    ("netlify", "Netlify", "modern_stack_detected", 0.60),
+    ("envoy", "Envoy Proxy", "kubernetes_detected", 0.75),
+    ("istio", "Istio", "kubernetes_detected", 0.80),
 ]
 
 # Script/link patterns to detect from HTML source
-# ONLY patterns that indicate real DevOps/infra maturity or buying intent.
-# Removed: generic cloud hosting (AWS, Azure, GCP), frontend frameworks (React, Angular),
-# CMS (WordPress, Shopify), marketing tools (HubSpot, Marketo), tag managers, chat widgets.
-# These are noise — every company uses some combination of them.
 _HTML_TECH_PATTERNS: list[tuple[str, str, str, float]] = [
     # Kubernetes / container — strong DevOps signal
     (r"kubernetes|k8s\.io", "Kubernetes", "kubernetes_detected", 0.80),
     (r"docker\.com|docker\.io", "Docker", "kubernetes_detected", 0.55),
-    # IaC / GitOps — only real GitOps tools, NOT GitHub/GitLab links (every company has those)
+    # IaC / GitOps
     (r"terraform|hashicorp", "Terraform/HashiCorp", "terraform_detected", 0.75),
     (r"argocd|argo-cd|argoproj", "ArgoCD", "gitops_detected", 0.75),
     (r"fluxcd|flux-system", "FluxCD", "gitops_detected", 0.70),
     (r"jenkins", "Jenkins", "gitops_detected", 0.55),
-    # NOTE: monitoring tools are in _MONITORING_PATTERNS, NOT here.
-    # tooling_sprawl_detected requires 2+ monitoring tools on same site.
+    # Cloud providers — indicates cloud maturity
+    (r"amazonaws\.com|aws-sdk|aws\.amazon", "AWS", "cloud_infrastructure_detected", 0.65),
+    (r"azure\.com|microsoft\.com/azure|msecnd\.net", "Azure", "cloud_infrastructure_detected", 0.65),
+    (r"googleapis\.com|gstatic\.com|google-analytics", "Google Cloud/GCP", "cloud_infrastructure_detected", 0.55),
+    # Frontend frameworks — indicates engineering maturity
+    (r"react|reactjs|react-dom|_next/static|__next", "React/Next.js", "modern_stack_detected", 0.55),
+    (r"angular|ng-version", "Angular", "modern_stack_detected", 0.50),
+    (r"vue\.js|vuejs|__vue", "Vue.js", "modern_stack_detected", 0.50),
+    # SaaS / enterprise tools — indicates tech spend
+    (r"salesforce\.com|force\.com|pardot", "Salesforce", "enterprise_saas_detected", 0.70),
+    (r"hubspot\.com|hs-scripts|hbspt", "HubSpot", "enterprise_saas_detected", 0.55),
+    (r"marketo\.net|munchkin", "Marketo", "enterprise_saas_detected", 0.60),
+    (r"segment\.com|segment\.io|analytics\.js", "Segment", "data_platform_detected", 0.70),
+    (r"amplitude\.com", "Amplitude", "data_platform_detected", 0.60),
+    (r"mixpanel\.com", "Mixpanel", "data_platform_detected", 0.55),
+    (r"snowplow|snowflake", "Snowplow/Snowflake", "data_platform_detected", 0.65),
+    (r"intercom\.io|intercomcdn", "Intercom", "enterprise_saas_detected", 0.50),
+    (r"zendesk\.com|zdassets", "Zendesk", "enterprise_saas_detected", 0.50),
+    (r"stripe\.com|js\.stripe", "Stripe", "enterprise_saas_detected", 0.55),
+    # Auth / security — indicates security posture
+    (r"okta\.com|oktacdn", "Okta", "enterprise_saas_detected", 0.70),
+    (r"auth0\.com", "Auth0", "enterprise_saas_detected", 0.65),
+    (r"onelogin", "OneLogin", "enterprise_saas_detected", 0.60),
 ]
 
-# Meta generator patterns — CMS detection is NOT a buying signal, disabled.
-_META_GENERATOR_PATTERNS: list[tuple[str, str, str, float]] = []
+# Meta generator patterns
+_META_GENERATOR_PATTERNS: list[tuple[str, str, str, float]] = [
+    (r"wordpress", "WordPress", "modern_stack_detected", 0.35),
+    (r"shopify", "Shopify", "enterprise_saas_detected", 0.50),
+    (r"drupal", "Drupal", "modern_stack_detected", 0.40),
+    (r"next\.js", "Next.js", "modern_stack_detected", 0.60),
+]
 
 # Monitoring tools — only emit tooling_sprawl_detected if 2+ found on same site.
 # A single monitoring tool is normal; sprawl means overlapping tools.
