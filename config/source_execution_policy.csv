@@ -21,3 +21,4 @@ gnews,3,1.0,15,2,2,80,false
 github_stargazers,5,2.0,15,2,2,50,true
 twitter_api,1,0.067,20,2,15,10,true
 serper_twitter,6,3.0,15,2,2,50,true
+reddit_official,4,0.5,20,2,5,50,true
