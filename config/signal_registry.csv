@@ -50,3 +50,4 @@ recent_funding_event,shared,firmographic,12,60,0.65,true,firmographic
 employee_growth_positive,shared,firmographic,10,45,0.6,true,firmographic
 employee_count_in_range,shared,firmographic,8,90,0.7,true,firmographic
 repo_starred,shared,pql,12,30,0.5,true,engagement_pql
+community_mention,shared,behavioral,6,14,0.3,true,trigger_intent

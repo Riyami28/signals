@@ -103,6 +103,15 @@ community,poc_stage_progression,procurement opened,0.88
 community,poc_stage_progression,legal review opened,0.88
 community,vendor_consolidation_program,tool consolidation,0.75
 community,vendor_consolidation_program,single control plane,0.8
+community,vendor_consolidation_program,vendor consolidation,0.82
+community,supply_chain_platform_rollout,supply chain platform,0.74
+community,supply_chain_platform_rollout,supply chain,0.55
+community,cost_reduction_mandate,cost optimization,0.62
+community,kubernetes_detected,kubernetes,0.7
+community,kubernetes_detected,eks,0.7
+community,terraform_detected,terraform,0.7
+community,infrastructure_modernization,infrastructure modernization,0.8
+community,infrastructure_modernization,iac,0.75
 news,enterprise_modernization_program,digital transformation,0.55
 news,enterprise_modernization_program,digital strategy,0.6
 news,enterprise_modernization_program,technology modernization,0.65
