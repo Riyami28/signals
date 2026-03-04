@@ -54,9 +54,9 @@ def _build_observation(
     """Transforms a Reddit post into a standard SignalObservation."""
     payload = post.model_dump()
     raw_hash = stable_hash(payload, prefix="raw")
-    
+
     observed_at = datetime.fromtimestamp(post.created_utc, tz=timezone.utc).isoformat()
-    
+
     obs_id = stable_hash(
         {
             "account_id": account_id,
@@ -67,7 +67,7 @@ def _build_observation(
         },
         prefix="obs",
     )
-    
+
     return SignalObservation(
         obs_id=obs_id,
         account_id=account_id,
@@ -329,9 +329,9 @@ async def _collect_account(
 
         db.record_crawl_attempt(conn, source=source_name, account_id=account_id, endpoint=endpoint, status="success", error_summary="")
         db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=endpoint, commit=False)
-        
+
         return inserted, seen, 1
-        
+
     except Exception as exc:
         logger.error(f"reddit_collector account #{account_index}: exception during collection: {type(exc).__name__}: {exc}")
         import traceback
