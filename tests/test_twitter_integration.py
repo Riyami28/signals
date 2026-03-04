@@ -33,9 +33,7 @@ def _make_twitter241_response(tweets: list[dict]) -> dict:
     """Build a minimal twitter241 search-v3 GraphQL response."""
     entries = []
     for t in tweets:
-        created_at_ms = int(
-            datetime.fromisoformat(t["created_at"].replace("Z", "+00:00")).timestamp() * 1000
-        )
+        created_at_ms = int(datetime.fromisoformat(t["created_at"].replace("Z", "+00:00")).timestamp() * 1000)
         entries.append(
             {
                 "__typename": "TimelineTimelineEntry",
@@ -95,9 +93,13 @@ def _make_settings(tmp_path: Path, enable_live: bool = False) -> Settings:
 
 
 def _get_conn():
-    return db.get_connection(
-        "postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test"
+    import os
+
+    dsn = os.getenv(
+        "SIGNALS_TEST_PG_DSN",
+        "postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test",
     )
+    return db.get_connection(dsn)
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +111,7 @@ class TestParseRapidapiTweetsIntegration:
     def test_parses_twitter241_graphql_shape(self):
         tweets_in = [
             {"id": "111", "text": "kubernetes is amazing", "created_at": "2026-03-01T10:00:00Z"},
-            {"id": "222", "text": "terraform devops rocks",  "created_at": "2026-03-02T11:00:00Z"},
+            {"id": "222", "text": "terraform devops rocks", "created_at": "2026-03-02T11:00:00Z"},
         ]
         data = _make_twitter241_response(tweets_in)
         result = _parse_rapidapi_tweets(data)
@@ -198,7 +200,13 @@ class TestIngestTweetsIntegration:
             {"signal_code": "kubernetes_detected", "keyword": "kubernetes", "confidence": "0.7"},
             {"signal_code": "terraform_detected", "keyword": "terraform", "confidence": "0.7"},
         ]
-        tweets = [{"id": "tweet_multi", "text": "using kubernetes and terraform together", "created_at": "2026-03-01T10:00:00Z"}]
+        tweets = [
+            {
+                "id": "tweet_multi",
+                "text": "using kubernetes and terraform together",
+                "created_at": "2026-03-01T10:00:00Z",
+            }
+        ]
 
         inserted, seen = _ingest_tweets(conn, account_id, "twitter_api", 0.75, lexicon, tweets, {})
         conn.commit()
@@ -245,9 +253,7 @@ class TestCollectCsvPhaseIntegration:
 
         settings = _make_settings(tmp_path, enable_live=False)
         conn = _get_conn()
-        lexicon = {
-            "twitter": [{"signal_code": "kubernetes_detected", "keyword": "kubernetes", "confidence": "0.7"}]
-        }
+        lexicon = {"twitter": [{"signal_code": "kubernetes_detected", "keyword": "kubernetes", "confidence": "0.7"}]}
         source_reliability = {"twitter_csv": 0.70}
 
         result = await collect(conn, settings, lexicon, source_reliability)
@@ -335,9 +341,7 @@ class TestCollectLivePhaseIntegration:
         """collect() with live crawl enabled → mocked API → observations in DB."""
         raw_dir = tmp_path / "data" / "raw"
         raw_dir.mkdir(parents=True)
-        (raw_dir / "twitter.csv").write_text(
-            "domain,company_name,url,text,signal_code,confidence,observed_at\n"
-        )
+        (raw_dir / "twitter.csv").write_text("domain,company_name,url,text,signal_code,confidence,observed_at\n")
 
         settings = _make_settings(tmp_path, enable_live=True)
 
@@ -346,16 +350,16 @@ class TestCollectLivePhaseIntegration:
         db.upsert_account(conn, company_name="Stripe", domain="stripe.com", source_type="seed", commit=True)
 
         # Build a fake API response
-        api_response = _make_twitter241_response([
-            {"id": "live_001", "text": "stripe uses kubernetes extensively", "created_at": "2026-03-03T09:00:00Z"},
-        ])
+        api_response = _make_twitter241_response(
+            [
+                {"id": "live_001", "text": "stripe uses kubernetes extensively", "created_at": "2026-03-03T09:00:00Z"},
+            ]
+        )
 
         def _mock_transport(request):
             return httpx.Response(200, json=api_response)
 
-        lexicon = {
-            "twitter": [{"signal_code": "kubernetes_detected", "keyword": "kubernetes", "confidence": "0.7"}]
-        }
+        lexicon = {"twitter": [{"signal_code": "kubernetes_detected", "keyword": "kubernetes", "confidence": "0.7"}]}
         source_reliability = {"twitter_csv": 0.70, "twitter_api": 0.75}
 
         with patch("httpx.AsyncClient") as mock_client_cls:
@@ -375,8 +379,7 @@ class TestCollectLivePhaseIntegration:
 
         assert result["inserted"] >= 1
         row = conn.execute(
-            "SELECT signal_code, source FROM signal_observations "
-            "WHERE source = 'twitter_api' LIMIT 1"
+            "SELECT signal_code, source FROM signal_observations WHERE source = 'twitter_api' LIMIT 1"
         ).fetchone()
         conn.close()
         assert row is not None
@@ -387,9 +390,7 @@ class TestCollectLivePhaseIntegration:
         """429 from API → crawl attempt recorded, no crash."""
         raw_dir = tmp_path / "data" / "raw"
         raw_dir.mkdir(parents=True)
-        (raw_dir / "twitter.csv").write_text(
-            "domain,company_name,url,text,signal_code,confidence,observed_at\n"
-        )
+        (raw_dir / "twitter.csv").write_text("domain,company_name,url,text,signal_code,confidence,observed_at\n")
         settings = _make_settings(tmp_path, enable_live=True)
 
         conn = _get_conn()
@@ -421,9 +422,7 @@ class TestCollectLivePhaseIntegration:
 
         raw_dir = tmp_path / "data" / "raw"
         raw_dir.mkdir(parents=True)
-        (raw_dir / "twitter.csv").write_text(
-            "domain,company_name,url,text,signal_code,confidence,observed_at\n"
-        )
+        (raw_dir / "twitter.csv").write_text("domain,company_name,url,text,signal_code,confidence,observed_at\n")
         settings = Settings(
             project_root=tmp_path,
             enable_live_crawl=True,

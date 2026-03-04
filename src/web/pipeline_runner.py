@@ -155,9 +155,21 @@ def _run_pipeline_sync(
                 serper_twitter_enabled = _collector_enabled("serper_twitter") and settings.serper_api_key
                 reddit_enabled = _collector_enabled("reddit_api")
                 reddit_official_enabled = _collector_enabled("reddit_official")
-                twitter_live_enabled = _collector_enabled("twitter_api") and (getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", ""))
+                twitter_live_enabled = _collector_enabled("twitter_api") and (
+                    getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", "")
+                )
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled or serper_twitter_enabled or reddit_enabled or reddit_official_enabled or twitter_live_enabled
+                any_external = (
+                    serper_news_enabled
+                    or serper_jobs_enabled
+                    or techscan_enabled
+                    or gnews_enabled
+                    or stargazer_enabled
+                    or serper_twitter_enabled
+                    or reddit_enabled
+                    or reddit_official_enabled
+                    or twitter_live_enabled
+                )
 
                 if any_external:
                     active_sources = []

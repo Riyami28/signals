@@ -32,6 +32,7 @@ def _is_stale_posting(title: str, snippet: str) -> bool:
             return True
     return False
 
+
 # Job-specific search suffixes to find relevant engineering roles
 _JOB_SEARCH_SUFFIXES = [
     "devops OR SRE OR platform engineer OR cloud engineer OR kubernetes",

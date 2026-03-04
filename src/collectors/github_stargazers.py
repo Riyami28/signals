@@ -82,9 +82,18 @@ def _extract_company_domain(user: dict) -> tuple[str, str]:
         email_domain = email.split("@", 1)[1].lower()
         # Skip generic email providers
         generic = {
-            "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
-            "protonmail.com", "icloud.com", "mail.com", "aol.com",
-            "live.com", "yandex.com", "qq.com", "163.com",
+            "gmail.com",
+            "yahoo.com",
+            "hotmail.com",
+            "outlook.com",
+            "protonmail.com",
+            "icloud.com",
+            "mail.com",
+            "aol.com",
+            "live.com",
+            "yandex.com",
+            "qq.com",
+            "163.com",
         }
         if email_domain in generic:
             email_domain = ""
@@ -134,7 +143,8 @@ async def _fetch_stargazers(
         except httpx.HTTPStatusError as exc:
             logger.warning(
                 "github_stargazers_http_error repo=%s status=%s",
-                repo, exc.response.status_code,
+                repo,
+                exc.response.status_code,
             )
             break
         except Exception as exc:
@@ -282,9 +292,7 @@ async def collect(
                     if not company and not email_domain:
                         return 0, 0, 0  # Can't match without company info
 
-                    account_id = _match_user_to_account(
-                        company, email_domain, domain_to_account, name_to_account
-                    )
+                    account_id = _match_user_to_account(company, email_domain, domain_to_account, name_to_account)
                     if not account_id:
                         return 0, 1, 0  # Seen but not matched
 
@@ -332,8 +340,11 @@ async def collect(
                 commit=False,
             )
             db.mark_crawled(
-                conn, source=source_name, account_id="__global__",
-                endpoint=endpoint, commit=False,
+                conn,
+                source=source_name,
+                account_id="__global__",
+                endpoint=endpoint,
+                commit=False,
             )
 
     conn.commit()
@@ -341,7 +352,11 @@ async def collect(
     dt = time.monotonic() - t0
     logger.info(
         "github_stargazers done repos=%d stargazers_seen=%d matched=%d inserted=%d duration=%.1fs",
-        len(repos), total_seen, matched_users, total_inserted, dt,
+        len(repos),
+        total_seen,
+        matched_users,
+        total_inserted,
+        dt,
     )
 
     return {

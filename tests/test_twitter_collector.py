@@ -11,10 +11,13 @@ import pytest
 # Override the global autouse postgres fixture — these are pure unit tests with no DB.
 @pytest.fixture(autouse=True)
 def postgres_test_isolation(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv(
-        "SIGNALS_PG_DSN",
+    import os
+
+    test_dsn = os.getenv(
+        "SIGNALS_TEST_PG_DSN",
         "postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test",
     )
+    monkeypatch.setenv("SIGNALS_PG_DSN", test_dsn)
     yield
 
 
@@ -228,7 +231,7 @@ class TestCollectFunction:
             lexicon_by_source={},
             source_reliability={},
         )
-        assert result == {"inserted": 0, "seen": 0}
+        assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     @pytest.mark.asyncio
     async def test_collect_live_skipped_without_bearer_token(self, tmp_path, caplog):
@@ -254,5 +257,5 @@ class TestCollectFunction:
                 source_reliability={},
             )
 
-        assert result == {"inserted": 0, "seen": 0}
+        assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
         assert any("no_api_key" in r.message for r in caplog.records)

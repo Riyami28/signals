@@ -36,16 +36,17 @@ def load_twitter_handles(path) -> dict[str, str]:
             handles[domain] = handle
     return handles
 
+
 TWITTER_OFFICIAL_SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent"
 DEFAULT_TWITTER_TERMS = (
-    "(hiring OR \"we're hiring\" OR devops OR kubernetes OR terraform OR finops "
-    "OR \"cloud cost\" OR \"cloud migration\" OR \"digital transformation\" "
-    "OR compliance OR soc2 OR \"cost reduction\" OR \"cost optimization\" "
-    "OR \"funding round\" OR \"series a\" OR \"series b\" "
-    "OR \"product launch\" OR \"supply chain\" OR \"vendor consolidation\" "
-    "OR \"security audit\" OR outage OR ERP OR SAP "
-    "OR \"platform engineering\" OR \"tool consolidation\" "
-    "OR \"growing team\" OR modernization) -is:retweet lang:en"
+    '(hiring OR "we\'re hiring" OR devops OR kubernetes OR terraform OR finops '
+    'OR "cloud cost" OR "cloud migration" OR "digital transformation" '
+    'OR compliance OR soc2 OR "cost reduction" OR "cost optimization" '
+    'OR "funding round" OR "series a" OR "series b" '
+    'OR "product launch" OR "supply chain" OR "vendor consolidation" '
+    'OR "security audit" OR outage OR ERP OR SAP '
+    'OR "platform engineering" OR "tool consolidation" '
+    'OR "growing team" OR modernization) -is:retweet lang:en'
 )
 _LIVE_PROGRESS_COMMIT_EVERY = 25
 _VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -70,16 +71,15 @@ def _twitter_search_query_url(query: str, lookback_days: int, max_results: int =
     return f"{TWITTER_OFFICIAL_SEARCH_URL}?{params}"
 
 
-def _rapidapi_search_url(
-    host: str, query: str, count: int = 20, from_handle: str = "", since_id: str = ""
-) -> str:
+def _rapidapi_search_url(host: str, query: str, count: int = 20, from_handle: str = "", since_id: str = "") -> str:
     """Build URL for RapidAPI Twttr API (twitter241 / search-v3 endpoint).
 
     If from_handle is provided, searches tweets FROM that specific Twitter handle.
     If since_id is provided, only returns tweets newer than that tweet ID (incremental fetch).
     """
     if from_handle:
-        search_query = f"from:{from_handle} ({query})"
+        bare_handle = from_handle.lstrip("@")  # Twitter from: operator requires no @ prefix
+        search_query = f"from:{bare_handle} ({query})"
     else:
         search_query = query
 
@@ -106,12 +106,7 @@ def _parse_rapidapi_tweets(data: dict[str, Any]) -> list[dict[str, Any]]:
 
     # twitter241 search-v3: GraphQL nested shape
     try:
-        instructions = (
-            data.get("result", {})
-            .get("timeline_response", {})
-            .get("timeline", {})
-            .get("instructions", [])
-        )
+        instructions = data.get("result", {}).get("timeline_response", {}).get("timeline", {}).get("instructions", [])
         if instructions:
             for instruction in instructions:
                 for entry in instruction.get("entries", []):
@@ -122,16 +117,26 @@ def _parse_rapidapi_tweets(data: dict[str, Any]) -> list[dict[str, Any]]:
                     if inner.get("__typename") != "TimelineTweet":
                         continue
                     result = inner.get("tweet_results", {}).get("result", {})
-                    details = result.get("details", {})
+                    # API may use 'details' (twitter241 custom) or 'legacy' (standard GraphQL)
+                    details = result.get("details") or result.get("legacy") or {}
                     text = str(details.get("full_text") or details.get("text") or "").strip()
                     tweet_id = str(result.get("rest_id") or "")
                     created_at_ms = details.get("created_at_ms")
                     if created_at_ms:
-                        created_at = datetime.fromtimestamp(
-                            int(created_at_ms) / 1000, tz=timezone.utc
-                        ).isoformat()
+                        created_at = datetime.fromtimestamp(int(created_at_ms) / 1000, tz=timezone.utc).isoformat()
                     else:
-                        created_at = ""
+                        # Standard Twitter date string: "Mon Mar 04 12:00:00 +0000 2026"
+                        created_at_str = details.get("created_at", "")
+                        try:
+                            created_at = (
+                                datetime.strptime(created_at_str, "%a %b %d %H:%M:%S +0000 %Y")
+                                .replace(tzinfo=timezone.utc)
+                                .isoformat()
+                                if created_at_str
+                                else ""
+                            )
+                        except Exception:
+                            created_at = created_at_str
                     if text:
                         tweets.append({"id": tweet_id, "text": text, "created_at": created_at})
             return tweets
@@ -244,12 +249,7 @@ def _extract_handle_from_response(data: dict, company_name: str, domain: str) ->
     closely matches the company name or domain. Returns '@handle' or ''.
     """
     try:
-        instructions = (
-            data.get("result", {})
-            .get("timeline_response", {})
-            .get("timeline", {})
-            .get("instructions", [])
-        )
+        instructions = data.get("result", {}).get("timeline_response", {}).get("timeline", {}).get("instructions", [])
         company_lower = company_name.lower().replace(" ", "").replace("-", "").replace(".", "")
         domain_root = domain.split(".")[0].replace("-", "").lower()
 
@@ -276,9 +276,14 @@ def _extract_handle_from_response(data: dict, company_name: str, domain: str) ->
                 dn_lower = display_name.lower().replace(" ", "").replace("-", "")
 
                 # Match if screen name or display name contains company name / domain root
-                if (company_lower in sn_lower or sn_lower in company_lower or
-                        domain_root in sn_lower or sn_lower in domain_root or
-                        company_lower in dn_lower or dn_lower in company_lower):
+                if (
+                    company_lower in sn_lower
+                    or sn_lower in company_lower
+                    or domain_root in sn_lower
+                    or sn_lower in domain_root
+                    or company_lower in dn_lower
+                    or dn_lower in company_lower
+                ):
                     return f"@{screen_name}"
     except Exception as exc:
         logger.debug("handle_autodiscovery_failed company=%s error=%s", company_name, exc)
@@ -324,6 +329,8 @@ async def _collect_live_twitter_account(
 
     # Check CSV/cache for known official Twitter handle
     official_handle = twitter_handles.get(domain, "").strip()
+    # Twitter from: operator requires handle WITHOUT @ (e.g. from:netflix not from:@netflix)
+    handle_bare = official_handle.lstrip("@")
 
     search_keywords = DEFAULT_TWITTER_TERMS
 
@@ -336,7 +343,7 @@ async def _collect_live_twitter_account(
     if use_rapidapi:
         if official_handle:
             # ✓ Known handle → get ALL tweets from official account, let lexicon classify
-            query = f"from:{official_handle} -is:retweet lang:en"
+            query = f"from:{handle_bare} -is:retweet lang:en"
         else:
             # No known handle → search company name + domain WITH signal keywords
             query = f'("{company_name}" OR "{domain}") {search_keywords}'
@@ -348,7 +355,7 @@ async def _collect_live_twitter_account(
 
         if official_handle:
             search_url = _rapidapi_search_url(
-                rapidapi_host, "-is:retweet lang:en", from_handle=official_handle, since_id=since_id
+                rapidapi_host, "-is:retweet lang:en", from_handle=handle_bare, since_id=since_id
             )
         else:
             search_url = _rapidapi_search_url(rapidapi_host, query, since_id=since_id)
@@ -356,7 +363,7 @@ async def _collect_live_twitter_account(
     else:
         if official_handle:
             # ✓ Known handle → get ALL tweets, lexicon will classify
-            full_query = f"from:{official_handle} -is:retweet lang:en"
+            full_query = f"from:{handle_bare} -is:retweet lang:en"
         else:
             full_query = f'("{company_name}" OR "{domain}") {search_keywords}'
 
@@ -450,13 +457,8 @@ async def _collect_live_twitter_account(
         discovered = _extract_handle_from_response(data, company_name, domain)
         if discovered:
             twitter_handles[domain] = discovered  # Cache in memory for this run
-            logger.info(
-                "twitter_handle_autodiscovered domain=%s handle=%s", domain, discovered
-            )
-            _save_handle_to_csv(
-                domain, discovered,
-                settings.project_root / "config" / "company_twitter_handles.csv"
-            )
+            logger.info("twitter_handle_autodiscovered domain=%s handle=%s", domain, discovered)
+            _save_handle_to_csv(domain, discovered, settings.project_root / "config" / "company_twitter_handles.csv")
 
     inserted_delta, seen_delta = _ingest_tweets(
         conn=conn,
@@ -501,16 +503,14 @@ async def _collect_live_twitter_async(
         return 0, 0
 
     # Load source-specific execution policy (twitter_api = 1 worker, 0.067 req/sec)
-    source_policies = load_source_execution_policy(
-        settings.project_root / "config" / "source_execution_policy.csv"
-    )
+    source_policies = load_source_execution_policy(settings.project_root / "config" / "source_execution_policy.csv")
     twitter_policy = source_policies.get(api_source)
     if twitter_policy:
         policy_workers = twitter_policy.max_parallel_workers
         req_delay = 1.0 / twitter_policy.requests_per_second if twitter_policy.requests_per_second > 0 else 15.0
     else:
         policy_workers = 1  # Default: always sequential for Twitter to respect rate limits
-        req_delay = 15.0    # 15 seconds between requests = 4 per minute = safe for free tier
+        req_delay = 15.0  # 15 seconds between requests = 4 per minute = safe for free tier
 
     concurrency = min(max(1, policy_workers), len(accounts))
     semaphore = asyncio.Semaphore(concurrency)
@@ -519,7 +519,9 @@ async def _collect_live_twitter_async(
     failed_workers = 0
     logger.info(
         "twitter_async_config concurrency=%d req_delay_secs=%.1f accounts=%d",
-        concurrency, req_delay, len(accounts),
+        concurrency,
+        req_delay,
+        len(accounts),
     )
 
     # Rate-limit flag: once we hit 429, stop all remaining workers
@@ -559,10 +561,7 @@ async def _collect_live_twitter_async(
                 except httpx.HTTPStatusError as exc:
                     if exc.response is not None and exc.response.status_code == 429:
                         rate_limited.set()
-                        logger.warning(
-                            "twitter_rate_limit_global quota_exhausted=true "
-                            "stopping all remaining workers"
-                        )
+                        logger.warning("twitter_rate_limit_global quota_exhausted=true stopping all remaining workers")
                         return 0, 0, 0
                     return 0, 0, 1
 
@@ -661,7 +660,7 @@ async def collect(
 
         if api_reliability <= 0:
             conn.commit()
-            return {"inserted": inserted, "seen": seen}
+            return {"inserted": inserted, "seen": seen, "accounts_processed": accounts_processed}
 
         backend = "rapidapi" if rapidapi_key else "official"
         if account_ids:
@@ -688,7 +687,9 @@ async def collect(
 
         logger.info(
             "twitter_live_plan total=%d with_official_handle=%d using_fallback_search=%d",
-            len(accounts), len(accounts_with_handles), len(accounts_fallback),
+            len(accounts),
+            len(accounts_with_handles),
+            len(accounts_fallback),
         )
         # ✓ ALL companies get searched — handles → official tweets, others → company mentions with keywords
         _emit_progress(
