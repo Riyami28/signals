@@ -35,12 +35,12 @@ SOURCE_NAME = "serper_twitter"
 # Broad signal terms covering all high-value signal categories
 _TWITTER_SIGNAL_TERMS = (
     "hiring OR devops OR kubernetes OR terraform OR finops "
-    "OR \"cloud cost\" OR \"cloud migration\" OR \"digital transformation\" "
-    "OR compliance OR soc2 OR \"cost reduction\" OR \"cost optimization\" "
-    "OR \"funding round\" OR \"series a\" OR \"series b\" "
-    "OR \"product launch\" OR \"supply chain\" OR \"vendor consolidation\" "
-    "OR \"security audit\" OR outage OR ERP OR SAP "
-    "OR \"platform engineering\" OR modernization"
+    'OR "cloud cost" OR "cloud migration" OR "digital transformation" '
+    'OR compliance OR soc2 OR "cost reduction" OR "cost optimization" '
+    'OR "funding round" OR "series a" OR "series b" '
+    'OR "product launch" OR "supply chain" OR "vendor consolidation" '
+    'OR "security audit" OR outage OR ERP OR SAP '
+    'OR "platform engineering" OR modernization'
 )
 
 
@@ -127,9 +127,9 @@ async def _fetch_serper_twitter(
         # Return only results from twitter.com or x.com
         organic = data.get("organic", [])
         return [
-            r for r in organic
-            if "twitter.com" in str(r.get("link", "")).lower()
-            or "x.com" in str(r.get("link", "")).lower()
+            r
+            for r in organic
+            if "twitter.com" in str(r.get("link", "")).lower() or "x.com" in str(r.get("link", "")).lower()
         ]
     except httpx.HTTPStatusError as exc:
         logger.warning(
@@ -166,9 +166,7 @@ async def _collect_one_account(
         return 0, 0
 
     # Build search query — site-restrict to Twitter/X AND include signal keywords
-    query = (
-        f'(site:twitter.com OR site:x.com) "{company_name}" ({_TWITTER_SIGNAL_TERMS})'
-    )
+    query = f'(site:twitter.com OR site:x.com) "{company_name}" ({_TWITTER_SIGNAL_TERMS})'
 
     results = await _fetch_serper_twitter(client, query, api_key, num_results, lookback_days=lookback_days)
 

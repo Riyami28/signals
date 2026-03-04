@@ -95,9 +95,7 @@ def _build_observation(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True,
 )
-async def _fetch_reddit_search_json(
-    query: str, settings: Settings
-) -> dict[str, Any]:
+async def _fetch_reddit_search_json(query: str, settings: Settings) -> dict[str, Any]:
     """Fetches search results from Reddit JSON API with retries."""
     # Support mock API for development (use SIGNALS_REDDIT_API_BASE_URL env var)
     reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
@@ -126,9 +124,7 @@ async def _fetch_reddit_search_json(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True,
 )
-async def _fetch_reddit_subreddit_json(
-    subreddit: str, settings: Settings
-) -> dict[str, Any]:
+async def _fetch_reddit_subreddit_json(subreddit: str, settings: Settings) -> dict[str, Any]:
     """Fetches recent posts from a specific subreddit."""
     reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
 
@@ -453,7 +449,7 @@ async def collect(
 
     logger.info(
         f"reddit_collector.collect() starting: enable_live_crawl={settings.enable_live_crawl}, "
-            f"source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
+        f"source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
     )
 
     if not settings.enable_live_crawl:

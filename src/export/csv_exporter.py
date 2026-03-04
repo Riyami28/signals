@@ -578,20 +578,31 @@ def export_twitter_signals(conn, output_path: Path) -> int:
     # Create export data
     export_rows = []
     for row in rows:
-        conf_val = float(row.get('confidence', 0) or 0)
-        export_rows.append({
-            'domain': row.get('domain', ''),
-            'company_name': row.get('company_name', ''),
-            'signal_code': row.get('signal_code', ''),
-            'source': row.get('source', ''),
-            'confidence': f"{conf_val:.2f}",
-            'evidence_text': row.get('evidence_text', '') or '',
-            'evidence_url': row.get('evidence_url', '') or '',
-            'observed_at': row.get('observed_at', '') or '',
-        })
+        conf_val = float(row.get("confidence", 0) or 0)
+        export_rows.append(
+            {
+                "domain": row.get("domain", ""),
+                "company_name": row.get("company_name", ""),
+                "signal_code": row.get("signal_code", ""),
+                "source": row.get("source", ""),
+                "confidence": f"{conf_val:.2f}",
+                "evidence_text": row.get("evidence_text", "") or "",
+                "evidence_url": row.get("evidence_url", "") or "",
+                "observed_at": row.get("observed_at", "") or "",
+            }
+        )
 
     # Write to CSV
-    fieldnames = ['domain', 'company_name', 'signal_code', 'source', 'confidence', 'evidence_text', 'evidence_url', 'observed_at']
+    fieldnames = [
+        "domain",
+        "company_name",
+        "signal_code",
+        "source",
+        "confidence",
+        "evidence_text",
+        "evidence_url",
+        "observed_at",
+    ]
     write_csv_rows(output_path, export_rows, fieldnames=fieldnames)
 
     # Log summary with details
@@ -602,13 +613,13 @@ def export_twitter_signals(conn, output_path: Path) -> int:
 
     current_domain = None
     for row in rows:
-        domain = row.get('domain', '')
-        company = row.get('company_name', '')
-        signal_code = row.get('signal_code', '')
-        source = row.get('source', '')
-        confidence = row.get('confidence', 0)
-        text = row.get('evidence_text', '')
-        url = row.get('evidence_url', '')
+        domain = row.get("domain", "")
+        company = row.get("company_name", "")
+        signal_code = row.get("signal_code", "")
+        source = row.get("source", "")
+        confidence = row.get("confidence", 0)
+        text = row.get("evidence_text", "")
+        url = row.get("evidence_url", "")
 
         if domain != current_domain:
             current_domain = domain
