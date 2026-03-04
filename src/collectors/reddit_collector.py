@@ -22,6 +22,9 @@ from src.utils import (
     utc_now_iso,
 )
 
+# Time window: only collect posts from last 14 days
+REDDIT_DATA_WINDOW_DAYS = 14
+
 logger = logging.getLogger(__name__)
 
 # Reddit requires a specific User-Agent to avoid being blocked
@@ -264,6 +267,17 @@ async def _collect_account(
                     score=int(item.get("score", 0)),
                     num_comments=int(item.get("num_comments", 0)),
                 )
+
+                # Filter: only collect posts from last 14 days
+                from datetime import datetime, timedelta, timezone
+
+                now = datetime.now(timezone.utc)
+                post_age_days = (now - datetime.fromtimestamp(post.created_utc, tz=timezone.utc)).days
+                if post_age_days > REDDIT_DATA_WINDOW_DAYS:
+                    logger.debug(
+                        f"reddit_collector account #{account_index}: skipping old post (age={post_age_days} days, threshold={REDDIT_DATA_WINDOW_DAYS})"
+                    )
+                    continue
 
                 text_to_classify = f"{post.title}\n{post.selftext}".strip()
                 matches = classify_text(text_to_classify, lexicon_rows)
