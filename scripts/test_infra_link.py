@@ -19,21 +19,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-# Add project root to path
+# Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src import db
-from src.models import Account, SignalObservation
-from src.settings import Settings
-from src.utils import stable_hash, utc_now_iso
+# noqa: E402 - imports after path manipulation necessary for script execution
+from src import db  # noqa: E402
+from src.models import Account, SignalObservation  # noqa: E402
+from src.settings import Settings  # noqa: E402
+from src.utils import stable_hash, utc_now_iso  # noqa: E402
 
 
 def print_header():
     """Print test header."""
-    print("\n" + "╔" + "="*42 + "╗")
-    print("║" + " "*10 + "Infrastructure Connectivity Test" + " "*1 + "║")
-    print("╚" + "="*42 + "╝\n")
+    print("\n" + "╔" + "=" * 42 + "╗")
+    print("║" + " " * 10 + "Infrastructure Connectivity Test" + " " * 1 + "║")
+    print("╚" + "=" * 42 + "╝\n")
 
 
 def print_check(num, title):
@@ -97,7 +98,7 @@ def test_postgres():
         cur = conn.execute("SELECT version();")
         version_row = cur.fetchone()
         if version_row:
-            version = version_row.get('version') if isinstance(version_row, dict) else version_row[0]
+            version = version_row.get("version") if isinstance(version_row, dict) else version_row[0]
             if "PostgreSQL 16" in version:
                 print_pass("Connected to PostgreSQL 16")
             else:
@@ -110,7 +111,7 @@ def test_postgres():
         cur = conn.execute("SELECT current_schema;")
         schema_row = cur.fetchone()
         if schema_row:
-            schema = schema_row.get('current_schema') if isinstance(schema_row, dict) else schema_row[0]
+            schema = schema_row.get("current_schema") if isinstance(schema_row, dict) else schema_row[0]
             if schema == "signals":
                 print_pass("Default schema: signals")
             else:
@@ -126,11 +127,7 @@ def test_postgres():
 
         try:
             account_id = db.upsert_account(
-                conn,
-                test_domain,
-                "Test Company for Signal Verification",
-                "seed",
-                commit=True
+                conn, test_domain, "Test Company for Signal Verification", "seed", commit=True
             )
             print_pass(f"Inserted test account: {test_domain}")
         except Exception as e:
@@ -148,7 +145,7 @@ def test_postgres():
             source_reliability=0.8,
             evidence_url="https://example.com/test",
             evidence_text="Test observation from connectivity check",
-            raw_payload_hash=stable_hash({"test": "payload"}, prefix="raw")
+            raw_payload_hash=stable_hash({"test": "payload"}, prefix="raw"),
         )
 
         try:
@@ -161,13 +158,10 @@ def test_postgres():
             print_warn(f"Observation insert failed: {e}")
 
         # Query back
-        cur = conn.execute(
-            "SELECT COUNT(*) as cnt FROM signal_observations WHERE signal_code = %s",
-            ("test_signal",)
-        )
+        cur = conn.execute("SELECT COUNT(*) as cnt FROM signal_observations WHERE signal_code = %s", ("test_signal",))
         count_row = cur.fetchone()
         if count_row:
-            count = count_row.get('cnt') if isinstance(count_row, dict) else count_row[0]
+            count = count_row.get("cnt") if isinstance(count_row, dict) else count_row[0]
             print_pass(f"Query returned {count} row(s)")
         else:
             print_fail("Could not query signal_observations")
@@ -187,12 +181,7 @@ def test_redis():
     try:
         import redis
 
-        r = redis.Redis(
-            host="127.0.0.1",
-            port=6379,
-            decode_responses=True,
-            socket_connect_timeout=5
-        )
+        r = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True, socket_connect_timeout=5)
 
         pong = r.ping()
         if pong:
@@ -290,18 +279,18 @@ async def main():
     results.append(("HTTP", await test_httpx()))
 
     # Summary
-    print("\n" + "="*44)
+    print("\n" + "=" * 44)
     passed = sum(1 for _, result in results if result)
     total = len(results)
 
     if passed == total:
         print("✓ ALL CHECKS PASSED — Ready for ./signals start")
-        print("="*44 + "\n")
+        print("=" * 44 + "\n")
         return 0
     else:
         failed = total - passed
         print(f"⚠ {failed} check(s) failed — see above for details")
-        print("="*44 + "\n")
+        print("=" * 44 + "\n")
         return 1
 
 
