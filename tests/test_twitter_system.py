@@ -21,16 +21,13 @@ from src import db
 from src.collectors import twitter
 from src.settings import Settings
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
 
 def _conn():
-    return db.get_connection(
-        "postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test"
-    )
+    return db.get_connection("postgresql://signals:signals_dev_password@127.0.0.1:55432/signals_test")
 
 
 def _settings(tmp_path: Path, **kwargs) -> Settings:
@@ -47,9 +44,7 @@ def _settings(tmp_path: Path, **kwargs) -> Settings:
 def _empty_csv(tmp_path: Path) -> None:
     raw = tmp_path / "data" / "raw"
     raw.mkdir(parents=True, exist_ok=True)
-    (raw / "twitter.csv").write_text(
-        "domain,company_name,url,text,signal_code,confidence,observed_at\n"
-    )
+    (raw / "twitter.csv").write_text("domain,company_name,url,text,signal_code,confidence,observed_at\n")
 
 
 def _graphql_response(*tweet_texts: str) -> dict:
@@ -57,31 +52,33 @@ def _graphql_response(*tweet_texts: str) -> dict:
     entries = []
     for i, text in enumerate(tweet_texts):
         tweet_id = f"sys_tweet_{i:04d}"
-        entries.append({
-            "__typename": "TimelineTimelineEntry",
-            "entry_id": f"tweet-{tweet_id}",
-            "sort_index": str(i),
-            "content": {
-                "__typename": "TimelineTimelineItem",
+        entries.append(
+            {
+                "__typename": "TimelineTimelineEntry",
+                "entry_id": f"tweet-{tweet_id}",
+                "sort_index": str(i),
                 "content": {
-                    "__typename": "TimelineTweet",
-                    "tweet_display_type": "Tweet",
-                    "tweet_results": {
-                        "__typename": "TweetResults",
-                        "result": {
-                            "__typename": "Tweet",
-                            "rest_id": tweet_id,
-                            "details": {
-                                "__typename": "TweetDetails",
-                                "full_text": text,
-                                "created_at_ms": 1741000000000,
+                    "__typename": "TimelineTimelineItem",
+                    "content": {
+                        "__typename": "TimelineTweet",
+                        "tweet_display_type": "Tweet",
+                        "tweet_results": {
+                            "__typename": "TweetResults",
+                            "result": {
+                                "__typename": "Tweet",
+                                "rest_id": tweet_id,
+                                "details": {
+                                    "__typename": "TweetDetails",
+                                    "full_text": text,
+                                    "created_at_ms": 1741000000000,
+                                },
+                                "legacy": {"__typename": "TweetLegacy"},
                             },
-                            "legacy": {"__typename": "TweetLegacy"},
                         },
                     },
                 },
-            },
-        })
+            }
+        )
     return {
         "cursor": {"top": "", "bottom": ""},
         "result": {
@@ -174,7 +171,9 @@ class TestSys02CsvSignalIngestion:
         result = await twitter.collect(conn, settings, {}, {"twitter_csv": 0.70})
         conn.commit()
 
-        accounts = conn.execute("SELECT COUNT(DISTINCT account_id) AS c FROM signal_observations WHERE source = 'twitter_csv'").fetchone()["c"]
+        accounts = conn.execute(
+            "SELECT COUNT(DISTINCT account_id) AS c FROM signal_observations WHERE source = 'twitter_csv'"
+        ).fetchone()["c"]
         conn.close()
 
         assert result["inserted"] == 2
@@ -277,7 +276,8 @@ class TestSys03LiveApiIngestion:
 
         with patch("httpx.AsyncClient", return_value=_mock_http_client(api_resp)):
             result = await twitter.collect(
-                conn, settings,
+                conn,
+                settings,
                 {"twitter": [{"signal_code": "kubernetes_detected", "keyword": "kubernetes", "confidence": "0.7"}]},
                 {"twitter_csv": 0.70, "twitter_api": 0.75},
             )
@@ -331,9 +331,7 @@ class TestSys04ErrorHandling:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         err_resp = MagicMock()
         err_resp.status_code = 500
-        mock_client.get = AsyncMock(
-            side_effect=httpx.HTTPStatusError("500", request=MagicMock(), response=err_resp)
-        )
+        mock_client.get = AsyncMock(side_effect=httpx.HTTPStatusError("500", request=MagicMock(), response=err_resp))
 
         with patch("httpx.AsyncClient", return_value=mock_client):
             result = await twitter.collect(conn, settings, {}, {"twitter_csv": 0.70, "twitter_api": 0.75})
@@ -387,7 +385,6 @@ class TestSys05ScoringPicksUpTwitter:
     @pytest.mark.asyncio
     async def test_twitter_observation_contributes_to_score(self, tmp_path):
         """Twitter observation stored → scoring engine produces a non-zero score."""
-        import datetime
         from src.scoring.engine import run_scoring
         from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
 
@@ -425,9 +422,7 @@ class TestSys05ScoringPicksUpTwitter:
         conn.commit()
 
         # Find the scoretest.com account
-        acct = conn.execute(
-            "SELECT account_id FROM accounts WHERE domain = 'scoretest.com'"
-        ).fetchone()
+        acct = conn.execute("SELECT account_id FROM accounts WHERE domain = 'scoretest.com'").fetchone()
         assert acct is not None
 
         score_row = conn.execute(
