@@ -166,7 +166,7 @@ async def collect(
         headers=headers,
         follow_redirects=True,
         timeout=settings.http_timeout_seconds,
-    ) as client:
+    ) as _client:
         for account_index, account in enumerate(accounts, 1):
             account_id = str(account["account_id"])
             company_name = str(account["company_name"] or account["domain"])

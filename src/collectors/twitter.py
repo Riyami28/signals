@@ -348,7 +348,7 @@ async def _collect_live_twitter_account(
 
         if official_handle:
             search_url = _rapidapi_search_url(
-                rapidapi_host, f"-is:retweet lang:en", from_handle=official_handle, since_id=since_id
+                rapidapi_host, "-is:retweet lang:en", from_handle=official_handle, since_id=since_id
             )
         else:
             search_url = _rapidapi_search_url(rapidapi_host, query, since_id=since_id)

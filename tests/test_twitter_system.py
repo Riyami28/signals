@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -386,7 +386,6 @@ class TestSys05ScoringPicksUpTwitter:
     @pytest.mark.asyncio
     async def test_twitter_observation_contributes_to_score(self, tmp_path):
         """Twitter observation stored → scoring engine produces a non-zero score."""
-        import datetime
         from src.scoring.engine import run_scoring
         from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
 
@@ -409,7 +408,7 @@ class TestSys05ScoringPicksUpTwitter:
         source_registry = load_source_registry(project_root / "config" / "source_registry.csv")
         thresholds = load_thresholds(project_root / "config" / "thresholds.csv")
 
-        run_date = datetime.date(2026, 3, 1)
+        run_date = date(2026, 3, 1)
         run_id = db.create_score_run(conn, "2026-03-01")
         observations = db.fetch_observations_for_scoring(conn, "2026-03-01")
         result = run_scoring(
