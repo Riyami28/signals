@@ -102,8 +102,8 @@
         </tr>
       </thead>
       <template x-for="acc in accounts" :key="acc.account_id">
-        <tbody>
-          <tr :class="{'expanded': expandedId === acc.account_id}" @click="toggleExpand(acc.account_id)">
+        <tbody :data-account-id="acc.account_id">
+          <tr :class="{'expanded': expandedId === acc.account_id}" @click="toggleExpand(acc.account_id)" style="cursor:pointer">
             <td @click.stop><input type="checkbox" :value="acc.account_id" x-model="selected"></td>
             <td style="font-weight:600;color:var(--text-bright)" x-text="acc.company_name"></td>
             <td style="color:var(--text-muted);font-size:12px" x-text="acc.domain"></td>

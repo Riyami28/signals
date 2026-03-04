@@ -147,14 +147,22 @@ def _run_pipeline_sync(
                             )
 
                 # --- ALL external collectors in PARALLEL ---
-                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + GitHub Stargazers
+                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + Reddit (community) + GitHub Stargazers
                 serper_news_enabled = _collector_enabled("serper_news") and settings.serper_api_key
                 serper_jobs_enabled = _collector_enabled("serper_jobs") and settings.serper_api_key
                 techscan_enabled = _collector_enabled("website_techscan")
                 gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
+                reddit_enabled = _collector_enabled("reddit_api")
                 stargazer_enabled = _collector_enabled("github_stargazers")
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled
+                any_external = (
+                    serper_news_enabled
+                    or serper_jobs_enabled
+                    or techscan_enabled
+                    or gnews_enabled
+                    or reddit_enabled
+                    or stargazer_enabled
+                )
 
                 if any_external:
                     active_sources = []
@@ -166,6 +174,8 @@ def _run_pipeline_sync(
                         active_sources.append("website_techscan")
                     if gnews_enabled:
                         active_sources.append("gnews")
+                    if reddit_enabled:
+                        active_sources.append("reddit_api")
 
                     _emit(
                         queue,
@@ -244,6 +254,21 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("gnews")
+
+                        # --- Reddit API (community signals from Reddit discussions) ---
+                        if reddit_enabled:
+                            from src.collectors import reddit_collector
+
+                            tasks.append(
+                                reddit_collector.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability_dict=source_registry,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("reddit_api")
 
                         # --- GitHub Stargazers (FREE — tracks repo stars) ---
                         if stargazer_enabled:
