@@ -7,7 +7,17 @@ import logging
 from datetime import date
 
 from src import db
-from src.collectors import community, first_party, gnews_collector, jobs, news, reddit_collector, reddit_official, technographics, website_techscan
+from src.collectors import (
+    community,
+    first_party,
+    gnews_collector,
+    jobs,
+    news,
+    reddit_collector,
+    reddit_official,
+    technographics,
+    website_techscan,
+)
 from src.integrations.crunchbase import CrunchbaseClient, enrich_firmographics, evaluate_firmographic_signals
 from src.models import SignalObservation
 from src.pipeline.helpers import bootstrap

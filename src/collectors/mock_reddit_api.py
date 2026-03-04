@@ -3,11 +3,12 @@ Mock Reddit API server for testing/development without real Reddit credentials.
 Serves Reddit-like JSON data for signal collection.
 """
 
-from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
-from typing import Optional
 import json
 from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Mock Reddit API")
 
@@ -23,7 +24,7 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=1)).timestamp(),
             "score": 150,
             "num_comments": 25,
-            "author": "datadog_team"
+            "author": "datadog_team",
         },
         {
             "id": "post_002",
@@ -34,7 +35,7 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=5)).timestamp(),
             "score": 200,
             "num_comments": 45,
-            "author": "datadog_eng"
+            "author": "datadog_eng",
         },
     ],
     "stripe": [
@@ -47,7 +48,7 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=2)).timestamp(),
             "score": 180,
             "num_comments": 35,
-            "author": "stripe_ops"
+            "author": "stripe_ops",
         },
         {
             "id": "post_004",
@@ -58,7 +59,7 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=10)).timestamp(),
             "score": 220,
             "num_comments": 50,
-            "author": "stripe_infra"
+            "author": "stripe_infra",
         },
     ],
     "notion": [
@@ -71,7 +72,7 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=3)).timestamp(),
             "score": 160,
             "num_comments": 30,
-            "author": "notion_eng"
+            "author": "notion_eng",
         },
     ],
     "figma": [
@@ -84,7 +85,7 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=7)).timestamp(),
             "score": 140,
             "num_comments": 28,
-            "author": "figma_devops"
+            "author": "figma_devops",
         },
     ],
     "github": [
@@ -97,10 +98,11 @@ MOCK_POSTS = {
             "created_utc": (datetime.utcnow() - timedelta(days=4)).timestamp(),
             "score": 190,
             "num_comments": 40,
-            "author": "github_platform"
+            "author": "github_platform",
         },
     ],
 }
+
 
 @app.get("/search")
 async def search_posts(
@@ -111,8 +113,6 @@ async def search_posts(
     limit: Optional[int] = Query(25),
 ):
     """Mock Reddit search endpoint"""
-    results = []
-
     # Return all posts if no specific query
     all_posts = []
     for company_posts in MOCK_POSTS.values():
@@ -133,13 +133,16 @@ async def search_posts(
     # Limit results
     all_posts = all_posts[:limit]
 
-    return JSONResponse({
-        "data": {
-            "children": [{"data": post} for post in all_posts],
-            "after": None,
-            "before": None,
+    return JSONResponse(
+        {
+            "data": {
+                "children": [{"data": post} for post in all_posts],
+                "after": None,
+                "before": None,
+            }
         }
-    })
+    )
+
 
 @app.get("/r/{subreddit}/new")
 async def subreddit_posts(
@@ -160,34 +163,43 @@ async def subreddit_posts(
     # Limit
     all_posts = all_posts[:limit]
 
-    return JSONResponse({
-        "data": {
-            "children": [{"data": post} for post in all_posts],
-            "after": None,
-            "before": None,
+    return JSONResponse(
+        {
+            "data": {
+                "children": [{"data": post} for post in all_posts],
+                "after": None,
+                "before": None,
+            }
         }
-    })
+    )
+
 
 @app.get("/api/v1/me")
 async def get_user_info():
     """Mock Reddit user info endpoint"""
-    return JSONResponse({
-        "id": "mock_user_id",
-        "name": "zopdev_signals",
-        "link_karma": 1000,
-        "comment_karma": 5000,
-    })
+    return JSONResponse(
+        {
+            "id": "mock_user_id",
+            "name": "zopdev_signals",
+            "link_karma": 1000,
+            "comment_karma": 5000,
+        }
+    )
+
 
 @app.get("/robots.txt")
 async def robots_txt():
     """Mock robots.txt - allow all"""
     return "User-agent: *\nDisallow: "
 
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return JSONResponse({"status": "ok", "api": "mock_reddit_api"})
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8765)
