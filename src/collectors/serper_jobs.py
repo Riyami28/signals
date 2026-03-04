@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any
 
@@ -17,6 +18,19 @@ from src.utils import classify_text, stable_hash, utc_now_iso
 logger = logging.getLogger(__name__)
 
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
+
+# Regex to detect stale job postings (e.g., "3 months ago", "5 months ago")
+# Only flags "months" — "days ago" or "hours ago" are fine.
+_STALE_AGE_RE = re.compile(r"\b(\d+)\s+months?\s+ago\b", re.IGNORECASE)
+
+
+def _is_stale_posting(title: str, snippet: str) -> bool:
+    """Return True if the snippet or title mentions the posting is months old."""
+    for text in (title, snippet):
+        m = _STALE_AGE_RE.search(text)
+        if m and int(m.group(1)) >= 2:
+            return True
+    return False
 
 # Job-specific search suffixes to find relevant engineering roles
 _JOB_SEARCH_SUFFIXES = [
@@ -161,11 +175,15 @@ async def _fetch_serper_search(
     api_key: str,
     num_results: int = 10,
 ) -> list[dict]:
-    """Call Serper search API with job-related query and return organic results."""
+    """Call Serper search API with job-related query and return organic results.
+
+    Uses tbs=qdr:m to restrict results to the past month — avoids returning
+    stale job postings that Google still has indexed from months ago.
+    """
     try:
         resp = await client.post(
             SERPER_SEARCH_URL,
-            json={"q": query, "num": num_results},
+            json={"q": query, "num": num_results, "tbs": "qdr:m"},
             headers={
                 "X-API-KEY": api_key,
                 "Content-Type": "application/json",
@@ -219,6 +237,10 @@ async def _collect_one_account(
             link = str(item.get("link", ""))
 
             if not link:
+                continue
+
+            # Skip stale postings (e.g., "5 months ago" in snippet)
+            if _is_stale_posting(title, snippet):
                 continue
 
             # Filter: only keep results from job boards or career pages
