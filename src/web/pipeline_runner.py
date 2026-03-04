@@ -154,8 +154,10 @@ def _run_pipeline_sync(
                 gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
                 stargazer_enabled = _collector_enabled("github_stargazers")
                 serper_twitter_enabled = _collector_enabled("serper_twitter") and settings.serper_api_key
+                reddit_enabled = _collector_enabled("reddit_api")
+                reddit_official_enabled = _collector_enabled("reddit_official")
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled or serper_twitter_enabled
+                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled or serper_twitter_enabled or reddit_enabled or reddit_official_enabled
 
                 if any_external:
                     active_sources = []
@@ -169,6 +171,10 @@ def _run_pipeline_sync(
                         active_sources.append("gnews")
                     if serper_twitter_enabled:
                         active_sources.append("serper_twitter")
+                    if reddit_enabled:
+                        active_sources.append("reddit")
+                    if reddit_official_enabled:
+                        active_sources.append("reddit_official")
 
                     _emit(
                         queue,
@@ -261,6 +267,35 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("serper_twitter")
+
+                        # --- Reddit collectors (FREE — public Reddit JSON API) ---
+                        if reddit_enabled:
+                            from src.collectors import reddit_collector
+
+                            tasks.append(
+                                reddit_collector.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry.get("reddit_api", 0.65),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("reddit")
+
+                        if reddit_official_enabled:
+                            from src.collectors import reddit_official
+
+                            tasks.append(
+                                reddit_official.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry.get("reddit_official", 0.70),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("reddit_official")
 
                         # --- GitHub Stargazers (FREE — tracks repo stars) ---
                         if stargazer_enabled:
