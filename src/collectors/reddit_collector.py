@@ -29,12 +29,15 @@ REDDIT_USER_AGENT = "browser:zopdev-signals-collector:v1.0 (by /u/zopdev)"
 
 _VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {"1", "true", "yes", "on"}
 
+
 def _emit_progress(message: str) -> None:
     if _VERBOSE_PROGRESS:
         print(message, flush=True)
 
+
 class RedditPost(BaseModel):
     """Pydantic model for validating raw Reddit API data."""
+
     title: str
     selftext: str
     url: str
@@ -44,12 +47,9 @@ class RedditPost(BaseModel):
     score: int
     num_comments: int
 
+
 def _build_observation(
-    account_id: str,
-    post: RedditPost,
-    signal_code: str,
-    confidence: float,
-    reliability: float
+    account_id: str, post: RedditPost, signal_code: str, confidence: float, reliability: float
 ) -> SignalObservation:
     """Transforms a Reddit post into a standard SignalObservation."""
     payload = post.model_dump()
@@ -78,19 +78,12 @@ def _build_observation(
         evidence_text=f"[{post.subreddit}] {post.title}: {post.selftext[:300]}",
         confidence=confidence,
         source_reliability=reliability,
-        raw_payload_hash=raw_hash
+        raw_payload_hash=raw_hash,
     )
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True
-)
-async def _fetch_reddit_search_json(
-    query: str,
-    settings: Settings,
-    client: httpx.AsyncClient
-) -> dict[str, Any]:
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+async def _fetch_reddit_search_json(query: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches search results from Reddit JSON API with retries."""
     # Support mock API for development (use SIGNALS_REDDIT_API_BASE_URL env var)
     reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
@@ -112,16 +105,8 @@ async def _fetch_reddit_search_json(
         return response.json()
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True
-)
-async def _fetch_reddit_subreddit_json(
-    subreddit: str,
-    settings: Settings,
-    client: httpx.AsyncClient
-) -> dict[str, Any]:
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+async def _fetch_reddit_subreddit_json(subreddit: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches recent posts from a specific subreddit."""
     reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
 
@@ -134,6 +119,7 @@ async def _fetch_reddit_subreddit_json(
     response = await client.get(subreddit_url, timeout=settings.http_timeout_seconds)
     response.raise_for_status()
     return response.json()
+
 
 async def _collect_account(
     conn,
@@ -149,10 +135,6 @@ async def _collect_account(
     logger.info(f"reddit_collector._collect_account() called for account #{account_index}")
 
     domain = str(account["domain"])
-    if domain.endswith(".example"):
-        logger.debug(f"reddit_collector account #{account_index}: skipping example domain")
-        return 0, 0, 0
-
     account_id = str(account["account_id"])
     company_name = str(account["company_name"] or domain)
     handle_row = handles.get(domain, {})
@@ -178,15 +160,17 @@ async def _collect_account(
 
     logger.debug(f"reddit_collector account #{account_index}: domain={domain}, company={company_name}, query={query}")
 
-    # Standard checkpointing - but allow re-crawling for testing/real data
-    # if db.was_crawled_today(conn, source=source_name, account_id=account_id, endpoint=endpoint):
-    #     logger.debug(f"reddit_collector account #{account_index}: already crawled today, skipping")
-    #     return 0, 0, 1
+    # Standard checkpointing - prevent redundant same-day crawls
+    if db.was_crawled_today(conn, source=source_name, account_id=account_id, endpoint=endpoint):
+        logger.debug(f"reddit_collector account #{account_index}: already crawled today, skipping")
+        return 0, 0, 1
 
     logger.info(f"reddit_collector account #{account_index}: proceeding to API call with query='{query}'")
 
     try:
-        logger.debug(f"reddit_collector account #{account_index}: attempting to fetch from official subreddit r/{query}")
+        logger.debug(
+            f"reddit_collector account #{account_index}: attempting to fetch from official subreddit r/{query}"
+        )
 
         # First, try to fetch from official company subreddit
         subreddit_candidates = [
@@ -201,7 +185,9 @@ async def _collect_account(
                 logger.debug(f"reddit_collector account #{account_index}: trying subreddit r/{subreddit_name}")
                 data = await _fetch_reddit_subreddit_json(subreddit_name, settings, client)
                 if data and data.get("data", {}).get("children"):
-                    logger.info(f"reddit_collector account #{account_index}: found official subreddit r/{subreddit_name}")
+                    logger.info(
+                        f"reddit_collector account #{account_index}: found official subreddit r/{subreddit_name}"
+                    )
                     break
             except Exception as e:
                 logger.debug(f"reddit_collector account #{account_index}: subreddit r/{subreddit_name} not found: {e}")
@@ -224,8 +210,17 @@ async def _collect_account(
         seen = 0
 
         if not posts_raw:
-            logger.warning(f"reddit_collector account #{account_index}: no posts in response, data keys: {list(data.keys())}")
-            db.record_crawl_attempt(conn, source=source_name, account_id=account_id, endpoint=endpoint, status="success", error_summary="no_posts")
+            logger.warning(
+                f"reddit_collector account #{account_index}: no posts in response, data keys: {list(data.keys())}"
+            )
+            db.record_crawl_attempt(
+                conn,
+                source=source_name,
+                account_id=account_id,
+                endpoint=endpoint,
+                status="success",
+                error_summary="no_posts",
+            )
             db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=endpoint, commit=False)
             return 0, 0, 1
 
@@ -237,13 +232,17 @@ async def _collect_account(
             try:
                 # Debug: log entry structure
                 if entry_idx == 0:
-                    logger.debug(f"reddit_collector account #{account_index}: first entry keys: {list(item.keys())[:5]}")
+                    logger.debug(
+                        f"reddit_collector account #{account_index}: first entry keys: {list(item.keys())[:5]}"
+                    )
 
                 # Handle both 'url' and 'permalink' fields from Reddit API
                 post_url = item.get("url", "")
                 permalink = item.get("permalink", "")
 
-                logger.debug(f"reddit_collector account #{account_index}: entry {entry_idx} - url={post_url[:50] if post_url else 'NONE'}, permalink={permalink[:50] if permalink else 'NONE'}")
+                logger.debug(
+                    f"reddit_collector account #{account_index}: entry {entry_idx} - url={post_url[:50] if post_url else 'NONE'}, permalink={permalink[:50] if permalink else 'NONE'}"
+                )
 
                 # Construct proper Reddit URL
                 if not post_url or not post_url.startswith("http"):
@@ -263,7 +262,7 @@ async def _collect_account(
                     author=item.get("author", ""),
                     created_utc=float(item.get("created_utc", 0.0)),
                     score=int(item.get("score", 0)),
-                    num_comments=int(item.get("num_comments", 0))
+                    num_comments=int(item.get("num_comments", 0)),
                 )
 
                 text_to_classify = f"{post.title}\n{post.selftext}".strip()
@@ -273,11 +272,29 @@ async def _collect_account(
                 if not matches:
                     # Relevant subreddits for FinOps/Infrastructure discussions
                     relevant_subreddits = [
-                        'devops', 'kubernetes', 'devopsjobs', 'sre', 'finops', 'cloudarchitecture',
-                        'aws', 'azure', 'gcp', 'cloud', 'infrastructure', 'terraform',
-                        'docker', 'containerization', 'microservices', 'platformengineering',
-                        'programming', 'learnprogramming', 'softwareengineering', 'webdev',
-                        'enterprisearchitecture', 'sysadmin', 'itsecurity'
+                        "devops",
+                        "kubernetes",
+                        "devopsjobs",
+                        "sre",
+                        "finops",
+                        "cloudarchitecture",
+                        "aws",
+                        "azure",
+                        "gcp",
+                        "cloud",
+                        "infrastructure",
+                        "terraform",
+                        "docker",
+                        "containerization",
+                        "microservices",
+                        "platformengineering",
+                        "programming",
+                        "learnprogramming",
+                        "softwareengineering",
+                        "webdev",
+                        "enterprisearchitecture",
+                        "sysadmin",
+                        "itsecurity",
                     ]
 
                     subreddit_lower = post.subreddit.lower()
@@ -285,11 +302,29 @@ async def _collect_account(
 
                     # Infrastructure-related keywords for additional relevance checking
                     infra_keywords = [
-                        'kubernetes', 'k8s', 'eks', 'gke', 'aks',
-                        'terraform', 'infrastructure', 'iac', 'devops',
-                        'cloud', 'finops', 'cost', 'serverless', 'docker',
-                        'container', 'deployment', 'staging', 'production',
-                        'cluster', 'microservices', 'scaling', 'api', 'backend'
+                        "kubernetes",
+                        "k8s",
+                        "eks",
+                        "gke",
+                        "aks",
+                        "terraform",
+                        "infrastructure",
+                        "iac",
+                        "devops",
+                        "cloud",
+                        "finops",
+                        "cost",
+                        "serverless",
+                        "docker",
+                        "container",
+                        "deployment",
+                        "staging",
+                        "production",
+                        "cluster",
+                        "microservices",
+                        "scaling",
+                        "api",
+                        "backend",
                     ]
                     text_lower = text_to_classify.lower()
                     has_infra_keyword = any(keyword in text_lower for keyword in infra_keywords)
@@ -302,7 +337,9 @@ async def _collect_account(
                         # Skip - not relevant to FinOps/infrastructure
                         continue
 
-                logger.info(f"reddit_collector account #{account_index}: post '{post.title[:50]}' -> {len(matches)} signal(s): {[m[0] for m in matches]}")
+                logger.info(
+                    f"reddit_collector account #{account_index}: post '{post.title[:50]}' -> {len(matches)} signal(s): {[m[0] for m in matches]}"
+                )
 
                 for signal_code, confidence, _ in matches:
                     seen += 1
@@ -311,34 +348,53 @@ async def _collect_account(
                         post=post,
                         signal_code=signal_code,
                         confidence=confidence,
-                        reliability=reliability
+                        reliability=reliability,
                     )
                     if db.insert_signal_observation(conn, obs, commit=False):
                         inserted += 1
-                        logger.debug(f"reddit_collector account #{account_index}: inserted signal obs_id={obs.obs_id}, signal_code={signal_code}")
+                        logger.debug(
+                            f"reddit_collector account #{account_index}: inserted signal obs_id={obs.obs_id}, signal_code={signal_code}"
+                        )
                     else:
-                        logger.debug(f"reddit_collector account #{account_index}: failed to insert signal obs_id={obs.obs_id}")
+                        logger.debug(
+                            f"reddit_collector account #{account_index}: failed to insert signal obs_id={obs.obs_id}"
+                        )
             except ValidationError as e:
                 logger.warning(f"reddit_collector account #{account_index}: validation error on post: {e}")
-                logger.debug(f"  title={item.get('title')}, created_utc={item.get('created_utc')}, permalink={item.get('permalink')}")
+                logger.debug(
+                    f"  title={item.get('title')}, created_utc={item.get('created_utc')}, permalink={item.get('permalink')}"
+                )
                 continue
             except Exception as e:
                 logger.error(f"reddit_collector account #{account_index}: unexpected error on post: {e}")
                 logger.debug(f"  item keys: {list(item.keys())}")
                 continue
 
-        db.record_crawl_attempt(conn, source=source_name, account_id=account_id, endpoint=endpoint, status="success", error_summary="")
+        db.record_crawl_attempt(
+            conn, source=source_name, account_id=account_id, endpoint=endpoint, status="success", error_summary=""
+        )
         db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=endpoint, commit=False)
 
         return inserted, seen, 1
 
     except Exception as exc:
-        logger.error(f"reddit_collector account #{account_index}: exception during collection: {type(exc).__name__}: {exc}")
+        logger.error(
+            f"reddit_collector account #{account_index}: exception during collection: {type(exc).__name__}: {exc}"
+        )
         import traceback
+
         logger.debug(f"reddit_collector account #{account_index}: traceback: {traceback.format_exc()}")
-        db.record_crawl_attempt(conn, source=source_name, account_id=account_id, endpoint=endpoint, status="exception", error_summary=str(exc)[:200])
+        db.record_crawl_attempt(
+            conn,
+            source=source_name,
+            account_id=account_id,
+            endpoint=endpoint,
+            status="exception",
+            error_summary=str(exc)[:200],
+        )
         db.mark_crawled(conn, source=source_name, account_id=account_id, endpoint=endpoint, commit=False)
         return 0, 0, 1
+
 
 async def collect(
     conn,
@@ -359,7 +415,9 @@ async def collect(
     if lexicon_rows is None:
         lexicon_rows = lexicon_by_source.get("community", [])
 
-    logger.info(f"reddit_collector.collect() starting: enable_live_crawl={settings.enable_live_crawl}, source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}")
+    logger.info(
+        f"reddit_collector.collect() starting: enable_live_crawl={settings.enable_live_crawl}, source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
+    )
 
     if not settings.enable_live_crawl:
         logger.info("reddit_collector: live_crawl disabled, returning early")
@@ -374,17 +432,23 @@ async def collect(
     # Get accounts - use provided account_ids or fetch all accounts
     if account_ids:
         cursor = conn.cursor()
-        cursor.execute("SELECT account_id, company_name, domain, source_type FROM signals.accounts WHERE account_id = ANY(%s)", (account_ids,))
+        cursor.execute(
+            "SELECT account_id, company_name, domain, source_type FROM signals.accounts WHERE account_id = ANY(%s)",
+            (account_ids,),
+        )
         accounts = [dict(row) for row in cursor.fetchall()]
         logger.info(f"reddit_collector: fetched {len(accounts)} accounts from account_ids")
     else:
         # Fetch all accounts if no account_ids specified
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT account_id, company_name, domain, source_type
             FROM signals.accounts
             LIMIT %s
-        """, (settings.live_max_accounts,))
+        """,
+            (settings.live_max_accounts,),
+        )
         accounts = [dict(row) for row in cursor.fetchall()]
         logger.info(f"reddit_collector: fetched {len(accounts)} accounts from database")
 
@@ -401,7 +465,9 @@ async def collect(
     seen_total = 0
     accounts_processed = 0
 
-    logger.info(f"reddit_collector: starting with {len(accounts)} accounts, concurrency={concurrency}, lexicon_size={len(lexicon_rows) if lexicon_rows else 0}")
+    logger.info(
+        f"reddit_collector: starting with {len(accounts)} accounts, concurrency={concurrency}, lexicon_size={len(lexicon_rows) if lexicon_rows else 0}"
+    )
 
     async with httpx.AsyncClient(
         headers={"User-Agent": REDDIT_USER_AGENT},
@@ -420,7 +486,7 @@ async def collect(
                     handles=handles,
                     source_name=source_name,
                     reliability=source_reliability,
-                    client=client
+                    client=client,
                 )
 
         tasks = [_run_account(i, acct) for i, acct in enumerate(accounts, start=1)]
@@ -436,6 +502,8 @@ async def collect(
         accounts_processed += processed
         logger.debug(f"reddit_collector: account result inserted={ins}, seen={sn}, processed={processed}")
 
-    logger.info(f"reddit_collector: completed with inserted={inserted_total}, seen={seen_total}, accounts_processed={accounts_processed}")
+    logger.info(
+        f"reddit_collector: completed with inserted={inserted_total}, seen={seen_total}, accounts_processed={accounts_processed}"
+    )
     conn.commit()
     return {"inserted": inserted_total, "seen": seen_total, "accounts_processed": accounts_processed}
