@@ -269,8 +269,6 @@ async def _collect_account(
                 )
 
                 # Filter: only collect posts from last 14 days
-                from datetime import datetime, timedelta, timezone
-
                 now = datetime.now(timezone.utc)
                 post_age_days = (now - datetime.fromtimestamp(post.created_utc, tz=timezone.utc)).days
                 if post_age_days > REDDIT_DATA_WINDOW_DAYS:
