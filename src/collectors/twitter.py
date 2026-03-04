@@ -593,10 +593,12 @@ async def collect(
     settings: Settings,
     lexicon_by_source: dict[str, list[dict[str, str]]],
     source_reliability: dict[str, float],
+    account_ids: list[str] | None = None,
     db_pool=None,
 ) -> dict[str, int]:
     inserted = 0
     seen = 0
+    accounts_processed = 0
 
     lexicon_rows = lexicon_by_source.get("twitter", [])
     csv_source = "twitter_csv"
@@ -662,14 +664,25 @@ async def collect(
             return {"inserted": inserted, "seen": seen}
 
         backend = "rapidapi" if rapidapi_key else "official"
-        accounts = db.select_accounts_for_live_crawl(
-            conn,
-            source=api_source,
-            limit=settings.live_max_accounts,
-            include_domains=list(settings.live_target_domains),
-        )
+        if account_ids:
+            placeholders = ",".join(["%s"] * len(account_ids))
+            accounts = [
+                dict(r)
+                for r in conn.execute(
+                    f"SELECT account_id, company_name, domain FROM accounts WHERE account_id IN ({placeholders})",
+                    tuple(account_ids),
+                ).fetchall()
+            ]
+        else:
+            accounts = db.select_accounts_for_live_crawl(
+                conn,
+                source=api_source,
+                limit=settings.live_max_accounts,
+                include_domains=list(settings.live_target_domains),
+            )
 
         # Count how many have official handles vs will use fallback search
+        accounts_processed = len(accounts)
         accounts_with_handles = [a for a in accounts if a["domain"] in twitter_handles]
         accounts_fallback = [a for a in accounts if a["domain"] not in twitter_handles]
 
@@ -709,4 +722,4 @@ async def collect(
         )
 
     conn.commit()
-    return {"inserted": inserted, "seen": seen}
+    return {"inserted": inserted, "seen": seen, "accounts_processed": accounts_processed}

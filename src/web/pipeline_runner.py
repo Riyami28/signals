@@ -128,7 +128,6 @@ def _run_pipeline_sync(
                         ("jobs_pages", "jobs", "Job"),
                         ("news_rss", "news", "News"),
                         ("technographics", "technographics", "Technographics"),
-                        ("twitter_api", "twitter", "Twitter"),
                     ]
                     for policy_key, module_name, label in legacy_collectors:
                         if _collector_enabled(policy_key):
@@ -156,8 +155,9 @@ def _run_pipeline_sync(
                 serper_twitter_enabled = _collector_enabled("serper_twitter") and settings.serper_api_key
                 reddit_enabled = _collector_enabled("reddit_api")
                 reddit_official_enabled = _collector_enabled("reddit_official")
+                twitter_live_enabled = _collector_enabled("twitter_api") and (getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", ""))
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled or serper_twitter_enabled or reddit_enabled or reddit_official_enabled
+                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or stargazer_enabled or serper_twitter_enabled or reddit_enabled or reddit_official_enabled or twitter_live_enabled
 
                 if any_external:
                     active_sources = []
@@ -175,6 +175,8 @@ def _run_pipeline_sync(
                         active_sources.append("reddit")
                     if reddit_official_enabled:
                         active_sources.append("reddit_official")
+                    if twitter_live_enabled:
+                        active_sources.append("twitter_live")
 
                     _emit(
                         queue,
@@ -297,6 +299,21 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("reddit_official")
+
+                        # --- Twitter Live (RapidAPI / Official API — real-time tweets) ---
+                        if twitter_live_enabled:
+                            from src.collectors import twitter
+
+                            tasks.append(
+                                twitter.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("twitter_live")
 
                         # --- GitHub Stargazers (FREE — tracks repo stars) ---
                         if stargazer_enabled:
