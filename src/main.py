@@ -18,6 +18,10 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from dotenv import load_dotenv
+
+# Load .env file to populate environment variables (for os.getenv() calls in collectors)
+load_dotenv()
 
 from src import db
 from src.collectors import community, first_party, jobs, news, technographics

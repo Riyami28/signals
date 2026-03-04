@@ -44,8 +44,4 @@ sap_erp_modernization,shared,trigger_events,20,30,0.45,true,trigger_intent
 hiring_devops,shared,hiring,8,30,0.4,true,hiring_growth
 security_review_started,shared,trigger_events,14,30,0.45,true,trigger_intent
 warehouse_digitization,shared,trigger_events,14,30,0.45,true,trigger_intent
-funding_stage_series_b_plus,shared,firmographic,15,90,0.7,true,firmographic
-funding_stage_series_a,shared,firmographic,8,90,0.7,true,firmographic
-recent_funding_event,shared,firmographic,12,60,0.65,true,firmographic
-employee_growth_positive,shared,firmographic,10,45,0.6,true,firmographic
-employee_count_in_range,shared,firmographic,8,90,0.7,true,firmographic
+community_mention,shared,behavioral,6,14,0.3,true,trigger_intent

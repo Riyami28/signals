@@ -148,13 +148,14 @@ def _run_pipeline_sync(
                             )
 
                 # --- ALL external collectors in PARALLEL ---
-                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional)
+                # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + Reddit (community)
                 serper_news_enabled = _collector_enabled("serper_news") and settings.serper_api_key
                 serper_jobs_enabled = _collector_enabled("serper_jobs") and settings.serper_api_key
                 techscan_enabled = _collector_enabled("website_techscan")
                 gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
+                reddit_enabled = _collector_enabled("reddit_api")
 
-                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled
+                any_external = serper_news_enabled or serper_jobs_enabled or techscan_enabled or gnews_enabled or reddit_enabled
 
                 if any_external:
                     active_sources = []
@@ -166,6 +167,8 @@ def _run_pipeline_sync(
                         active_sources.append("website_techscan")
                     if gnews_enabled:
                         active_sources.append("gnews")
+                    if reddit_enabled:
+                        active_sources.append("reddit_api")
 
                     _emit(
                         queue,
@@ -244,6 +247,23 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("gnews")
+
+                        # --- Reddit API (community signals from Reddit discussions) ---
+                        reddit_enabled = _collector_enabled("reddit_api")
+                        if reddit_enabled:
+                            from src.collectors import reddit_collector
+
+                            reddit_lexicon = [r for r in keyword_lexicon.get("community", []) if r.get("keyword")]
+                            tasks.append(
+                                reddit_collector.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_rows=reddit_lexicon,
+                                    source_reliability=source_registry.get("reddit_api", 0.65),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("reddit_api")
 
                         results = await asyncio.gather(*tasks, return_exceptions=True)
                         return list(zip(task_labels, results))

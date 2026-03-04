@@ -23,4 +23,5 @@ serper_news,0.85,true
 serper_jobs,0.80,true
 website_techscan,0.70,true
 gnews,0.78,true
-crunchbase,0.82,true
+reddit_api,0.65,true
+reddit_official,0.75,true
