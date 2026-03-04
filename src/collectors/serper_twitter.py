@@ -34,9 +34,9 @@ SOURCE_NAME = "serper_twitter"
 
 # DevOps / FinOps / Platform Eng signal terms — mirrors twitter.py DEFAULT_TWITTER_TERMS
 _TWITTER_SIGNAL_TERMS = (
-    "devops OR kubernetes OR terraform OR finops OR \"cloud cost\" "
-    "OR \"platform engineering\" OR soc2 OR compliance "
-    "OR \"cost reduction\" OR \"cost optimization\""
+    'devops OR kubernetes OR terraform OR finops OR "cloud cost" '
+    'OR "platform engineering" OR soc2 OR compliance '
+    'OR "cost reduction" OR "cost optimization"'
 )
 
 
@@ -123,9 +123,9 @@ async def _fetch_serper_twitter(
         # Return only results from twitter.com or x.com
         organic = data.get("organic", [])
         return [
-            r for r in organic
-            if "twitter.com" in str(r.get("link", "")).lower()
-            or "x.com" in str(r.get("link", "")).lower()
+            r
+            for r in organic
+            if "twitter.com" in str(r.get("link", "")).lower() or "x.com" in str(r.get("link", "")).lower()
         ]
     except httpx.HTTPStatusError as exc:
         logger.warning(
@@ -162,9 +162,7 @@ async def _collect_one_account(
         return 0, 0
 
     # Build search query — site-restrict to Twitter/X AND include signal keywords
-    query = (
-        f'(site:twitter.com OR site:x.com) "{company_name}" ({_TWITTER_SIGNAL_TERMS})'
-    )
+    query = f'(site:twitter.com OR site:x.com) "{company_name}" ({_TWITTER_SIGNAL_TERMS})'
 
     results = await _fetch_serper_twitter(client, query, api_key, num_results, lookback_days=lookback_days)
 

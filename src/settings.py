@@ -164,8 +164,8 @@ class Settings(BaseSettings):
     crunchbase_rate_limit: int = Field(default=50, ge=1)
 
     # --- Twitter signal collection ---
-    twitter_bearer_token: str = Field(default="")        # Official Twitter API v2 Bearer Token
-    twitter_rapidapi_key: str = Field(default="")        # RapidAPI key (twitter-api45 / Twitter v2)
+    twitter_bearer_token: str = Field(default="")  # Official Twitter API v2 Bearer Token
+    twitter_rapidapi_key: str = Field(default="")  # RapidAPI key (twitter-api45 / Twitter v2)
     twitter_rapidapi_host: str = Field(default="twitter-api45.p.rapidapi.com")
     twitter_lookback_days: int = Field(default=7, ge=1, le=7)  # free tier = 7 days; Basic/Pro = up to 30
 
