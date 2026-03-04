@@ -7,6 +7,7 @@ function signalsApp() {
     search: '',
     tierFilter: '',
     labelFilter: '',
+    sourceFilter: '',
     sortBy: 'score',
     sortDir: 'desc',
     page: 1,
@@ -22,8 +23,27 @@ function signalsApp() {
     // CSV Import/Export
     csvUploading: false,
 
+    // Theme
+    theme: localStorage.getItem('signals_theme') || 'dark',
+
     async init() {
+      // Apply saved theme
+      this._applyTheme(this.theme);
       await this.loadAccounts();
+    },
+
+    toggleTheme() {
+      this.theme = this.theme === 'dark' ? 'light' : 'dark';
+      this._applyTheme(this.theme);
+      localStorage.setItem('signals_theme', this.theme);
+    },
+
+    _applyTheme(t) {
+      if (t === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
     },
 
     // --- CSV Export ---
@@ -32,6 +52,7 @@ function signalsApp() {
         tier: this.tierFilter,
         label: this.labelFilter,
         q: this.search,
+        source: this.sourceFilter,
       });
       window.open(`/api/export/csv?${params}`, '_blank');
     },
@@ -78,6 +99,7 @@ function signalsApp() {
         tier: this.tierFilter,
         label: this.labelFilter,
         q: this.search,
+        source: this.sourceFilter,
       });
       try {
         const resp = await fetch(`/api/accounts?${params}`);
@@ -93,7 +115,7 @@ function signalsApp() {
         this.stats.labeled = this.accounts.filter(a => a.labels).length;
 
         // Load full stats once
-        if (this.page === 1 && !this.search && !this.tierFilter && !this.labelFilter) {
+        if (this.page === 1 && !this.search && !this.tierFilter && !this.labelFilter && !this.sourceFilter) {
           this._loadFullStats();
         }
       } catch (e) {
@@ -227,6 +249,9 @@ function detailPanel() {
     accountLabels: [],
     newLabel: '',
     newNotes: '',
+
+    // Signal filter inside detail panel
+    signalSourceFilter: '',
 
     // Timeline state
     timelineItems: [],

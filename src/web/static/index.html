@@ -4,7 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signals Pipeline</title>
-<link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="/static/styles.css?v=9">
+<script>
+  // Apply saved theme immediately to prevent flash
+  (function() {
+    var t = localStorage.getItem('signals_theme');
+    if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  })();
+</script>
 <script defer src="/static/alpine.min.js"></script>
 </head>
 <body>
@@ -14,6 +21,9 @@
   <div class="header">
     <h1>Signals Pipeline</h1>
     <div class="header-right" style="display:flex;gap:8px;align-items:center;">
+      <!-- Theme Toggle -->
+      <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+              x-text="theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'"></button>
       <!-- CSV Import -->
       <input type="file" id="csvFileInput" accept=".csv" style="display:none"
              @change="handleCsvUpload($event)">
@@ -63,6 +73,16 @@
       <option value="sal">SAL</option>
       <option value="abm">ABM</option>
     </select>
+    <select class="filter-select" x-model="sourceFilter" @change="page=1; loadAccounts()">
+      <option value="">All Sources</option>
+      <option value="serper_news">News</option>
+      <option value="serper_jobs">Jobs</option>
+      <option value="website_techscan">Tech Scan</option>
+      <option value="github_stargazers">GitHub Stars</option>
+      <option value="reddit_api">Reddit</option>
+      <option value="first_party_csv">First Party</option>
+      <option value="website_scan">Website</option>
+    </select>
   </div>
 
   <!-- Action Bar (when items selected) -->
@@ -103,7 +123,7 @@
       </thead>
       <template x-for="acc in accounts" :key="acc.account_id">
         <tbody>
-          <tr :class="{'expanded': expandedId === acc.account_id}" @click="toggleExpand(acc.account_id)">
+          <tr :class="{'expanded': expandedId === acc.account_id}" @click="toggleExpand(acc.account_id)" style="cursor:pointer">
             <td @click.stop><input type="checkbox" :value="acc.account_id" x-model="selected"></td>
             <td style="font-weight:600;color:var(--text-bright)" x-text="acc.company_name"></td>
             <td style="color:var(--text-muted);font-size:12px" x-text="acc.domain"></td>
@@ -125,270 +145,297 @@
               <span x-text="expandedId === acc.account_id ? '&#9660;' : '&#9654;'"></span>
             </td>
           </tr>
-          <!-- Detail Panel -->
-          <tr x-show="expandedId === acc.account_id" class="detail-panel">
-            <td colspan="8">
-              <div class="detail-inner" x-data="detailPanel()" x-init="load(acc.account_id)">
-                  <!-- Tabs -->
-                  <div class="tabs">
-                    <div class="tab" :class="{'active': dtab==='dimensions'}" @click="dtab='dimensions'">Dimensions</div>
-                    <div class="tab" :class="{'active': dtab==='signals'}" @click="dtab='signals'">Signals</div>
-                    <div class="tab" :class="{'active': dtab==='research'}" @click="dtab='research'; loadResearch(acc.account_id)">Research</div>
-                    <div class="tab" :class="{'active': dtab==='contacts'}" @click="dtab='contacts'">Contacts</div>
-                    <div class="tab" :class="{'active': dtab==='labels'}" @click="dtab='labels'; loadLabels(acc.account_id)">Labels</div>
-                  </div>
-
-                  <!-- Dimensions Tab -->
-                  <div x-show="dtab==='dimensions'">
-                    <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
-                      <div>
-                        <!-- Velocity Banner -->
-                        <template x-if="detail.velocity">
-                          <div class="velocity-banner">
-                            <span class="velocity-category" :class="'velocity-' + (detail.velocity.category || 'stable')"
-                                  x-text="(detail.velocity.category || 'stable').toUpperCase()"></span>
-                            <span class="velocity-delta">7d: <strong x-text="(detail.velocity['7d'] > 0 ? '+' : '') + detail.velocity['7d']"></strong></span>
-                            <span class="velocity-delta">14d: <strong x-text="(detail.velocity['14d'] > 0 ? '+' : '') + detail.velocity['14d']"></strong></span>
-                            <span class="velocity-delta">30d: <strong x-text="(detail.velocity['30d'] > 0 ? '+' : '') + detail.velocity['30d']"></strong></span>
-                          </div>
-                        </template>
-                        <!-- Dimension Bars -->
-                        <div class="dimension-grid">
-                          <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
-                            <div class="dimension-row">
-                              <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
-                              <div class="dimension-bar-bg">
-                                <div class="dimension-bar-fill"
-                                     :style="'width:' + Math.min(100, Math.max(0, (typeof score === 'object' ? (score.score || 0) : score))) + '%'"
-                                     :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'bar-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'bar-medium' : 'bar-low'">
-                                </div>
-                              </div>
-                              <span class="dimension-score" x-text="typeof score === 'object' ? (score.score || 0) : score"></span>
-                            </div>
-                          </template>
-                        </div>
-                      </div>
-                    </template>
-                    <div x-show="!detail || !detail.dimension_scores || Object.keys(detail.dimension_scores).length === 0" class="empty">No dimension scores available. Run scoring pipeline first.</div>
-                  </div>
-
-                  <!-- Signals Tab (only real signals — skip internal:// synthetic data) -->
-                  <div x-show="dtab==='signals'">
-                    <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
-                      <div>
-                        <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
-                          <div class="signal-card">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                              <span class="signal-code" x-text="sig.signal_code"></span>
-                              <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
-                              <template x-if="sig.observed_at">
-                                <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
-                              </template>
-                            </div>
-                            <div class="signal-evidence" x-text="sig.evidence_text"></div>
-                            <template x-if="sig.evidence_url">
-                              <div style="margin-top:4px">
-                                <a class="signal-url" :href="sig.evidence_url" target="_blank" x-text="(sig.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
-                              </div>
-                            </template>
-                          </div>
-                        </template>
-                      </div>
-                    </template>
-                    <div x-show="!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0" class="empty">No real signals detected. Run pipeline to collect signals via Serper.</div>
-                  </div>
-
-                  <!-- Research Tab -->
-                  <div x-show="dtab==='research'">
-                    <template x-if="researchData && researchData.research">
-                      <div>
-                        <div class="research-brief" x-text="researchData.research.research_brief || 'No research brief available'"></div>
-                        <template x-if="researchData.research.enrichment_json">
-                          <div>
-                            <h4 style="color:var(--blue);font-size:13px;margin-top:16px;margin-bottom:8px">Enrichment Data</h4>
-                            <div class="enrichment-grid" x-data="{ enr: JSON.parse(researchData.research.enrichment_json || '{}') }">
-                              <template x-for="[k,v] in Object.entries(enr).filter(([k]) => !k.endsWith('_confidence') && !k.endsWith('_source'))">
-                                <div class="enr-item">
-                                  <div class="enr-label" x-text="k.replace(/_/g, ' ')"></div>
-                                  <div class="enr-value" x-text="typeof v === 'object' ? JSON.stringify(v) : v"></div>
-                                </div>
-                              </template>
-                            </div>
-                          </div>
-                        </template>
-                      </div>
-                    </template>
-                    <div x-show="!researchData || !researchData.research" class="empty">No research data. Run the pipeline to generate research.</div>
-                  </div>
-
-                  <!-- Contacts Tab -->
-                  <div x-show="dtab==='contacts'">
-                    <!-- Empty state: no contacts yet -->
-                    <template x-if="!detail || !detail.contacts || detail.contacts.length === 0">
-                      <div class="empty">
-                        <div style="margin-bottom:16px">No decision makers found yet.</div>
-                        <button class="btn btn-blue"
-                                @click="discoverContacts(acc.account_id)"
-                                :disabled="contactsLoading">
-                          <template x-if="contactsLoading"><span>Discovering...</span></template>
-                          <template x-if="!contactsLoading"><span>Discover Decision Makers</span></template>
-                        </button>
-                      </div>
-                    </template>
-
-                    <!-- Contact cards -->
-                    <template x-if="detail && detail.contacts && detail.contacts.length > 0">
-                      <div>
-                        <!-- Header: count + refresh -->
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                          <span style="font-size:12px;color:var(--text-muted)"
-                                x-text="detail.contacts.length + ' contact(s)'"></span>
-                          <button class="btn btn-sm"
-                                  @click="discoverContacts(acc.account_id)"
-                                  :disabled="contactsLoading">
-                            <template x-if="contactsLoading">Refreshing...</template>
-                            <template x-if="!contactsLoading">Refresh</template>
-                          </button>
-                        </div>
-
-                        <template x-for="c in detail.contacts" :key="c.contact_id">
-                          <div class="contact-card"
-                               :class="{ 'warm-highlight': c.warmth_score > 0 }"
-                               :style="c.contact_status === 'ranked' ? 'border-left:3px solid var(--blue)' :
-                                        c.contact_status === 'verified' ? 'border-left:3px solid var(--green)' :
-                                        c.contact_status === 'enriched' ? 'border-left:3px solid var(--orange)' : ''">
-
-                            <!-- Row 1: Name + badges -->
-                            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                              <div>
-                                <div class="contact-name" x-text="c.first_name + ' ' + c.last_name"></div>
-                                <div class="contact-title" x-text="c.title || 'Unknown Title'"></div>
-                              </div>
-                              <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-                                <template x-if="c.management_level">
-                                  <span class="tier"
-                                        :class="c.management_level === 'C-Level' ? 'tier-high' :
-                                                c.management_level === 'VP' ? 'tier-medium' : 'tier-low'"
-                                        x-text="c.management_level"></span>
-                                </template>
-                                <template x-if="c.authority_score > 0">
-                                  <span style="font-family:var(--mono);font-size:11px;color:var(--blue)"
-                                        x-text="'Auth: ' + (c.authority_score * 100).toFixed(0) + '%'"></span>
-                                </template>
-                              </div>
-                            </div>
-
-                            <!-- Warm path badge -->
-                            <template x-if="c.warmth_score > 0">
-                              <div style="margin-top:6px">
-                                <span class="warm-badge" x-text="c.warm_path_reason"></span>
-                              </div>
-                            </template>
-
-                            <!-- Semantic role tag -->
-                            <template x-if="c.semantic_role">
-                              <div style="margin-top:4px">
-                                <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--border-light);color:var(--cyan)"
-                                      x-text="c.semantic_role"></span>
-                              </div>
-                            </template>
-
-                            <!-- Contact info (visible after enrichment) -->
-                            <template x-if="c.contact_status === 'enriched' || c.contact_status === 'verified'">
-                              <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                                <template x-if="c.email">
-                                  <div style="display:flex;align-items:center;gap:4px">
-                                    <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
-                                    <template x-if="c.email_verified">
-                                      <span style="font-size:10px;color:var(--green);font-weight:600" title="Verified">&#10003;</span>
-                                    </template>
-                                    <template x-if="c.verification_status === 'catch_all'">
-                                      <span style="font-size:10px;color:var(--orange)" title="Catch-all domain">&#9888;</span>
-                                    </template>
-                                  </div>
-                                </template>
-                                <template x-if="!c.email">
-                                  <span style="font-size:11px;color:var(--text-muted)">No email found</span>
-                                </template>
-                                <template x-if="c.linkedin_url">
-                                  <a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a>
-                                </template>
-                              </div>
-                            </template>
-
-                            <!-- Pre-enrichment: show email/LinkedIn if already available from discovery -->
-                            <template x-if="c.contact_status !== 'enriched' && c.contact_status !== 'verified' && (c.email || c.linkedin_url)">
-                              <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                                <template x-if="c.email">
-                                  <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
-                                </template>
-                                <template x-if="c.linkedin_url">
-                                  <a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a>
-                                </template>
-                              </div>
-                            </template>
-
-                            <!-- Reveal / Enrich button -->
-                            <template x-if="c.contact_status !== 'enriched' && c.contact_status !== 'verified'">
-                              <div style="margin-top:8px">
-                                <button class="btn btn-sm btn-blue"
-                                        @click.stop="enrichContact(c.contact_id, acc.account_id)"
-                                        :disabled="enrichingContactId === c.contact_id">
-                                  <template x-if="enrichingContactId === c.contact_id">
-                                    <span>Enriching...</span>
-                                  </template>
-                                  <template x-if="enrichingContactId !== c.contact_id">
-                                    <span>Reveal Contact</span>
-                                  </template>
-                                </button>
-                              </div>
-                            </template>
-
-                            <!-- Status footer -->
-                            <div style="margin-top:6px;display:flex;gap:8px;font-size:10px;color:var(--text-muted)">
-                              <template x-if="c.enrichment_source">
-                                <span x-text="'Source: ' + c.enrichment_source"></span>
-                              </template>
-                              <span :style="'color:' + contactStatusColor(c.contact_status)"
-                                    x-text="(c.contact_status || 'discovered').toUpperCase()"></span>
-                            </div>
-                          </div>
-                        </template>
-                      </div>
-                    </template>
-                  </div>
-
-                  <!-- Labels Tab -->
-                  <div x-show="dtab==='labels'">
-                    <div style="margin-bottom:12px">
-                      <template x-for="lbl in accountLabels">
-                        <div style="display:inline-flex;align-items:center;gap:4px;margin:4px">
-                          <span class="label-badge" :class="'label-' + lbl.label" x-text="lbl.label.toUpperCase()"></span>
-                          <span style="font-size:11px;color:var(--text-muted)" x-text="lbl.notes || ''"></span>
-                          <button class="btn btn-sm btn-danger" @click.stop="removeLabel(lbl.label_id, acc.account_id)" style="padding:2px 6px;font-size:10px">x</button>
-                        </div>
-                      </template>
-                    </div>
-                    <div class="label-form">
-                      <select class="label-select" x-model="newLabel">
-                        <option value="">Add label...</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="not_qualified">Not Qualified</option>
-                        <option value="sql">SQL</option>
-                        <option value="mql">MQL</option>
-                        <option value="sal">SAL</option>
-                        <option value="abm">ABM</option>
-                      </select>
-                      <input class="notes-input" type="text" placeholder="Notes (optional)" x-model="newNotes">
-                      <button class="btn btn-blue btn-sm" @click.stop="addLabel(acc.account_id)" :disabled="!newLabel">Add</button>
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
         </tbody>
       </template>
     </table>
+  </div>
+
+  <!-- Side Panel Overlay -->
+  <div class="side-panel-overlay" :class="{'open': expandedId}" @click="expandedId = null"></div>
+
+  <!-- Side Panel -->
+  <div class="side-panel" :class="{'open': expandedId}"
+       x-data="detailPanel()"
+       x-effect="if(expandedId) { dtab='dimensions'; signalSourceFilter=''; load(expandedId); }"
+       @keydown.escape.window="expandedId = null">
+
+    <!-- Header -->
+    <div class="side-panel-header">
+      <div>
+        <h2 class="side-panel-title"
+            x-text="(accounts.find(a => a.account_id === expandedId) || {}).company_name || ''"></h2>
+        <div class="side-panel-domain"
+             x-text="(accounts.find(a => a.account_id === expandedId) || {}).domain || ''"></div>
+        <div class="side-panel-meta">
+          <span class="score" :class="'score-' + ((accounts.find(a => a.account_id === expandedId) || {}).tier || 'low')"
+                x-text="Number((accounts.find(a => a.account_id === expandedId) || {}).score || 0).toFixed(1)"></span>
+          <span class="tier" :class="'tier-' + ((accounts.find(a => a.account_id === expandedId) || {}).tier || '')"
+                x-text="((accounts.find(a => a.account_id === expandedId) || {}).tier || '').toUpperCase()"></span>
+        </div>
+      </div>
+      <button class="side-panel-close" @click="expandedId = null">&times;</button>
+    </div>
+
+    <!-- Body -->
+    <div class="side-panel-body">
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab" :class="{'active': dtab==='dimensions'}" @click="dtab='dimensions'">Dimensions</div>
+        <div class="tab" :class="{'active': dtab==='signals'}" @click="dtab='signals'">Signals</div>
+        <div class="tab" :class="{'active': dtab==='research'}" @click="dtab='research'; loadResearch(expandedId)">Research</div>
+        <div class="tab" :class="{'active': dtab==='contacts'}" @click="dtab='contacts'">Contacts</div>
+        <div class="tab" :class="{'active': dtab==='labels'}" @click="dtab='labels'; loadLabels(expandedId)">Labels</div>
+      </div>
+
+      <!-- Dimensions Tab -->
+      <div x-show="dtab==='dimensions'">
+        <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
+          <div>
+            <template x-if="detail.velocity">
+              <div class="velocity-banner">
+                <span class="velocity-category" :class="'velocity-' + (detail.velocity.category || 'stable')"
+                      x-text="(detail.velocity.category || 'stable').toUpperCase()"></span>
+                <span class="velocity-delta">7d: <strong x-text="(detail.velocity['7d'] > 0 ? '+' : '') + detail.velocity['7d']"></strong></span>
+                <span class="velocity-delta">14d: <strong x-text="(detail.velocity['14d'] > 0 ? '+' : '') + detail.velocity['14d']"></strong></span>
+                <span class="velocity-delta">30d: <strong x-text="(detail.velocity['30d'] > 0 ? '+' : '') + detail.velocity['30d']"></strong></span>
+              </div>
+            </template>
+            <div class="dimension-grid">
+              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
+                <div class="dimension-row">
+                  <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
+                  <div class="dimension-bar-bg">
+                    <div class="dimension-bar-fill"
+                         :style="'width:' + Math.min(100, Math.max(0, (typeof score === 'object' ? (score.score || 0) : score))) + '%'"
+                         :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'bar-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'bar-medium' : 'bar-low'">
+                    </div>
+                  </div>
+                  <span class="dimension-score" x-text="typeof score === 'object' ? (score.score || 0) : score"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        <div x-show="!detail || !detail.dimension_scores || Object.keys(detail.dimension_scores).length === 0" class="empty">No dimension scores available. Run scoring pipeline first.</div>
+      </div>
+
+      <!-- Signals Tab -->
+      <div x-show="dtab==='signals'">
+        <div class="signal-filters" x-show="detail && detail.signals && detail.signals.length > 0"
+             x-data="{ _real() { return (detail && detail.signals ? detail.signals : []).filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')) },
+                        _cnt(src) { return this._real().filter(s => s.source === src).length },
+                        _sources: [
+                          {key:'serper_news', label:'News'},
+                          {key:'serper_jobs', label:'Jobs'},
+                          {key:'website_techscan', label:'Tech Scan'},
+                          {key:'website_scan', label:'Website'},
+                          {key:'reddit_api', label:'Reddit'},
+                          {key:'github_stargazers', label:'GitHub Stars'},
+                          {key:'twitter_api', label:'Twitter'},
+                        ] }">
+          <button class="signal-filter-pill" :class="{'active': signalSourceFilter === ''}" @click="signalSourceFilter = ''">
+            All <span class="pill-count" x-text="_real().length"></span>
+          </button>
+          <template x-for="s in _sources">
+            <button class="signal-filter-pill" :class="{'active': signalSourceFilter === s.key, 'pill-zero': _cnt(s.key) === 0}" @click="signalSourceFilter = s.key">
+              <span x-text="s.label"></span> <span class="pill-count" x-text="_cnt(s.key)"></span>
+            </button>
+          </template>
+        </div>
+        <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
+          <div>
+            <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
+              <div class="signal-card" :class="{'signal-card-high': sig.impact === 'high'}" x-show="!signalSourceFilter || sig.source === signalSourceFilter">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                  <span class="signal-code" x-text="sig.signal_code"></span>
+                  <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
+                        x-text="(sig.impact || 'low').toUpperCase() + ' IMPACT'"></span>
+                  <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)"
+                        x-text="'wt:' + (sig.base_weight || 0)"></span>
+                  <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
+                  <template x-if="sig.dimension">
+                    <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--border-light);color:var(--cyan)" x-text="sig.dimension"></span>
+                  </template>
+                  <template x-if="sig.observed_at">
+                    <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
+                  </template>
+                </div>
+                <div class="signal-evidence" x-text="sig.evidence_text"></div>
+                <template x-if="sig.evidence_url">
+                  <div style="margin-top:4px">
+                    <a class="signal-url" :href="sig.evidence_url" target="_blank" x-text="(sig.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+        <div x-show="!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0" class="empty">No real signals detected. Run pipeline to collect signals.</div>
+      </div>
+
+      <!-- Research Tab -->
+      <div x-show="dtab==='research'">
+        <template x-if="researchData && researchData.research">
+          <div>
+            <div class="research-brief" x-text="researchData.research.research_brief || 'No research brief available'"></div>
+            <template x-if="researchData.research.enrichment_json">
+              <div>
+                <h4 style="color:var(--blue);font-size:13px;margin-top:16px;margin-bottom:8px">Enrichment Data</h4>
+                <div class="enrichment-grid" x-data="{ enr: JSON.parse(researchData.research.enrichment_json || '{}') }">
+                  <template x-for="[k,v] in Object.entries(enr).filter(([k]) => !k.endsWith('_confidence') && !k.endsWith('_source'))">
+                    <div class="enr-item">
+                      <div class="enr-label" x-text="k.replace(/_/g, ' ')"></div>
+                      <div class="enr-value" x-text="typeof v === 'object' ? JSON.stringify(v) : v"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+        <div x-show="!researchData || !researchData.research" class="empty">No research data. Run the pipeline to generate research.</div>
+      </div>
+
+      <!-- Contacts Tab -->
+      <div x-show="dtab==='contacts'">
+        <template x-if="!detail || !detail.contacts || detail.contacts.length === 0">
+          <div class="empty">
+            <div style="margin-bottom:16px">No decision makers found yet.</div>
+            <button class="btn btn-blue"
+                    @click="discoverContacts(expandedId)"
+                    :disabled="contactsLoading">
+              <template x-if="contactsLoading"><span>Discovering...</span></template>
+              <template x-if="!contactsLoading"><span>Discover Decision Makers</span></template>
+            </button>
+          </div>
+        </template>
+        <template x-if="detail && detail.contacts && detail.contacts.length > 0">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <span style="font-size:12px;color:var(--text-muted)"
+                    x-text="detail.contacts.length + ' contact(s)'"></span>
+              <button class="btn btn-sm"
+                      @click="discoverContacts(expandedId)"
+                      :disabled="contactsLoading">
+                <template x-if="contactsLoading">Refreshing...</template>
+                <template x-if="!contactsLoading">Refresh</template>
+              </button>
+            </div>
+            <template x-for="c in detail.contacts" :key="c.contact_id">
+              <div class="contact-card"
+                   :class="{ 'warm-highlight': c.warmth_score > 0 }"
+                   :style="c.contact_status === 'ranked' ? 'border-left:3px solid var(--blue)' :
+                            c.contact_status === 'verified' ? 'border-left:3px solid var(--green)' :
+                            c.contact_status === 'enriched' ? 'border-left:3px solid var(--orange)' : ''">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                  <div>
+                    <div class="contact-name" x-text="c.first_name + ' ' + c.last_name"></div>
+                    <div class="contact-title" x-text="c.title || 'Unknown Title'"></div>
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+                    <template x-if="c.management_level">
+                      <span class="tier"
+                            :class="c.management_level === 'C-Level' ? 'tier-high' :
+                                    c.management_level === 'VP' ? 'tier-medium' : 'tier-low'"
+                            x-text="c.management_level"></span>
+                    </template>
+                    <template x-if="c.authority_score > 0">
+                      <span style="font-family:var(--mono);font-size:11px;color:var(--blue)"
+                            x-text="'Auth: ' + (c.authority_score * 100).toFixed(0) + '%'"></span>
+                    </template>
+                  </div>
+                </div>
+                <template x-if="c.warmth_score > 0">
+                  <div style="margin-top:6px">
+                    <span class="warm-badge" x-text="c.warm_path_reason"></span>
+                  </div>
+                </template>
+                <template x-if="c.semantic_role">
+                  <div style="margin-top:4px">
+                    <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--border-light);color:var(--cyan)"
+                          x-text="c.semantic_role"></span>
+                  </div>
+                </template>
+                <template x-if="c.contact_status === 'enriched' || c.contact_status === 'verified'">
+                  <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                    <template x-if="c.email">
+                      <div style="display:flex;align-items:center;gap:4px">
+                        <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
+                        <template x-if="c.email_verified">
+                          <span style="font-size:10px;color:var(--green);font-weight:600" title="Verified">&#10003;</span>
+                        </template>
+                        <template x-if="c.verification_status === 'catch_all'">
+                          <span style="font-size:10px;color:var(--orange)" title="Catch-all domain">&#9888;</span>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="!c.email">
+                      <span style="font-size:11px;color:var(--text-muted)">No email found</span>
+                    </template>
+                    <template x-if="c.linkedin_url">
+                      <a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="c.contact_status !== 'enriched' && c.contact_status !== 'verified' && (c.email || c.linkedin_url)">
+                  <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                    <template x-if="c.email">
+                      <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
+                    </template>
+                    <template x-if="c.linkedin_url">
+                      <a class="contact-link" :href="c.linkedin_url" target="_blank">LinkedIn</a>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="c.contact_status !== 'enriched' && c.contact_status !== 'verified'">
+                  <div style="margin-top:8px">
+                    <button class="btn btn-sm btn-blue"
+                            @click.stop="enrichContact(c.contact_id, expandedId)"
+                            :disabled="enrichingContactId === c.contact_id">
+                      <template x-if="enrichingContactId === c.contact_id"><span>Enriching...</span></template>
+                      <template x-if="enrichingContactId !== c.contact_id"><span>Reveal Contact</span></template>
+                    </button>
+                  </div>
+                </template>
+                <div style="margin-top:6px;display:flex;gap:8px;font-size:10px;color:var(--text-muted)">
+                  <template x-if="c.enrichment_source">
+                    <span x-text="'Source: ' + c.enrichment_source"></span>
+                  </template>
+                  <span :style="'color:' + contactStatusColor(c.contact_status)"
+                        x-text="(c.contact_status || 'discovered').toUpperCase()"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Labels Tab -->
+      <div x-show="dtab==='labels'">
+        <div style="margin-bottom:12px">
+          <template x-for="lbl in accountLabels">
+            <div style="display:inline-flex;align-items:center;gap:4px;margin:4px">
+              <span class="label-badge" :class="'label-' + lbl.label" x-text="lbl.label.toUpperCase()"></span>
+              <span style="font-size:11px;color:var(--text-muted)" x-text="lbl.notes || ''"></span>
+              <button class="btn btn-sm btn-danger" @click.stop="removeLabel(lbl.label_id, expandedId)" style="padding:2px 6px;font-size:10px">x</button>
+            </div>
+          </template>
+        </div>
+        <div class="label-form">
+          <select class="label-select" x-model="newLabel">
+            <option value="">Add label...</option>
+            <option value="qualified">Qualified</option>
+            <option value="not_qualified">Not Qualified</option>
+            <option value="sql">SQL</option>
+            <option value="mql">MQL</option>
+            <option value="sal">SAL</option>
+            <option value="abm">ABM</option>
+          </select>
+          <input class="notes-input" type="text" placeholder="Notes (optional)" x-model="newNotes">
+          <button class="btn btn-blue btn-sm" @click.stop="addLabel(expandedId)" :disabled="!newLabel">Add</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Pagination -->
@@ -434,6 +481,6 @@
   </template>
 </div>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=9"></script>
 </body>
 </html>
