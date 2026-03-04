@@ -69,7 +69,9 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
         else {"inserted": 0, "seen": 0}
     )
     results["reddit_official"] = (
-        await reddit_official.collect(conn=conn, settings=settings, lexicon_rows=lexicon, source_reliability=source_reliability)
+        await reddit_official.collect(
+            conn=conn, settings=settings, lexicon_by_source=lexicon, source_reliability_dict=source_reliability
+        )
         if _collector_enabled("reddit_official")
         else {"inserted": 0, "seen": 0}
     )
