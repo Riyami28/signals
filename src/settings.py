@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     discovery_thresholds_path: Path = Field(default=Path(""))
     discovery_blocklist_path: Path = Field(default=Path(""))
     promotion_policy_path: Path = Field(default=Path(""))
+    subreddit_mapping_path: Path = Field(default=Path(""))
 
     # --- Google Sheets ---
     google_sheet_id: Optional[str] = Field(default=None, alias="GOOGLE_SHEETS_SPREADSHEET_ID")
@@ -234,6 +235,8 @@ class Settings(BaseSettings):
             self.discovery_blocklist_path = cd / "discovery_blocklist.csv"
         if self.promotion_policy_path == Path(""):
             self.promotion_policy_path = cd / "promotion_policy.csv"
+        if self.subreddit_mapping_path == Path(""):
+            self.subreddit_mapping_path = cd / "subreddit_mapping.csv"
 
         # Normalize empty google_sheet_id to None.
         if self.google_sheet_id is not None and not self.google_sheet_id.strip():

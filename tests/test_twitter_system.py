@@ -21,7 +21,6 @@ from src import db
 from src.collectors import twitter
 from src.settings import Settings
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -387,7 +386,6 @@ class TestSys05ScoringPicksUpTwitter:
     @pytest.mark.asyncio
     async def test_twitter_observation_contributes_to_score(self, tmp_path):
         """Twitter observation stored → scoring engine produces a non-zero score."""
-        import datetime
         from src.scoring.engine import run_scoring
         from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
 

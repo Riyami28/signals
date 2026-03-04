@@ -7,7 +7,19 @@ import logging
 from datetime import date
 
 from src import db
-from src.collectors import community, first_party, gnews_collector, jobs, news, serper_twitter, technographics, twitter, website_techscan
+from src.collectors import (
+    community,
+    first_party,
+    gnews_collector,
+    jobs,
+    news,
+    reddit_collector,
+    reddit_official,
+    serper_twitter,
+    technographics,
+    twitter,
+    website_techscan,
+)
 from src.integrations.crunchbase import CrunchbaseClient, enrich_firmographics, evaluate_firmographic_signals
 from src.models import SignalObservation
 from src.pipeline.helpers import bootstrap
@@ -47,6 +59,23 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     results["community"] = (
         await community.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("reddit_api")
+        else {"inserted": 0, "seen": 0}
+    )
+    results["reddit"] = (
+        await reddit_collector.collect(
+            conn=conn, settings=settings, lexicon_by_source=lexicon, source_reliability_dict=source_reliability
+        )
+        if _collector_enabled("reddit_api")
+        else {"inserted": 0, "seen": 0}
+    )
+    results["reddit_official"] = (
+        await reddit_official.collect(
+            conn=conn,
+            settings=settings,
+            lexicon_rows=lexicon.get("community", []),
+            source_reliability=source_reliability.get("reddit_official", 0.75),
+        )
+        if _collector_enabled("reddit_official")
         else {"inserted": 0, "seen": 0}
     )
     results["first_party"] = (
