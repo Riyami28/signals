@@ -7,8 +7,7 @@ jobs_pages,12,1.0,20,2,2,100,false
 greenhouse_api,10,1.0,20,2,2,100,false
 lever_api,10,1.0,20,2,2,100,false
 technographics,12,1.5,20,2,2,120,false
-reddit_api,8,1.0,15,2,2,150,true
-reddit_official,4,0.5,20,2,5,50,true
+reddit_api,8,1.0,15,2,2,150,false
 social_provider,4,0.5,20,2,3,80,false
 earnings_transcripts_provider,4,0.5,25,2,3,60,false
 first_party_csv,4,5.0,10,1,1,500,true
@@ -22,3 +21,4 @@ gnews,3,1.0,15,2,2,80,false
 github_stargazers,5,2.0,15,2,2,50,true
 twitter_api,1,0.067,20,2,15,10,true
 serper_twitter,6,3.0,15,2,2,50,true
+reddit_official,4,0.5,20,2,5,50,true
