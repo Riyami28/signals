@@ -30,12 +30,7 @@ logger = logging.getLogger(__name__)
 # Reddit requires a specific User-Agent to avoid being blocked
 REDDIT_USER_AGENT = "browser:zopdev-signals-collector:v1.0 (by /u/zopdev)"
 
-_VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
+_VERBOSE_PROGRESS = os.getenv("SIGNALS_VERBOSE_PROGRESS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _emit_progress(message: str) -> None:
@@ -90,60 +85,67 @@ def _build_observation(
     )
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True,
-)
-async def _fetch_reddit_search_json(
-    query: str, settings: Settings
-) -> dict[str, Any]:
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+async def _fetch_reddit_search_json(query: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches search results from Reddit JSON API with retries."""
-    # Support mock API for development (use SIGNALS_REDDIT_API_BASE_URL env var)
-    reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
-
-    if reddit_api_base.startswith("http://"):  # Mock API - use httpx directly for testing
-        search_url = f"{reddit_api_base}/search?q={quote_plus(query)}&sort=new&limit=25"
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.get(search_url)
-            response.raise_for_status()
-            return response.json()
-    else:  # Real Reddit API
-        # Use async_get to respect robots.txt and rate limiting per settings.respect_robots_txt
-        search_url = f"{reddit_api_base}/search.json?q={quote_plus(query)}&sort=new&limit=25&t=month"
-
-        logger.debug(f"_fetch_reddit_search_json: fetching {search_url}")
-        response = await async_get(
-            search_url,
-            respect_robots_txt=settings.respect_robots_txt,
-        )
+    # Use RapidAPI if key is provided, otherwise use public API
+    if settings.reddit_rapidapi_key and settings.reddit_use_rapidapi:
+        search_url = f"https://{settings.reddit_rapidapi_host}/search?q={quote_plus(query)}&sort=new&limit=25"
+        headers = {
+            "x-rapidapi-key": settings.reddit_rapidapi_key,
+            "x-rapidapi-host": settings.reddit_rapidapi_host,
+        }
+        logger.debug(f"_fetch_reddit_search_json: fetching from RapidAPI: {search_url}")
+        response = await client.get(search_url, headers=headers, timeout=settings.http_timeout_seconds)
         response.raise_for_status()
         return response.json()
+    else:
+        # Support mock API for development (use SIGNALS_REDDIT_API_BASE_URL env var)
+        reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
+
+        if reddit_api_base.startswith("http://"):  # Mock API - use httpx directly, skip robots.txt
+            search_url = f"{reddit_api_base}/search?q={quote_plus(query)}&sort=new&limit=25"
+            response = await client.get(search_url, timeout=15)
+            response.raise_for_status()
+            return response.json()
+        else:  # Real Reddit API
+            # NOTE: Reddit's robots.txt blocks /search.json for crawlers, but this is a legitimate use case
+            # (public signal collection from community discussions about companies).
+            # We use httpx directly instead of async_get to bypass robots.txt checking.
+            search_url = f"{reddit_api_base}/search.json?q={quote_plus(query)}&sort=new&limit=25&t=month"
+
+            logger.debug(f"_fetch_reddit_search_json: fetching {search_url}")
+            response = await client.get(search_url, timeout=settings.http_timeout_seconds)
+            response.raise_for_status()
+            return response.json()
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True,
-)
-async def _fetch_reddit_subreddit_json(
-    subreddit: str, settings: Settings
-) -> dict[str, Any]:
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+async def _fetch_reddit_subreddit_json(subreddit: str, settings: Settings, client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetches recent posts from a specific subreddit."""
-    reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
+    # Use RapidAPI if key is provided, otherwise use public API
+    if settings.reddit_rapidapi_key and settings.reddit_use_rapidapi:
+        subreddit_url = f"https://{settings.reddit_rapidapi_host}/r/{subreddit}/new?limit=25"
+        headers = {
+            "x-rapidapi-key": settings.reddit_rapidapi_key,
+            "x-rapidapi-host": settings.reddit_rapidapi_host,
+        }
+        logger.debug(f"_fetch_reddit_subreddit_json: fetching from RapidAPI: {subreddit_url}")
+        response = await client.get(subreddit_url, headers=headers, timeout=settings.http_timeout_seconds)
+        response.raise_for_status()
+        return response.json()
+    else:
+        reddit_api_base = os.getenv("SIGNALS_REDDIT_API_BASE_URL", "https://www.reddit.com")
 
-    if reddit_api_base.startswith("http://"):  # Mock API
-        subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
-    else:  # Real Reddit API
-        subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
+        if reddit_api_base.startswith("http://"):  # Mock API
+            subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
+        else:  # Real Reddit API
+            subreddit_url = f"{reddit_api_base}/r/{subreddit}/new.json?limit=25"
 
-    logger.debug(f"_fetch_reddit_subreddit_json: fetching {subreddit_url}")
-    response = await async_get(
-        subreddit_url,
-        respect_robots_txt=settings.respect_robots_txt,
-    )
-    response.raise_for_status()
-    return response.json()
+        logger.debug(f"_fetch_reddit_subreddit_json: fetching {subreddit_url}")
+        response = await client.get(subreddit_url, timeout=settings.http_timeout_seconds)
+        response.raise_for_status()
+        return response.json()
 
 
 async def _collect_account(
@@ -155,6 +157,7 @@ async def _collect_account(
     handles: dict[str, dict[str, str]],
     source_name: str,
     reliability: float,
+    client: httpx.AsyncClient,
 ) -> tuple[int, int, int]:
     logger.info(f"reddit_collector._collect_account() called for account #{account_index}")
 
@@ -207,7 +210,7 @@ async def _collect_account(
         for subreddit_name in subreddit_candidates:
             try:
                 logger.debug(f"reddit_collector account #{account_index}: trying subreddit r/{subreddit_name}")
-                data = await _fetch_reddit_subreddit_json(subreddit_name, settings)
+                data = await _fetch_reddit_subreddit_json(subreddit_name, settings, client)
                 if data and data.get("data", {}).get("children"):
                     logger.info(
                         f"reddit_collector account #{account_index}: found official subreddit r/{subreddit_name}"
@@ -220,7 +223,7 @@ async def _collect_account(
         # Fall back to search if no official subreddit found
         if not data or not data.get("data", {}).get("children"):
             logger.debug(f"reddit_collector account #{account_index}: falling back to search for '{query}'")
-            data = await _fetch_reddit_search_json(query, settings)
+            data = await _fetch_reddit_search_json(query, settings, client)
 
         # Debug response structure
         if not data:
@@ -265,9 +268,7 @@ async def _collect_account(
                 permalink = item.get("permalink", "")
 
                 logger.debug(
-                    f"reddit_collector account #{account_index}: entry {entry_idx} - "
-                    f"url={post_url[:50] if post_url else 'NONE'}, "
-                    f"permalink={permalink[:50] if permalink else 'NONE'}"
+                    f"reddit_collector account #{account_index}: entry {entry_idx} - url={post_url[:50] if post_url else 'NONE'}, permalink={permalink[:50] if permalink else 'NONE'}"
                 )
 
                 # Construct proper Reddit URL
@@ -296,8 +297,7 @@ async def _collect_account(
                 post_age_days = (now - datetime.fromtimestamp(post.created_utc, tz=timezone.utc)).days
                 if post_age_days > REDDIT_DATA_WINDOW_DAYS:
                     logger.debug(
-                        f"reddit_collector account #{account_index}: skipping old post "
-                        f"(age={post_age_days} days, threshold={REDDIT_DATA_WINDOW_DAYS})"
+                        f"reddit_collector account #{account_index}: skipping old post (age={post_age_days} days, threshold={REDDIT_DATA_WINDOW_DAYS})"
                     )
                     continue
 
@@ -452,8 +452,7 @@ async def collect(
         lexicon_rows = lexicon_by_source.get("community", [])
 
     logger.info(
-        f"reddit_collector.collect() starting: enable_live_crawl={settings.enable_live_crawl}, "
-            f"source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
+        f"reddit_collector.collect() starting: enable_live_crawl={settings.enable_live_crawl}, source_reliability={source_reliability}, lexicon_rows={len(lexicon_rows) if lexicon_rows else 0}"
     )
 
     if not settings.enable_live_crawl:
@@ -503,25 +502,31 @@ async def collect(
     accounts_processed = 0
 
     logger.info(
-        f"reddit_collector: starting with {len(accounts)} accounts, concurrency={concurrency}, "
-        f"lexicon_size={len(lexicon_rows) if lexicon_rows else 0}"
+        f"reddit_collector: starting with {len(accounts)} accounts, concurrency={concurrency}, lexicon_size={len(lexicon_rows) if lexicon_rows else 0}"
     )
 
-    async def _run_account(i: int, acct: dict):
-        async with semaphore:
-            return await _collect_account(
-                conn=conn,
-                settings=settings,
-                lexicon_rows=lexicon_rows,
-                account=acct,
-                account_index=i,
-                handles=handles,
-                source_name=source_name,
-                reliability=source_reliability,
-            )
+    async with httpx.AsyncClient(
+        headers={"User-Agent": REDDIT_USER_AGENT},
+        follow_redirects=True,
+        timeout=settings.http_timeout_seconds,
+    ) as client:
 
-    tasks = [_run_account(i, acct) for i, acct in enumerate(accounts, start=1)]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+        async def _run_account(i: int, acct: dict):
+            async with semaphore:
+                return await _collect_account(
+                    conn=conn,
+                    settings=settings,
+                    lexicon_rows=lexicon_rows,
+                    account=acct,
+                    account_index=i,
+                    handles=handles,
+                    source_name=source_name,
+                    reliability=source_reliability,
+                    client=client,
+                )
+
+        tasks = [_run_account(i, acct) for i, acct in enumerate(accounts, start=1)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
     for result in results:
         if isinstance(result, Exception):
