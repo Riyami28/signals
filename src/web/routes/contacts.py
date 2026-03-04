@@ -32,6 +32,7 @@ from src.integrations.apollo import (
     find_email_via_hunter,
     search_contacts_for_account,
 )
+from src.integrations.discovery_registry import DiscoveryRegistry
 from src.integrations.email_verify import EmailVerifier
 from src.integrations.lusha import LushaClient
 from src.integrations.serp_discover import SerpDiscoverer
@@ -103,37 +104,55 @@ def discover_contacts(
         domain = account["domain"]
         company_name = account.get("company_name", domain)
 
-        # ── Step 1: Broad Apollo fetch ─────────────────────────────────────
-        apollo_client = None
-        if settings.apollo_api_key:
-            apollo_client = ApolloClient(
-                api_key=settings.apollo_api_key,
-                rate_limit=settings.apollo_rate_limit,
-            )
+        # ── Step 1: Discover contacts using registry pattern ─────────────────
+        registry = DiscoveryRegistry(settings)
+        discovery_result = registry.discover(
+            domain=domain,
+            company_name=company_name,
+            limit=limit,
+        )
 
-        raw_contacts = _broad_fetch(domain, company_name, apollo_client, settings, limit)
-
-        if not raw_contacts:
+        if not discovery_result.contacts:
+            available_providers = registry.list_providers()
             return {
                 "account_id": account_id,
                 "contacts": db.get_contacts_for_account(conn, account_id),
                 "total_discovered": 0,
-                "message": (
-                    "No contacts found via Apollo broad search. Check API key configuration or try a different domain."
-                ),
+                "message": discovery_result.message,
+                "available_providers": available_providers,
             }
 
+        raw_contacts = [
+            {
+                "first_name": c.first_name,
+                "last_name": c.last_name,
+                "title": c.title,
+                "email": c.email,
+                "linkedin_url": c.linkedin_url,
+                "management_level": c.management_level,
+                "year_joined": c.year_joined,
+                "department": c.department,
+                "enrichment_source": c.enrichment_source,
+                "employment_verified": False if c.is_stale else None,
+                "employment_note": "Stale contact detected" if c.is_stale else "",
+            }
+            for c in discovery_result.contacts
+        ]
+
         logger.info(
-            "contacts.discover: broad_fetch domain=%s found=%d",
+            "contacts.discover: %s discovery domain=%s found=%d credits=%d",
+            discovery_result.source,
             domain,
             len(raw_contacts),
+            discovery_result.credits_used,
         )
 
         # ── Step 2: Store all as 'discovered' ─────────────────────────────
         for c in raw_contacts:
             c["account_id"] = account_id
             c.setdefault("contact_status", "discovered")
-            c.setdefault("enrichment_source", "apollo")
+            # Use the discovery source from the registry result
+            c["enrichment_source"] = discovery_result.source
             db.upsert_single_contact(conn, c)
 
         # ── Step 3: Warm path scoring ──────────────────────────────────────
