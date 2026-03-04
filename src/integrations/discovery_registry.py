@@ -326,9 +326,7 @@ class DiscoveryRegistry:
                 message="No discovery providers configured. Please add Apollo or Serper API key to .env",
             )
 
-        logger.info(
-            f"Discovery: Using {selected.name} to discover contacts for {company_name} ({domain})"
-        )
+        logger.info(f"Discovery: Using {selected.name} to discover contacts for {company_name} ({domain})")
 
         return selected.discover(
             domain=domain,
