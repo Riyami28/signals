@@ -20,9 +20,6 @@ from typing import Optional
 import typer
 from dotenv import load_dotenv
 
-# Load .env file to populate environment variables (for os.getenv() calls in collectors)
-load_dotenv()
-
 from src import db
 from src.collectors import community, first_party, jobs, news, technographics
 from src.discovery import hunt as hunt_pipeline
@@ -66,6 +63,9 @@ from src.source_policy import load_source_execution_policy
 from src.sync.google_sheets import sync_outputs
 from src.sync.zoho_push import run_zoho_push
 from src.utils import ensure_project_directories, load_csv_rows, normalize_domain, parse_date, write_csv_rows
+
+# Load .env file to populate environment variables (for os.getenv() calls in collectors)
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
