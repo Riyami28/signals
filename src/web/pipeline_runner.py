@@ -258,6 +258,7 @@ def _run_pipeline_sync(
                                     settings,
                                     lexicon_by_source=keyword_lexicon,
                                     source_reliability=source_registry,
+                                    account_ids=account_ids if account_ids else None,
                                 )
                             )
                             task_labels.append("serper_twitter")

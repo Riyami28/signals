@@ -19,6 +19,7 @@ import asyncio
 import logging
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -31,6 +32,16 @@ logger = logging.getLogger(__name__)
 
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 SOURCE_NAME = "serper_twitter"
+_TWITTER_HOSTS = {"twitter.com", "x.com"}
+
+
+def _is_twitter_url(url: str) -> bool:
+    """Return True only for actual twitter.com / x.com URLs (not substring matches like crux.com)."""
+    try:
+        host = urlparse(url).netloc.lower().removeprefix("www.")
+        return host in _TWITTER_HOSTS or any(host.endswith(f".{h}") for h in _TWITTER_HOSTS)
+    except Exception:
+        return False
 
 # Broad signal terms covering all high-value signal categories
 _TWITTER_SIGNAL_TERMS = (
@@ -124,13 +135,9 @@ async def _fetch_serper_twitter(
         )
         resp.raise_for_status()
         data = resp.json()
-        # Return only results from twitter.com or x.com
+        # Return only results from twitter.com or x.com (proper domain check, not substring)
         organic = data.get("organic", [])
-        return [
-            r for r in organic
-            if "twitter.com" in str(r.get("link", "")).lower()
-            or "x.com" in str(r.get("link", "")).lower()
-        ]
+        return [r for r in organic if _is_twitter_url(str(r.get("link", "")))]
     except httpx.HTTPStatusError as exc:
         logger.warning(
             "serper_twitter_http_error query=%s status=%s",
@@ -241,6 +248,7 @@ async def collect(
     lexicon_by_source: dict[str, list[dict[str, str]]],
     source_reliability: dict[str, float],
     db_pool=None,
+    account_ids: list[str] | None = None,
 ) -> dict[str, int]:
     """Main entry point for serper_twitter collector.
 
@@ -274,13 +282,24 @@ async def collect(
     # Align time window with twitter_lookback_days (default 7 → qdr:w = past week)
     lookback_days = getattr(settings, "twitter_lookback_days", 7)
 
-    accounts = [
-        dict(r)
-        for r in conn.execute(
-            "SELECT account_id, company_name, domain FROM accounts ORDER BY company_name LIMIT %s",
-            (max_accounts,),
-        ).fetchall()
-    ]
+    if account_ids:
+        placeholders = ", ".join("%s" for _ in account_ids)
+        accounts = [
+            dict(r)
+            for r in conn.execute(
+                f"SELECT account_id, company_name, domain FROM accounts"
+                f" WHERE account_id IN ({placeholders}) ORDER BY company_name LIMIT %s",
+                tuple(account_ids) + (max_accounts,),
+            ).fetchall()
+        ]
+    else:
+        accounts = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT account_id, company_name, domain FROM accounts ORDER BY company_name LIMIT %s",
+                (max_accounts,),
+            ).fetchall()
+        ]
 
     if not accounts:
         return {"inserted": 0, "seen": 0}
