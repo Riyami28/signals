@@ -198,15 +198,23 @@ def get_account(account_id: str):
                     signals_by_dimension[dim] = []
                 # Extract evidence snippet (first 120 chars of evidence_text)
                 evidence_text = signal.get("evidence_text", "")
-                snippet = (evidence_text[:120] + "...") if len(evidence_text) > 120 else evidence_text
-                signals_by_dimension[dim].append({
-                    "signal_code": signal.get("signal_code", ""),
-                    "source": signal.get("source", ""),
-                    "component_score": float(signal.get("component_score") or 0),
-                    "evidence_url": signal.get("evidence_url", ""),
-                    "evidence_snippet": snippet,
-                    "observed_at": signal.get("observed_at", ""),
-                })
+                snippet = (
+                    (evidence_text[:120] + "...")
+                    if len(evidence_text) > 120
+                    else evidence_text
+                )
+                signals_by_dimension[dim].append(
+                    {
+                        "signal_code": signal.get("signal_code", ""),
+                        "source": signal.get("source", ""),
+                        "component_score": float(
+                            signal.get("component_score") or 0
+                        ),
+                        "evidence_url": signal.get("evidence_url", ""),
+                        "evidence_snippet": snippet,
+                        "observed_at": signal.get("observed_at", ""),
+                    }
+                )
 
             # Sort by component_score and keep top 5 per dimension
             for dim in signals_by_dimension:
