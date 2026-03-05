@@ -323,12 +323,16 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
             else {"inserted": 0, "seen": 0}
         )
         results["twitter_mcp"] = (
-            await twitter_mcp_collector.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            await twitter_mcp_collector.collect(
+                conn, settings, lexicon, source_reliability, db_pool=pool
+            )
             if _collector_enabled("twitter_mcp")
             else {"inserted": 0, "seen": 0}
         )
         results["hackernews_mcp"] = (
-            await hackernews_mcp_collector.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
+            await hackernews_mcp_collector.collect(
+                conn, settings, lexicon, source_reliability, db_pool=pool
+            )
             if _collector_enabled("hackernews_mcp")
             else {"inserted": 0, "seen": 0}
         )
