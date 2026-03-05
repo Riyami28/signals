@@ -6,6 +6,11 @@ website_scan,16,2.0,25,3,2,120,false
 jobs_pages,12,1.0,20,2,2,100,false
 greenhouse_api,10,1.0,20,2,2,100,false
 lever_api,10,1.0,20,2,2,100,false
+rss_feed,16,2.0,25,3,2,150,true
+website_scan,16,2.0,25,3,2,120,true
+jobs_pages,12,1.0,20,2,2,100,false
+greenhouse_api,10,1.0,20,2,2,100,true
+lever_api,10,1.0,20,2,2,100,true
 technographics,12,1.5,20,2,2,120,false
 reddit_api,8,1.0,15,2,2,150,true
 social_provider,4,0.5,20,2,3,80,false
@@ -21,4 +26,10 @@ gnews,3,1.0,15,2,2,80,false
 github_stargazers,5,2.0,15,2,2,50,false
 twitter_api,1,0.067,20,2,15,10,false
 serper_twitter,6,3.0,15,2,2,50,false
+github_stargazers,5,2.0,15,2,2,50,true
+twitter_api,1,0.067,20,2,15,10,true
+serper_twitter,6,3.0,15,2,2,50,true
+serper_reddit,6,3.0,15,2,2,50,true
 reddit_official,4,0.5,20,2,5,50,true
+builtwith_free,1,1.0,15,2,3,100,true
+firmographic_google,1,1.0,30,2,3,100,true

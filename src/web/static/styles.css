@@ -191,6 +191,47 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .side-panel-close:hover { color: var(--text); background: var(--bg-tertiary); }
 .side-panel-body { padding: 0 24px 24px; }
 
+/* Firmographic Section (inside Signals tab) */
+.firmo-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 12px; overflow: hidden;
+}
+.firmo-card-header {
+  font-size: 12px; font-weight: 600; color: var(--blue); text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+.firmo-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+}
+.firmo-item {
+  padding: 10px 14px; border-bottom: 1px solid var(--border-light);
+}
+.firmo-item:nth-child(odd) { border-right: 1px solid var(--border-light); }
+.firmo-item:last-child, .firmo-item:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+.firmo-label {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px;
+  margin-bottom: 3px;
+}
+.firmo-value { font-size: 13px; color: var(--text-bright); font-weight: 500; }
+.firmo-big { font-size: 16px; font-weight: 700; }
+.firmo-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+}
+.badge-public { background: var(--tint-green); color: var(--green); }
+.badge-private { background: var(--tint-blue); color: var(--blue); }
+.badge-size { background: var(--tint-purple); color: var(--purple); }
+.badge-revenue { background: var(--tint-orange); color: var(--orange); }
+.firmo-tech-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
+.firmo-tech-pill {
+  display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px;
+  background: var(--tint-cyan); color: var(--cyan); border: 1px solid rgba(121, 192, 255, 0.2);
+}
+.firmo-link {
+  color: var(--blue); text-decoration: none; font-size: 12px;
+}
+.firmo-link:hover { text-decoration: underline; }
+
 /* Tabs */
 .tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 1; padding-top: 12px; }
 .tab {
@@ -271,13 +312,22 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 /* Dimension Scores */
 .dimension-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .dimension-row { display: flex; align-items: center; gap: 12px; }
-.dimension-label { width: 140px; font-size: 12px; color: var(--text-muted); text-transform: capitalize; flex-shrink: 0; }
+.dimension-row-clickable { cursor: pointer; padding: 4px 8px; margin: -4px -8px; border-radius: 6px; transition: background 0.15s ease; }
+.dimension-row-clickable:hover { background: var(--bg-tertiary); }
+.dimension-row-clickable:hover .dimension-label { color: var(--blue); }
+.dimension-row-clickable:hover .dimension-arrow { opacity: 1; }
+.dimension-label { width: 140px; font-size: 12px; color: var(--text-muted); text-transform: capitalize; flex-shrink: 0; transition: color 0.15s; }
 .dimension-bar-bg { flex: 1; height: 20px; background: var(--border-light); border-radius: 4px; overflow: hidden; }
 .dimension-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; min-width: 2px; }
 .dimension-bar-fill.bar-high { background: var(--green); }
 .dimension-bar-fill.bar-medium { background: var(--orange); }
 .dimension-bar-fill.bar-low { background: var(--text-muted); }
-.dimension-score { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text-bright); width: 36px; text-align: right; }
+.dimension-score { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text-bright); width: 30px; text-align: right; }
+.dimension-tier { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; width: 56px; text-align: center; flex-shrink: 0; }
+.dimension-tier.tier-high { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+.dimension-tier.tier-medium { background: rgba(251, 191, 36, 0.15); color: var(--orange); }
+.dimension-tier.tier-low { background: rgba(156, 163, 175, 0.15); color: var(--text-muted); }
+.dimension-arrow { font-size: 12px; color: var(--blue); opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 
 /* Velocity Banner */
 .velocity-banner {

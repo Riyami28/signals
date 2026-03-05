@@ -28,12 +28,31 @@ async def run_pipeline_async(account_ids: list[str], stages: list[str], batch_id
     return run_id
 
 
+# Global timeout for the entire pipeline run (15 minutes).
+# Prevents zombie runs if a collector or DB operation hangs.
+_PIPELINE_TIMEOUT = 900
+
+
 async def _run_in_thread(
     run_id: str, account_ids: list[str], stages: list[str], queue: asyncio.Queue, batch_id: str = ""
 ):
     """Run pipeline stages in a thread and emit events to the queue."""
     try:
-        await asyncio.to_thread(_run_pipeline_sync, run_id, account_ids, stages, queue, batch_id)
+        await asyncio.wait_for(
+            asyncio.to_thread(_run_pipeline_sync, run_id, account_ids, stages, queue, batch_id),
+            timeout=_PIPELINE_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.error("pipeline run %s timed out after %ds", run_id, _PIPELINE_TIMEOUT)
+        await queue.put({"type": "error", "message": f"Pipeline timed out after {_PIPELINE_TIMEOUT}s"})
+        # Mark the DB row as failed so it doesn't stay stuck
+        try:
+            settings = load_settings()
+            conn = db.get_connection(settings.pg_dsn)
+            db.finish_ui_pipeline_run(conn, run_id, "failed", {"error": "Pipeline timeout"})
+            conn.close()
+        except Exception:
+            pass
     except Exception as exc:
         await queue.put({"type": "error", "message": str(exc)})
     finally:
@@ -61,8 +80,8 @@ def _run_pipeline_sync(
     score_run_id = None
 
     try:
-        # Record pipeline run
-        db.create_ui_pipeline_run(conn, account_ids, stages)
+        # Record pipeline run (pass run_id so DB row matches the ID we track)
+        db.create_ui_pipeline_run(conn, run_id, account_ids, stages)
 
         if batch_id:
             _emit(
@@ -134,16 +153,23 @@ def _run_pipeline_sync(
                             _emit(
                                 queue, {"type": "log", "stage": "ingest", "message": f"Collecting {label} signals..."}
                             )
-                            import importlib
+                            try:
+                                import importlib
 
-                            mod = importlib.import_module(f"src.collectors.{module_name}")
-                            c_result = _asyncio.run(mod.collect(conn, settings, keyword_lexicon, source_registry))
-                            ins = c_result.get("inserted", 0)
-                            total_inserted += ins
-                            _emit(
-                                queue,
-                                {"type": "log", "stage": "ingest", "message": f"{label}: {ins} signals"},
-                            )
+                                mod = importlib.import_module(f"src.collectors.{module_name}")
+                                c_result = _asyncio.run(mod.collect(conn, settings, keyword_lexicon, source_registry))
+                                ins = c_result.get("inserted", 0)
+                                total_inserted += ins
+                                _emit(
+                                    queue,
+                                    {"type": "log", "stage": "ingest", "message": f"{label}: {ins} signals"},
+                                )
+                            except Exception as legacy_exc:
+                                logger.warning("legacy_collector_error collector=%s error=%s", label, legacy_exc, exc_info=True)
+                                _emit(
+                                    queue,
+                                    {"type": "log", "stage": "ingest", "message": f"⚠️ {label}: error — {str(legacy_exc)[:200]}"},
+                                )
 
                 # --- ALL external collectors in PARALLEL ---
                 # Serper (Google Search) + Website Tech Scan (zero API) + GNews (optional) + GitHub Stargazers + Serper Twitter
@@ -153,11 +179,14 @@ def _run_pipeline_sync(
                 gnews_enabled = _collector_enabled("gnews") and settings.gnews_api_key
                 stargazer_enabled = _collector_enabled("github_stargazers")
                 serper_twitter_enabled = _collector_enabled("serper_twitter") and settings.serper_api_key
+                serper_reddit_enabled = _collector_enabled("serper_reddit") and settings.serper_api_key
                 reddit_enabled = _collector_enabled("reddit_api")
                 reddit_official_enabled = _collector_enabled("reddit_official")
                 twitter_live_enabled = _collector_enabled("twitter_api") and (
                     getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", "")
                 )
+                builtwith_enabled = _collector_enabled("builtwith_free") and settings.builtwith_api_key
+                firmographic_enabled = _collector_enabled("firmographic_google") and settings.serper_api_key and getattr(settings, "minimax_api_key", "")
 
                 any_external = (
                     serper_news_enabled
@@ -166,9 +195,12 @@ def _run_pipeline_sync(
                     or gnews_enabled
                     or stargazer_enabled
                     or serper_twitter_enabled
+                    or serper_reddit_enabled
                     or reddit_enabled
                     or reddit_official_enabled
                     or twitter_live_enabled
+                    or builtwith_enabled
+                    or firmographic_enabled
                 )
 
                 if any_external:
@@ -183,12 +215,18 @@ def _run_pipeline_sync(
                         active_sources.append("gnews")
                     if serper_twitter_enabled:
                         active_sources.append("serper_twitter")
+                    if serper_reddit_enabled:
+                        active_sources.append("serper_reddit")
                     if reddit_enabled:
                         active_sources.append("reddit")
                     if reddit_official_enabled:
                         active_sources.append("reddit_official")
                     if twitter_live_enabled:
                         active_sources.append("twitter_live")
+                    if builtwith_enabled:
+                        active_sources.append("builtwith")
+                    if firmographic_enabled:
+                        active_sources.append("firmographic")
 
                     _emit(
                         queue,
@@ -205,8 +243,12 @@ def _run_pipeline_sync(
                         all_news_lexicon.extend(r for r in keyword_lexicon.get(source_key, []) if r.get("keyword"))
                     jobs_lexicon = [r for r in keyword_lexicon.get("jobs", []) if r.get("keyword")]
 
+                    # Per-collector timeout (seconds) — prevents a single
+                    # slow/stuck collector from blocking the whole pipeline.
+                    _COLLECTOR_TIMEOUT = 120  # 2 minutes max per collector
+
                     async def _run_all_external():
-                        """Run ALL external collectors concurrently."""
+                        """Run ALL external collectors concurrently with per-collector timeouts."""
                         tasks = []
                         task_labels = []
 
@@ -283,6 +325,21 @@ def _run_pipeline_sync(
                             )
                             task_labels.append("serper_twitter")
 
+                        # --- Serper Reddit (Google-indexed Reddit posts — uses Serper API key) ---
+                        if serper_reddit_enabled:
+                            from src.collectors import serper_reddit
+
+                            tasks.append(
+                                serper_reddit.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("serper_reddit")
+
                         # --- Reddit collectors (FREE — public Reddit JSON API) ---
                         if reddit_enabled:
                             from src.collectors import reddit_collector
@@ -327,6 +384,33 @@ def _run_pipeline_sync(
                             )
                             task_labels.append("twitter_live")
 
+                        # --- BuiltWith Free API (tech stack from builtwith.com) ---
+                        if builtwith_enabled:
+                            from src.collectors import builtwith
+
+                            tasks.append(
+                                builtwith.collect(
+                                    conn,
+                                    settings,
+                                    source_reliability=source_registry.get("builtwith_free", 0.75),
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("builtwith")
+
+                        # --- Firmographic Google (Serper + MiniMax LLM) ---
+                        if firmographic_enabled:
+                            from src.collectors import firmographic_google
+
+                            tasks.append(
+                                firmographic_google.collect(
+                                    conn,
+                                    settings,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("firmographic_google")
+
                         # --- GitHub Stargazers (FREE — tracks repo stars) ---
                         if stargazer_enabled:
                             from src.collectors import github_stargazers
@@ -341,30 +425,66 @@ def _run_pipeline_sync(
                             )
                             task_labels.append("github_stargazers")
 
-                        results = await asyncio.gather(*tasks, return_exceptions=True)
+                        # Wrap each task with a timeout so no single collector can hang
+                        wrapped = [
+                            asyncio.wait_for(t, timeout=_COLLECTOR_TIMEOUT)
+                            for t in tasks
+                        ]
+                        results = await asyncio.gather(*wrapped, return_exceptions=True)
                         return list(zip(task_labels, results))
 
                     external_results = _asyncio.run(_run_all_external())
 
                     for label, result in external_results:
-                        if isinstance(result, Exception):
-                            logger.warning("collector_error collector=%s error=%s", label, result)
+                        if isinstance(result, asyncio.TimeoutError):
+                            logger.warning("collector_timeout collector=%s timeout=%ds", label, _COLLECTOR_TIMEOUT)
                             _emit(
                                 queue,
-                                {"type": "log", "stage": "ingest", "message": f"{label}: failed ({result})"},
+                                {"type": "log", "stage": "ingest", "message": f"⚠️ {label}: timed out after {_COLLECTOR_TIMEOUT}s"},
                             )
                             continue
+                        if isinstance(result, Exception):
+                            err_msg = str(result)[:200]
+                            logger.warning("collector_error collector=%s error=%s", label, result, exc_info=result)
+                            _emit(
+                                queue,
+                                {"type": "log", "stage": "ingest", "message": f"⚠️ {label}: error — {err_msg}"},
+                            )
+                            continue
+
+                        # Firmographic collector returns enriched/skipped/errors instead of inserted/seen
+                        if label == "firmographic_google":
+                            enriched = result.get("enriched", 0)
+                            accts = result.get("accounts_processed", 0)
+                            errs = result.get("errors", 0)
+                            msg = f"{label}: {enriched} enriched from {accts} accounts"
+                            if errs:
+                                msg += f" ({errs} errors)"
+                            _emit(queue, {"type": "log", "stage": "ingest", "message": msg})
+                            continue
+
                         ins = result.get("inserted", 0)
+                        seen = result.get("seen", 0)
                         accts = result.get("accounts_processed", 0)
                         total_inserted += ins
-                        _emit(
-                            queue,
-                            {
-                                "type": "log",
-                                "stage": "ingest",
-                                "message": f"{label}: {ins} signals from {accts} accounts",
-                            },
-                        )
+                        if ins == 0 and accts == 0:
+                            _emit(
+                                queue,
+                                {
+                                    "type": "log",
+                                    "stage": "ingest",
+                                    "message": f"{label}: 0 signals (collector may not have run — check API keys/config)",
+                                },
+                            )
+                        else:
+                            _emit(
+                                queue,
+                                {
+                                    "type": "log",
+                                    "stage": "ingest",
+                                    "message": f"{label}: {ins} signals from {accts} accounts ({seen} matches)",
+                                },
+                            )
 
                 dt = time.monotonic() - t0
                 _emit(

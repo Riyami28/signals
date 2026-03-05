@@ -130,8 +130,26 @@ def select_accounts_for_live_crawl(
     source: str,
     limit: int,
     include_domains: list[str] | tuple[str, ...] | None = None,
+    include_account_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     bounded_limit = max(1, int(limit))
+
+    # If specific account IDs requested, return those directly
+    if include_account_ids:
+        placeholders = ", ".join("%s" for _ in include_account_ids)
+        cur = conn.execute(
+            f"""
+            SELECT a.account_id, a.domain, a.company_name, a.created_at,
+                   NULL AS last_attempted_at
+            FROM accounts a
+            WHERE a.account_id IN ({placeholders})
+              AND COALESCE(a.domain, '') <> ''
+            LIMIT %s
+            """,
+            tuple(include_account_ids) + (bounded_limit,),
+        )
+        return list(cur.fetchall())
+
     domain_filters: list[str] = []
     for raw in list(include_domains or []):
         normalized = normalize_domain(str(raw))

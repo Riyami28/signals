@@ -1,16 +1,17 @@
-"""Serper.dev Google Search collector — finds Twitter/X posts via Google's index.
+"""Serper.dev Google Search collector — finds Reddit posts via Google's index.
 
-This collector uses Google Search (via Serper API) to surface Twitter/X content
-that is publicly indexed by Google, using `site:twitter.com OR site:x.com` queries.
+This collector uses Google Search (via Serper API) to surface Reddit content
+that is publicly indexed by Google, using `site:reddit.com` queries scoped to
+each watchlist company combined with cloud/DevOps/infrastructure keywords.
 
-Key advantages over direct Twitter API:
-- No Twitter API quota consumed
-- No Twitter ToS concerns (searching Google's public index)
-- Complements RapidAPI coverage for the same accounts
-- Finds high-signal tweets that Google has indexed prominently
+Key advantages:
+- No Reddit API quota consumed
+- Finds company-specific discussions on Reddit about cloud/DevOps topics
+- Complements existing reddit_collector (RapidAPI) and reddit_official
+- Google's ranking surfaces the most relevant threads
 
-Source name: serper_twitter
-Reliability: 0.60 (lower than twitter_api since results are Google-cached, not real-time)
+Source name: serper_reddit
+Reliability: 0.65
 """
 
 from __future__ import annotations
@@ -30,17 +31,17 @@ from src.utils import classify_text, stable_hash, utc_now_iso
 logger = logging.getLogger(__name__)
 
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
-SOURCE_NAME = "serper_twitter"
+SOURCE_NAME = "serper_reddit"
 
-# Broad signal terms covering all high-value signal categories
-_TWITTER_SIGNAL_TERMS = (
-    "hiring OR devops OR kubernetes OR terraform OR finops "
-    'OR "cloud cost" OR "cloud migration" OR "digital transformation" '
-    'OR compliance OR soc2 OR "cost reduction" OR "cost optimization" '
-    'OR "funding round" OR "series a" OR "series b" '
-    'OR "product launch" OR "supply chain" OR "vendor consolidation" '
-    'OR "security audit" OR outage OR ERP OR SAP '
-    'OR "platform engineering" OR modernization'
+# Broad cloud/DevOps/infrastructure signal terms for Reddit search
+_REDDIT_SIGNAL_TERMS = (
+    "kubernetes OR devops OR terraform OR finops "
+    'OR "cloud cost" OR "cloud migration" OR "platform engineering" '
+    'OR "digital transformation" OR modernization OR SRE '
+    'OR "cost optimization" OR "vendor consolidation" OR compliance '
+    'OR "infrastructure as code" OR docker OR "cloud native" '
+    'OR "site reliability" OR microservices OR observability '
+    'OR "ci cd" OR "continuous delivery" OR serverless'
 )
 
 
@@ -55,7 +56,7 @@ def _build_observation(
     payload: dict[str, Any],
 ) -> SignalObservation:
     raw_hash = stable_hash(payload, prefix="raw")
-    # Use evidence_url for dedup (not observed_at) so the same tweet URL
+    # Use evidence_url for dedup (not observed_at) so the same Reddit URL
     # across multiple runs doesn't create duplicate observations.
     obs_id = stable_hash(
         {
@@ -81,42 +82,43 @@ def _build_observation(
     )
 
 
-def _lookback_to_tbs(lookback_days: int) -> str:
-    """Convert lookback_days to Serper tbs (time-based search) parameter.
+def _is_reddit_post(link: str) -> bool:
+    """Return True if the URL is a Reddit post/comment, not a profile or wiki page."""
+    link_lower = link.lower()
+    if "reddit.com" not in link_lower:
+        return False
+    # Skip non-post pages
+    skip_patterns = [
+        "/user/",
+        "/wiki/",
+        "/about/",
+        "/search?",
+        "/submit",
+        "/message/",
+        "/settings/",
+        "/premium",
+        "/coins",
+    ]
+    for pattern in skip_patterns:
+        if pattern in link_lower:
+            return False
+    return True
 
-    Aligns Serper results with twitter_lookback_days so both sources cover
-    the same time window.
-      1  day  → qdr:d
-      ≤ 7 days → qdr:w  (default — matches Twitter free tier)
-      ≤ 30 days → qdr:m
-      else    → qdr:y
-    """
-    if lookback_days <= 1:
-        return "qdr:d"
-    if lookback_days <= 7:
-        return "qdr:w"
-    if lookback_days <= 30:
-        return "qdr:m"
-    return "qdr:y"
 
-
-async def _fetch_serper_twitter(
+async def _fetch_serper_reddit(
     client: httpx.AsyncClient,
     query: str,
     api_key: str,
     num_results: int = 10,
-    lookback_days: int = 7,
 ) -> list[dict]:
-    """Call Serper organic search and return results for twitter.com / x.com.
+    """Call Serper organic search and return results from reddit.com only.
 
-    Uses tbs parameter to restrict results to the same time window as
-    twitter_lookback_days — keeps both sources temporally consistent.
+    Uses tbs=qdr:m to restrict results to the past month for freshness.
     """
-    tbs = _lookback_to_tbs(lookback_days)
     try:
         resp = await client.post(
             SERPER_SEARCH_URL,
-            json={"q": query, "num": num_results, "tbs": tbs},
+            json={"q": query, "num": num_results, "tbs": "qdr:m"},
             headers={
                 "X-API-KEY": api_key,
                 "Content-Type": "application/json",
@@ -125,31 +127,17 @@ async def _fetch_serper_twitter(
         )
         resp.raise_for_status()
         data = resp.json()
-        # Return only actual tweet/status URLs from twitter.com or x.com
-        # Filter out profile pages, /with_replies, /followers, /lists, /search etc.
         organic = data.get("organic", [])
-        filtered = []
-        for r in organic:
-            link = str(r.get("link", "")).lower()
-            if not ("twitter.com" in link or "x.com" in link):
-                continue
-            # Must be a status/tweet URL: twitter.com/user/status/123 or x.com/user/status/123
-            if "/status/" in link:
-                filtered.append(r)
-            # Also accept hashtag pages as they contain relevant discussions
-            elif "/hashtag/" in link:
-                filtered.append(r)
-            # Skip everything else: profiles, /with_replies, /followers, /lists, /search, /i/
-        return filtered
+        return [r for r in organic if _is_reddit_post(str(r.get("link", "")))]
     except httpx.HTTPStatusError as exc:
         logger.warning(
-            "serper_twitter_http_error query=%s status=%s",
+            "serper_reddit_http_error query=%s status=%s",
             query[:60],
             exc.response.status_code,
         )
         return []
     except Exception as exc:
-        logger.warning("serper_twitter_error query=%s error=%s", query[:60], exc)
+        logger.warning("serper_reddit_error query=%s error=%s", query[:60], exc)
         return []
 
 
@@ -161,9 +149,8 @@ async def _collect_one_account(
     num_results: int,
     lexicon_rows: list[dict[str, str]],
     reliability: float,
-    lookback_days: int = 7,
 ) -> tuple[int, int]:
-    """Fetch Google-indexed Twitter results for one account and insert matching signals."""
+    """Fetch Google-indexed Reddit results for one account and insert matching signals."""
     account_id = str(account["account_id"])
     company_name = str(account.get("company_name") or account.get("domain", ""))
     domain = str(account.get("domain", ""))
@@ -171,14 +158,14 @@ async def _collect_one_account(
     if not company_name and not domain:
         return 0, 0
 
-    endpoint = f"serper_twitter:{domain}"
+    endpoint = f"serper_reddit:{domain}"
     if db.was_crawled_today(conn, source=SOURCE_NAME, account_id=account_id, endpoint=endpoint):
         return 0, 0
 
-    # Build search query — site-restrict to Twitter/X AND include signal keywords
-    query = f'(site:twitter.com OR site:x.com) "{company_name}" ({_TWITTER_SIGNAL_TERMS})'
+    # Build search query — site-restrict to reddit.com AND include signal keywords
+    query = f'site:reddit.com "{company_name}" ({_REDDIT_SIGNAL_TERMS})'
 
-    results = await _fetch_serper_twitter(client, query, api_key, num_results, lookback_days=lookback_days)
+    results = await _fetch_serper_reddit(client, query, api_key, num_results)
 
     if not results:
         db.record_crawl_attempt(
@@ -222,7 +209,7 @@ async def _collect_one_account(
                         "title": title,
                         "snippet": snippet,
                         "link": link,
-                        "query": query,
+                        "query": query[:100],
                         "matched_keyword": matched_keyword,
                     },
                 )
@@ -251,37 +238,37 @@ async def collect(
     account_ids: list[str] | None = None,
     db_pool=None,
 ) -> dict[str, int]:
-    """Main entry point for serper_twitter collector.
+    """Main entry point for serper_reddit collector.
 
-    Uses Google Search (via Serper API) to find publicly-indexed Twitter/X posts
-    that mention a company alongside DevOps/FinOps/platform signal keywords.
+    Uses Google Search (via Serper API) to find publicly-indexed Reddit posts
+    that mention a company alongside cloud/DevOps/infrastructure signal keywords.
 
     Returns:
-        {"inserted": N, "seen": N}
+        {"inserted": N, "seen": N, "accounts_processed": N}
     """
     api_key = settings.serper_api_key
     if not api_key:
-        logger.debug("serper_api_key not set, skipping serper_twitter collection")
-        return {"inserted": 0, "seen": 0}
+        logger.debug("serper_api_key not set, skipping serper_reddit collection")
+        return {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
-    reliability = source_reliability.get(SOURCE_NAME, 0.60)
+    reliability = source_reliability.get(SOURCE_NAME, 0.65)
     if reliability <= 0:
-        return {"inserted": 0, "seen": 0}
+        return {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
-    # Use twitter-specific lexicon rows; fall back to news rows if none defined
+    # Use serper_reddit lexicon; fall back to serper_twitter (broad cloud/devops keywords)
+    # then community if neither exists
     lexicon_rows = lexicon_by_source.get(SOURCE_NAME, [])
     if not lexicon_rows:
-        # Fall back to twitter source rows (same signal keywords)
-        lexicon_rows = lexicon_by_source.get("twitter", [])
+        lexicon_rows = lexicon_by_source.get("serper_twitter", [])
+    if not lexicon_rows:
+        lexicon_rows = lexicon_by_source.get("community", [])
 
     if not lexicon_rows:
-        logger.warning("serper_twitter_no_lexicon no keyword rows found for source=%s", SOURCE_NAME)
-        return {"inserted": 0, "seen": 0}
+        logger.warning("serper_reddit_no_lexicon no keyword rows found for source=%s", SOURCE_NAME)
+        return {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     max_accounts = getattr(settings, "serper_max_accounts", 50)
     num_results = getattr(settings, "serper_results_per_query", 10)
-    # Align time window with twitter_lookback_days (default 7 → qdr:w = past week)
-    lookback_days = getattr(settings, "twitter_lookback_days", 7)
 
     if account_ids:
         placeholders = ",".join(["%s"] * len(account_ids))
@@ -299,7 +286,7 @@ async def collect(
                 """SELECT a.account_id, a.company_name, a.domain
                    FROM accounts a
                    LEFT JOIN crawl_checkpoints cp
-                     ON cp.account_id = a.account_id AND cp.source = 'serper_twitter'
+                     ON cp.account_id = a.account_id AND cp.source = 'serper_reddit'
                    WHERE COALESCE(a.domain, '') <> ''
                    ORDER BY CASE WHEN cp.last_crawled_at IS NULL THEN 0 ELSE 1 END,
                             cp.last_crawled_at ASC, a.company_name ASC
@@ -312,7 +299,7 @@ async def collect(
         return {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     logger.info(
-        "serper_twitter starting accounts=%d max_results_per=%d",
+        "serper_reddit starting accounts=%d max_results_per=%d",
         len(accounts),
         num_results,
     )
@@ -336,7 +323,6 @@ async def collect(
                     num_results=num_results,
                     lexicon_rows=lexicon_rows,
                     reliability=reliability,
-                    lookback_days=lookback_days,
                 )
                 await asyncio.sleep(0.1)  # light pacing between requests
                 return result
@@ -346,21 +332,23 @@ async def collect(
 
     conn.commit()
 
+    processed = 0
     for result in results:
         if isinstance(result, Exception):
-            logger.warning("serper_twitter_worker_error: %s", result)
+            logger.warning("serper_reddit_worker_error: %s", result)
             continue
         ins, seen = result
         total_inserted += ins
         total_seen += seen
+        processed += 1
 
     dt = time.monotonic() - t0
     logger.info(
-        "serper_twitter done accounts=%d inserted=%d seen=%d duration=%.1fs",
-        len(accounts),
+        "serper_reddit done accounts=%d inserted=%d seen=%d duration=%.1fs",
+        processed,
         total_inserted,
         total_seen,
         dt,
     )
 
-    return {"inserted": total_inserted, "seen": total_seen, "accounts_processed": len(accounts)}
+    return {"inserted": total_inserted, "seen": total_seen, "accounts_processed": processed}

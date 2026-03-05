@@ -179,7 +179,7 @@ async def collect(
                 continue
 
             # Skip if already crawled today
-            if db.was_crawled_today(conn, account_id, endpoint=subreddit, source="reddit_official"):
+            if db.was_crawled_today(conn, source="reddit_official", account_id=account_id, endpoint=subreddit):
                 logger.debug(f"reddit_official #{account_index}: {company_name} - already crawled today")
                 continue
 

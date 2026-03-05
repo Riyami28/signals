@@ -265,6 +265,7 @@ function detailPanel() {
     enrichingContactId: null,
 
     async load(accountId) {
+      this.researchData = null;
       try {
         const resp = await fetch(`/api/accounts/${accountId}`);
         this.detail = await resp.json();
@@ -275,6 +276,7 @@ function detailPanel() {
     },
 
     async loadResearch(accountId) {
+      this.researchData = null;
       try {
         const resp = await fetch(`/api/research/${accountId}`);
         this.researchData = await resp.json();

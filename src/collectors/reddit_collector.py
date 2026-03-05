@@ -113,7 +113,7 @@ async def _fetch_reddit_search_json(query: str, settings: Settings) -> dict[str,
         logger.debug(f"_fetch_reddit_search_json: fetching {search_url}")
         response = await async_get(
             search_url,
-            respect_robots_txt=settings.respect_robots_txt,
+            settings,
         )
         response.raise_for_status()
         return response.json()
@@ -136,7 +136,7 @@ async def _fetch_reddit_subreddit_json(subreddit: str, settings: Settings) -> di
     logger.debug(f"_fetch_reddit_subreddit_json: fetching {subreddit_url}")
     response = await async_get(
         subreddit_url,
-        respect_robots_txt=settings.respect_robots_txt,
+        settings,
     )
     response.raise_for_status()
     return response.json()
@@ -479,7 +479,7 @@ async def collect(
             FROM signals.accounts
             LIMIT %s
         """,
-            (settings.live_max_accounts,),
+            (min(settings.live_max_accounts, 50),),
         )
         accounts = [dict(row) for row in cursor.fetchall()]
         logger.info(f"reddit_collector: fetched {len(accounts)} accounts from database")

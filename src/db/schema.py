@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS signal_observations (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_signal_observation_dedupe
 ON signal_observations(account_id, signal_code, source, observed_at, raw_payload_hash);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_signal_observation_url_dedupe
+ON signal_observations(account_id, signal_code, source, evidence_url)
+WHERE evidence_url IS NOT NULL AND evidence_url <> '';
+
 CREATE INDEX IF NOT EXISTS idx_signal_observations_account_observed
 ON signal_observations(account_id, observed_at);
 
@@ -120,7 +124,7 @@ CREATE TABLE IF NOT EXISTS crawl_attempts (
   account_id TEXT NOT NULL,
   endpoint TEXT NOT NULL,
   attempted_at TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('success', 'http_error', 'exception', 'skipped')),
+  status TEXT NOT NULL CHECK (status IN ('success', 'http_error', 'exception', 'skipped', 'rate_limited')),
   error_summary TEXT NOT NULL
 );
 

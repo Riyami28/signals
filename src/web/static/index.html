@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signals Pipeline</title>
-<link rel="stylesheet" href="/static/styles.css?v=9">
+<link rel="stylesheet" href="/static/styles.css?v=10">
 <script>
   // Apply saved theme immediately to prevent flash
   (function() {
@@ -77,11 +77,11 @@
       <option value="">All Sources</option>
       <option value="serper_news">News</option>
       <option value="serper_jobs">Jobs</option>
-      <option value="website_techscan">Tech Scan</option>
+      <option value="website_techscan">Tech Stack</option>
+      <option value="serper_reddit">Reddit</option>
+      <option value="serper_twitter">Twitter</option>
       <option value="github_stargazers">GitHub Stars</option>
-      <option value="reddit_api">Reddit</option>
       <option value="first_party_csv">First Party</option>
-      <option value="website_scan">Website</option>
     </select>
   </div>
 
@@ -156,7 +156,7 @@
   <!-- Side Panel -->
   <div class="side-panel" :class="{'open': expandedId}"
        x-data="detailPanel()"
-       x-effect="if(expandedId) { dtab='dimensions'; signalSourceFilter=''; load(expandedId); }"
+       x-effect="if(expandedId) { dtab='dimensions'; signalSourceFilter=''; load(expandedId); loadResearch(expandedId); }"
        @keydown.escape.window="expandedId = null">
 
     <!-- Header -->
@@ -202,7 +202,9 @@
             </template>
             <div class="dimension-grid">
               <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
-                <div class="dimension-row">
+                <div class="dimension-row dimension-row-clickable"
+                     @click="dtab='signals'; signalSourceFilter = dim === 'firmographic' ? 'firmographic' : 'dim:' + dim"
+                     :title="'Click to view ' + dim.replace(/_/g, ' ') + ' signals'">
                   <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
                   <div class="dimension-bar-bg">
                     <div class="dimension-bar-fill"
@@ -210,7 +212,11 @@
                          :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'bar-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'bar-medium' : 'bar-low'">
                     </div>
                   </div>
-                  <span class="dimension-score" x-text="typeof score === 'object' ? (score.score || 0) : score"></span>
+                  <span class="dimension-score" x-text="Math.round(typeof score === 'object' ? (score.score || 0) : score)"></span>
+                  <span class="dimension-tier"
+                        :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'tier-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'tier-medium' : 'tier-low'"
+                        x-text="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'Strong' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'Moderate' : (typeof score === 'object' ? (score.score || 0) : score) > 0 ? 'Weak' : 'None'"></span>
+                  <span class="dimension-arrow">→</span>
                 </div>
               </template>
             </div>
@@ -221,56 +227,186 @@
 
       <!-- Signals Tab -->
       <div x-show="dtab==='signals'">
-        <div class="signal-filters" x-show="detail && detail.signals && detail.signals.length > 0"
+        <div class="signal-filters"
              x-data="{ _real() { return (detail && detail.signals ? detail.signals : []).filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')) },
                         _cnt(src) { return this._real().filter(s => s.source === src).length },
+                        _hasFirmo() { try { return !!(researchData && researchData.research && researchData.research.enrichment_json && Object.keys(JSON.parse(researchData.research.enrichment_json)).length > 0) } catch(e) { return false } },
+                        _cntMulti(keys) { return this._real().filter(s => keys.includes(s.source)).length },
                         _sources: [
-                          {key:'serper_news', label:'News'},
-                          {key:'serper_jobs', label:'Jobs'},
-                          {key:'website_techscan', label:'Tech Scan'},
-                          {key:'website_scan', label:'Website'},
-                          {key:'reddit_api', label:'Reddit'},
-                          {key:'github_stargazers', label:'GitHub Stars'},
-                          {key:'twitter_api', label:'Twitter'},
+                          {keys:['serper_news'], label:'News'},
+                          {keys:['serper_jobs'], label:'Jobs'},
+                          {keys:['website_techscan','builtwith_free'], label:'Tech Stack'},
+                          {keys:['serper_reddit','reddit_api'], label:'Reddit'},
+                          {keys:['serper_twitter','twitter_api'], label:'Twitter'},
+                          {keys:['github_stargazers'], label:'GitHub Stars'},
                         ] }">
           <button class="signal-filter-pill" :class="{'active': signalSourceFilter === ''}" @click="signalSourceFilter = ''">
             All <span class="pill-count" x-text="_real().length"></span>
           </button>
           <template x-for="s in _sources">
-            <button class="signal-filter-pill" :class="{'active': signalSourceFilter === s.key, 'pill-zero': _cnt(s.key) === 0}" @click="signalSourceFilter = s.key">
-              <span x-text="s.label"></span> <span class="pill-count" x-text="_cnt(s.key)"></span>
+            <button class="signal-filter-pill" :class="{'active': signalSourceFilter === s.keys.join(','), 'pill-zero': _cntMulti(s.keys) === 0}" @click="signalSourceFilter = s.keys.join(',')">
+              <span x-text="s.label"></span> <span class="pill-count" x-text="_cntMulti(s.keys)"></span>
             </button>
           </template>
+          <button class="signal-filter-pill" :class="{'active': signalSourceFilter === 'firmographic', 'pill-zero': !_hasFirmo()}" @click="signalSourceFilter = 'firmographic'">
+            Firmographic <span class="pill-count" x-text="_hasFirmo() ? '✓' : '0'"></span>
+          </button>
         </div>
-        <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
-          <div>
-            <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
-              <div class="signal-card" :class="{'signal-card-high': sig.impact === 'high'}" x-show="!signalSourceFilter || sig.source === signalSourceFilter">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                  <span class="signal-code" x-text="sig.signal_code"></span>
-                  <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
-                        x-text="(sig.impact || 'low').toUpperCase() + ' IMPACT'"></span>
-                  <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)"
-                        x-text="'wt:' + (sig.base_weight || 0)"></span>
-                  <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
-                  <template x-if="sig.dimension">
-                    <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--border-light);color:var(--cyan)" x-text="sig.dimension"></span>
-                  </template>
-                  <template x-if="sig.observed_at">
-                    <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
+
+        <!-- Signal Cards (shown when NOT firmographic enrichment pill) -->
+        <div x-show="signalSourceFilter !== 'firmographic'">
+          <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
+            <div>
+              <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
+                <div class="signal-card" :class="{'signal-card-high': sig.impact === 'high'}" x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                    <span class="signal-code" x-text="sig.signal_code"></span>
+                    <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
+                          x-text="(sig.impact || 'low').toUpperCase() + ' IMPACT'"></span>
+                    <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)"
+                          x-text="'wt:' + (sig.base_weight || 0)"></span>
+                    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
+                    <template x-if="sig.dimension">
+                      <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--border-light);color:var(--cyan)" x-text="sig.dimension"></span>
+                    </template>
+                    <template x-if="sig.observed_at">
+                      <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
+                    </template>
+                  </div>
+                  <div class="signal-evidence" x-text="sig.evidence_text"></div>
+                  <template x-if="sig.evidence_url">
+                    <div style="margin-top:4px">
+                      <a class="signal-url" :href="sig.evidence_url" target="_blank" x-text="(sig.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
+                    </div>
                   </template>
                 </div>
-                <div class="signal-evidence" x-text="sig.evidence_text"></div>
-                <template x-if="sig.evidence_url">
-                  <div style="margin-top:4px">
-                    <a class="signal-url" :href="sig.evidence_url" target="_blank" x-text="(sig.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
+              </template>
+            </div>
+          </template>
+          <div x-show="signalSourceFilter === '' && (!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0)" class="empty">No real signals detected. Run pipeline to collect signals.</div>
+        </div>
+
+        <!-- Firmographic Data (shown when firmographic filter is active) -->
+        <div x-show="signalSourceFilter === 'firmographic'">
+          <template x-if="researchData && researchData.research && researchData.research.enrichment_json">
+            <div x-data="{ get fdata() { try { return JSON.parse((researchData && researchData.research && researchData.research.enrichment_json) || '{}') } catch(e) { return {} } } }">
+
+              <!-- Company Overview Card -->
+              <div class="firmo-card">
+                <div class="firmo-card-header">Company Overview</div>
+                <div class="firmo-grid">
+                  <div class="firmo-item" x-show="fdata.industry">
+                    <div class="firmo-label">Industry</div>
+                    <div class="firmo-value" x-text="fdata.industry"></div>
                   </div>
-                </template>
+                  <div class="firmo-item" x-show="fdata.sub_industry">
+                    <div class="firmo-label">Sub-Industry</div>
+                    <div class="firmo-value" x-text="fdata.sub_industry"></div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.company_type">
+                    <div class="firmo-label">Company Type</div>
+                    <div class="firmo-value">
+                      <span class="firmo-badge" :class="fdata.company_type === 'Public' ? 'badge-public' : 'badge-private'"
+                            x-text="fdata.company_type"></span>
+                    </div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.founded_year">
+                    <div class="firmo-label">Founded</div>
+                    <div class="firmo-value" x-text="fdata.founded_year"></div>
+                  </div>
+                </div>
               </div>
-            </template>
+
+              <!-- Size & Revenue Card -->
+              <div class="firmo-card">
+                <div class="firmo-card-header">Size & Revenue</div>
+                <div class="firmo-grid">
+                  <div class="firmo-item" x-show="fdata.employee_count || fdata.employees">
+                    <div class="firmo-label">Employees</div>
+                    <div class="firmo-value firmo-big" x-text="(fdata.employee_count || fdata.employees || '').toLocaleString()"></div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.employee_range">
+                    <div class="firmo-label">Employee Range</div>
+                    <div class="firmo-value">
+                      <span class="firmo-badge badge-size" x-text="fdata.employee_range"></span>
+                    </div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.revenue">
+                    <div class="firmo-label">Revenue</div>
+                    <div class="firmo-value firmo-big" x-text="fdata.revenue"></div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.revenue_range">
+                    <div class="firmo-label">Revenue Range</div>
+                    <div class="firmo-value">
+                      <span class="firmo-badge badge-revenue" x-text="fdata.revenue_range"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Location Card -->
+              <div class="firmo-card">
+                <div class="firmo-card-header">Headquarters</div>
+                <div class="firmo-grid">
+                  <div class="firmo-item" x-show="fdata.headquarters">
+                    <div class="firmo-label">Address</div>
+                    <div class="firmo-value" x-text="fdata.headquarters"></div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.city">
+                    <div class="firmo-label">City</div>
+                    <div class="firmo-value" x-text="fdata.city"></div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.state">
+                    <div class="firmo-label">State</div>
+                    <div class="firmo-value" x-text="fdata.state"></div>
+                  </div>
+                  <div class="firmo-item" x-show="fdata.country">
+                    <div class="firmo-label">Country</div>
+                    <div class="firmo-value" x-text="fdata.country"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tech Stack (if available) -->
+              <template x-if="fdata.tech_stack && fdata.tech_stack.length > 0">
+                <div class="firmo-card">
+                  <div class="firmo-card-header">Tech Stack</div>
+                  <div class="firmo-tech-list">
+                    <template x-for="tech in fdata.tech_stack">
+                      <span class="firmo-tech-pill" x-text="tech"></span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- LinkedIn -->
+              <template x-if="fdata.company_linkedin_url">
+                <div class="firmo-card">
+                  <div class="firmo-card-header">Links</div>
+                  <div style="padding:8px 14px">
+                    <a class="firmo-link" :href="fdata.company_linkedin_url" target="_blank">
+                      🔗 LinkedIn Profile
+                    </a>
+                    <template x-if="fdata.website">
+                      <a class="firmo-link" :href="fdata.website.startsWith('http') ? fdata.website : 'https://' + fdata.website" target="_blank" style="margin-left:16px">
+                        🌐 Website
+                      </a>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Source info -->
+              <div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:right">
+                <span x-show="fdata.firmographic_source" x-text="'Source: ' + fdata.firmographic_source"></span>
+              </div>
+
+            </div>
+          </template>
+          <div x-show="!researchData || !researchData.research || !researchData.research.enrichment_json" class="empty">
+            No firmographic data available. Run the pipeline to collect company data.
           </div>
-        </template>
-        <div x-show="!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0" class="empty">No real signals detected. Run pipeline to collect signals.</div>
+        </div>
       </div>
 
       <!-- Research Tab -->
@@ -281,7 +417,7 @@
             <template x-if="researchData.research.enrichment_json">
               <div>
                 <h4 style="color:var(--blue);font-size:13px;margin-top:16px;margin-bottom:8px">Enrichment Data</h4>
-                <div class="enrichment-grid" x-data="{ enr: JSON.parse(researchData.research.enrichment_json || '{}') }">
+                <div class="enrichment-grid" x-data="{ get enr() { try { return JSON.parse(researchData.research.enrichment_json || '{}') } catch(e) { return {} } } }">
                   <template x-for="[k,v] in Object.entries(enr).filter(([k]) => !k.endsWith('_confidence') && !k.endsWith('_source'))">
                     <div class="enr-item">
                       <div class="enr-label" x-text="k.replace(/_/g, ' ')"></div>
@@ -481,6 +617,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=9"></script>
+<script src="/static/app.js?v=10"></script>
 </body>
 </html>

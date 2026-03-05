@@ -208,6 +208,15 @@ async def _collect_live_technographics_account(
         observed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         for signal_code, confidence, matched_keyword in matches:
             seen_delta += 1
+            # Extract keyword context instead of dumping raw page text
+            kw_pos = page_text.lower().find(matched_keyword.lower())
+            if kw_pos >= 0:
+                ctx_start = max(0, kw_pos - 100)
+                ctx_end = min(len(page_text), kw_pos + len(matched_keyword) + 100)
+                context_snippet = page_text[ctx_start:ctx_end].strip()
+                evidence = f"Matched '{matched_keyword}' on {url}: ...{context_snippet}..."
+            else:
+                evidence = f"Keyword '{matched_keyword}' matched on {url}"
             observation = _build_observation(
                 account_id=account_id,
                 signal_code=signal_code,
@@ -216,7 +225,7 @@ async def _collect_live_technographics_account(
                 confidence=confidence,
                 source_reliability=scan_reliability,
                 evidence_url=url,
-                evidence_text=page_text,
+                evidence_text=evidence,
                 payload={"url": url, "matched_keyword": matched_keyword},
             )
             if db.insert_signal_observation(conn, observation, commit=False):
@@ -334,8 +343,18 @@ async def collect(
                 matches = classify_text(text, lexicon_rows)
 
             observed_at = row.get("observed_at", "") or utc_now_iso()
+            csv_url = row.get("url", "")
             for signal_code, confidence, matched_keyword in matches:
                 seen += 1
+                # Extract keyword context instead of dumping raw text
+                kw_pos = text.lower().find(matched_keyword.lower())
+                if kw_pos >= 0:
+                    ctx_start = max(0, kw_pos - 100)
+                    ctx_end = min(len(text), kw_pos + len(matched_keyword) + 100)
+                    context_snippet = text[ctx_start:ctx_end].strip()
+                    csv_evidence = f"Matched '{matched_keyword}': ...{context_snippet}..."
+                else:
+                    csv_evidence = f"Keyword '{matched_keyword}' matched" + (f" on {csv_url}" if csv_url else "")
                 observation = _build_observation(
                     account_id=account_id,
                     signal_code=signal_code,
@@ -343,8 +362,8 @@ async def collect(
                     observed_at=observed_at,
                     confidence=confidence,
                     source_reliability=reliability,
-                    evidence_url=row.get("url", ""),
-                    evidence_text=text,
+                    evidence_url=csv_url,
+                    evidence_text=csv_evidence,
                     payload={"row": row, "matched_keyword": matched_keyword},
                 )
                 if db.insert_signal_observation(conn, observation, commit=False):
