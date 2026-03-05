@@ -331,62 +331,47 @@
           <!-- ── Tech Stack grouped view ── -->
           <template x-if="signalSourceFilter === 'website_techscan,builtwith_free'">
             <div x-data="{ get groups() { return techStackGroups(); } }">
-              <!-- Cloud Tech Stack section -->
-              <template x-if="groups.cloud.length > 0">
-                <div>
-                  <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--cyan);text-transform:uppercase;margin:12px 0 8px">Cloud Tech Stack</div>
-                  <template x-for="g in groups.cloud" :key="g.signalCode">
-                    <div class="signal-card" style="padding:10px 12px">
-                      <!-- Header: label + impact + pts -->
-                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-                        <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="g.label"></span>
-                        <span class="impact-badge" :class="'impact-' + g.impact" x-text="g.impact.toUpperCase()"></span>
-                        <span x-show="g.pts > 0" class="contribution-badge" x-text="'+' + Number(g.pts).toFixed(1) + ' pts'"></span>
-                      </div>
-                      <!-- Tech tags as chips -->
-                      <div x-show="g.techTags.length > 0" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px">
-                        <template x-for="tag in g.techTags" :key="tag">
-                          <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,0.06);color:var(--text-primary);border:1px solid rgba(255,255,255,0.09)" x-text="tag"></span>
-                        </template>
-                        <span x-show="g.techTagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + g.techTagsExtra + ' more'"></span>
-                      </div>
-                      <!-- Single source line -->
-                      <div style="font-size:10px;color:var(--text-muted)">
-                        <span :style="g.firstUrl ? 'color:var(--cyan);cursor:pointer' : ''"
-                              @click="g.firstUrl && window.open(g.firstUrl, '_blank')"
-                              x-text="'via ' + g.sourcesLine"></span>
-                      </div>
-                    </div>
-                  </template>
+              <!-- Cloud Tech Stack — one merged block -->
+              <template x-if="groups.cloud.hasData">
+                <div class="signal-card" style="padding:12px 14px;margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <span style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--cyan);text-transform:uppercase">Cloud Tech Stack</span>
+                    <span x-show="groups.cloud.totalPts > 0" class="contribution-badge" x-text="'+' + groups.cloud.totalPts.toFixed(1) + ' pts'"></span>
+                  </div>
+                  <div x-show="groups.cloud.categories" style="font-size:10px;color:var(--text-muted);margin-bottom:8px" x-text="groups.cloud.categories"></div>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px">
+                    <template x-for="tag in groups.cloud.tags" :key="tag">
+                      <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(56,189,248,0.08);color:var(--text-primary);border:1px solid rgba(56,189,248,0.18)" x-text="tag"></span>
+                    </template>
+                    <span x-show="groups.cloud.tagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + groups.cloud.tagsExtra + ' more'"></span>
+                  </div>
+                  <span style="font-size:10px;"
+                        :style="groups.cloud.firstUrl ? 'color:var(--cyan);cursor:pointer' : 'color:var(--text-muted)'"
+                        @click="groups.cloud.firstUrl && window.open(groups.cloud.firstUrl, '_blank')"
+                        x-text="'via ' + groups.cloud.sourcesLine"></span>
                 </div>
               </template>
-              <!-- Non-Cloud Stack section -->
-              <template x-if="groups.nonCloud.length > 0">
-                <div>
-                  <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase;margin:12px 0 8px">Non-Cloud Stack</div>
-                  <template x-for="g in groups.nonCloud" :key="g.signalCode">
-                    <div class="signal-card" style="padding:10px 12px">
-                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-                        <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="g.label"></span>
-                        <span class="impact-badge" :class="'impact-' + g.impact" x-text="g.impact.toUpperCase()"></span>
-                        <span x-show="g.pts > 0" class="contribution-badge" x-text="'+' + Number(g.pts).toFixed(1) + ' pts'"></span>
-                      </div>
-                      <div x-show="g.techTags.length > 0" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px">
-                        <template x-for="tag in g.techTags" :key="tag">
-                          <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,0.06);color:var(--text-primary);border:1px solid rgba(255,255,255,0.09)" x-text="tag"></span>
-                        </template>
-                        <span x-show="g.techTagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + g.techTagsExtra + ' more'"></span>
-                      </div>
-                      <div style="font-size:10px;color:var(--text-muted)">
-                        <span :style="g.firstUrl ? 'color:var(--cyan);cursor:pointer' : ''"
-                              @click="g.firstUrl && window.open(g.firstUrl, '_blank')"
-                              x-text="'via ' + g.sourcesLine"></span>
-                      </div>
-                    </div>
-                  </template>
+              <!-- Non-Cloud Stack — one merged block -->
+              <template x-if="groups.nonCloud.hasData">
+                <div class="signal-card" style="padding:12px 14px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <span style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase">Non-Cloud Stack</span>
+                    <span x-show="groups.nonCloud.totalPts > 0" class="contribution-badge" x-text="'+' + groups.nonCloud.totalPts.toFixed(1) + ' pts'"></span>
+                  </div>
+                  <div x-show="groups.nonCloud.categories" style="font-size:10px;color:var(--text-muted);margin-bottom:8px" x-text="groups.nonCloud.categories"></div>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px">
+                    <template x-for="tag in groups.nonCloud.tags" :key="tag">
+                      <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,0.05);color:var(--text-primary);border:1px solid rgba(255,255,255,0.09)" x-text="tag"></span>
+                    </template>
+                    <span x-show="groups.nonCloud.tagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + groups.nonCloud.tagsExtra + ' more'"></span>
+                  </div>
+                  <span style="font-size:10px;"
+                        :style="groups.nonCloud.firstUrl ? 'color:var(--cyan);cursor:pointer' : 'color:var(--text-muted)'"
+                        @click="groups.nonCloud.firstUrl && window.open(groups.nonCloud.firstUrl, '_blank')"
+                        x-text="'via ' + groups.nonCloud.sourcesLine"></span>
                 </div>
               </template>
-              <div x-show="groups.cloud.length === 0 && groups.nonCloud.length === 0" class="empty">No tech stack signals detected.</div>
+              <div x-show="!groups.cloud.hasData && !groups.nonCloud.hasData" class="empty">No tech stack signals detected.</div>
             </div>
           </template>
 
@@ -933,6 +918,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=15"></script>
+<script src="/static/app.js?v=16"></script>
 </body>
 </html>
