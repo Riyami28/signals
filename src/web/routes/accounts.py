@@ -110,16 +110,16 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
             if observed_at_str:
                 try:
                     # Handle both ISO format and timezone-aware strings
-                    if observed_at_str.endswith('Z'):
-                        obs_dt = datetime.fromisoformat(observed_at_str.replace('Z', '+00:00'))
+                    if observed_at_str.endswith("Z"):
+                        obs_dt = datetime.fromisoformat(observed_at_str.replace("Z", "+00:00"))
                     else:
-                        obs_dt = datetime.fromisoformat(observed_at_str.split('+')[0])
+                        obs_dt = datetime.fromisoformat(observed_at_str.split("+")[0])
                     age_days = (now - obs_dt).days
                     if age_days <= 14:
                         fresh_count += 1
                 except (ValueError, TypeError):
                     pass
-        signal_freshness = min(100, int((fresh_count / len(signals)) * 100) if signals else 0)
+        signal_freshness = min(100, int((fresh_count / len(signals)) * 100)) if signals else 0
     else:
         signal_freshness = 0
 
@@ -127,7 +127,7 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
         "label": "Signal Freshness",
         "value": signal_freshness,
         "weight_pct": 30,
-        "explanation": f"{signal_freshness}% of signals within 14 days"
+        "explanation": f"{signal_freshness}% of signals within 14 days",
     }
 
     # 2. Source Diversity (25%)
@@ -146,7 +146,7 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
         "label": "Source Diversity",
         "value": source_diversity,
         "weight_pct": 25,
-        "explanation": f"{source_count} distinct source(s)"
+        "explanation": f"{source_count} distinct source(s)",
     }
 
     # 3. Evidence Quality (20%)
@@ -168,25 +168,30 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
         "label": "Evidence Quality",
         "value": evidence_quality,
         "weight_pct": 20,
-        "explanation": f"Avg confidence: {evidence_quality / 100:.2f}" if evidence_quality > 0 else "No signals"
+        "explanation": f"Avg confidence: {evidence_quality / 100:.2f}" if evidence_quality > 0 else "No signals",
     }
 
     # 4. Research Complete (15%)
     # Binary: has enrichment OR research brief
     research = account_detail.get("research", {})
-    research_complete = 100 if (
-        research and (
-            research.get("enrichment_json") or
-            research.get("research_brief") or
-            research.get("research_status") == "completed"
+    research_complete = (
+        100
+        if (
+            research
+            and (
+                research.get("enrichment_json")
+                or research.get("research_brief")
+                or research.get("research_status") == "completed"
+            )
         )
-    ) else 0
+        else 0
+    )
 
     components["research_complete"] = {
         "label": "Research Complete",
         "value": research_complete,
         "weight_pct": 15,
-        "explanation": "Has enrichment + brief" if research_complete == 100 else "Needs research"
+        "explanation": "Has enrichment + brief" if research_complete == 100 else "Needs research",
     }
 
     # 5. Contact Available (10%)
@@ -206,16 +211,16 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
         "label": "Contact Available",
         "value": contact_available,
         "weight_pct": 10,
-        "explanation": f"{len(contacts)} contact(s)" if contacts else "No contacts"
+        "explanation": f"{len(contacts)} contact(s)" if contacts else "No contacts",
     }
 
     # Calculate weighted average
     total_score = (
-        (components["signal_freshness"]["value"] * 0.30) +
-        (components["source_diversity"]["value"] * 0.25) +
-        (components["evidence_quality"]["value"] * 0.20) +
-        (components["research_complete"]["value"] * 0.15) +
-        (components["contact_available"]["value"] * 0.10)
+        (components["signal_freshness"]["value"] * 0.30)
+        + (components["source_diversity"]["value"] * 0.25)
+        + (components["evidence_quality"]["value"] * 0.20)
+        + (components["research_complete"]["value"] * 0.15)
+        + (components["contact_available"]["value"] * 0.10)
     )
 
     readiness_score = round(total_score)
@@ -228,11 +233,7 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
     else:
         status = "needs_research"
 
-    return {
-        "score": readiness_score,
-        "status": status,
-        "components": components
-    }
+    return {"score": readiness_score, "status": status, "components": components}
 
 
 @router.get("/accounts")
@@ -248,13 +249,29 @@ def list_accounts(
     readiness: str = Query(""),
 ):
     if sort not in _ALLOWED_SORT_FIELDS:
-        raise HTTPException(status_code=400, detail=f"invalid sort field, allowed: {sorted(_ALLOWED_SORT_FIELDS)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid sort field, allowed: {sorted(_ALLOWED_SORT_FIELDS)}",
+        )
     if dir.lower() not in _ALLOWED_SORT_DIRS:
-        raise HTTPException(status_code=400, detail="invalid sort direction, allowed: asc, desc")
+        raise HTTPException(
+            status_code=400,
+            detail="invalid sort direction, allowed: asc, desc",
+        )
     if tier and tier.lower() not in _ALLOWED_TIERS:
-        raise HTTPException(status_code=400, detail=f"invalid tier filter, allowed: {sorted(_ALLOWED_TIERS - {''})}")
-    if readiness and readiness.lower() not in {"action_ready", "review", "needs_research"}:
-        raise HTTPException(status_code=400, detail="invalid readiness filter, allowed: action_ready, review, needs_research")
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid tier filter, allowed: {sorted(_ALLOWED_TIERS - {''})}",
+        )
+    if readiness and readiness.lower() not in {
+        "action_ready",
+        "review",
+        "needs_research",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail=("invalid readiness filter, allowed: action_ready, review, needs_research"),
+        )
 
     safe_search = _sanitize_search(q)
     safe_label = label.strip()[:100]
@@ -389,18 +406,12 @@ def get_account(account_id: str):
                     signals_by_dimension[dim] = []
                 # Extract evidence snippet (first 120 chars of evidence_text)
                 evidence_text = signal.get("evidence_text", "")
-                snippet = (
-                    (evidence_text[:120] + "...")
-                    if len(evidence_text) > 120
-                    else evidence_text
-                )
+                snippet = (evidence_text[:120] + "...") if len(evidence_text) > 120 else evidence_text
                 signals_by_dimension[dim].append(
                     {
                         "signal_code": signal.get("signal_code", ""),
                         "source": signal.get("source", ""),
-                        "component_score": float(
-                            signal.get("component_score") or 0
-                        ),
+                        "component_score": float(signal.get("component_score") or 0),
                         "evidence_url": signal.get("evidence_url", ""),
                         "evidence_snippet": snippet,
                         "observed_at": signal.get("observed_at", ""),
@@ -409,10 +420,7 @@ def get_account(account_id: str):
 
             # Sort by component_score and keep top 5 per dimension
             for dim in signals_by_dimension:
-                signals_by_dimension[dim].sort(
-                    key=lambda s: s["component_score"],
-                    reverse=True
-                )
+                signals_by_dimension[dim].sort(key=lambda s: s["component_score"], reverse=True)
                 signals_by_dimension[dim] = signals_by_dimension[dim][:5]
 
             detail["signals_by_dimension"] = signals_by_dimension
