@@ -6,7 +6,7 @@ import csv
 import io
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -103,7 +103,7 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
     # 1. Signal Freshness (30%)
     signals = account_detail.get("signals", [])
     if signals:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         fresh_count = 0
         for sig in signals:
             observed_at_str = sig.get("observed_at", "")
@@ -114,6 +114,9 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
                         obs_dt = datetime.fromisoformat(observed_at_str.replace("Z", "+00:00"))
                     else:
                         obs_dt = datetime.fromisoformat(observed_at_str.split("+")[0])
+                        # Make naive datetime timezone-aware
+                        if obs_dt.tzinfo is None:
+                            obs_dt = obs_dt.replace(tzinfo=timezone.utc)
                     age_days = (now - obs_dt).days
                     if age_days <= 14:
                         fresh_count += 1
