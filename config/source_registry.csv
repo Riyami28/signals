@@ -7,7 +7,6 @@ ashby_api,0.25,true
 workday_api,0.25,true
 news_csv,0.75,true
 rss_feed,0.7,true
-google_news_rss,0.72,true
 technographics_csv,0.8,true
 website_scan,0.6,true
 community_csv,0.65,true
@@ -15,15 +14,9 @@ reddit_rss,0.62,true
 first_party_csv,0.9,true
 manual_review_import,0.95,true
 huginn_webhook,0.72,true
-story_hunt,0.78,true
-story_hunt_js,0.74,true
-bombora_api,0.82,true
-g2_api,0.78,true
 serper_news,0.85,true
 serper_jobs,0.80,true
 website_techscan,0.70,true
-gnews,0.78,true
-crunchbase,0.82,true
 twitter_csv,0.70,true
 twitter_api,0.75,true
 serper_twitter,0.60,true
@@ -33,3 +26,4 @@ reddit_official,0.75,true
 builtwith_free,0.75,true
 firmographic_google,0.80,true
 reddit_mcp,0.80,true
+twitter_mcp,0.78,true

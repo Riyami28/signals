@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 
 from src import db
 from src.collectors import community, first_party, jobs, news, serper_twitter, technographics, twitter
+from src.collectors import twitter_mcp_collector
 from src.discovery import hunt as hunt_pipeline
 from src.discovery import pipeline as discovery_pipeline
 from src.discovery import watchlist_builder
@@ -310,6 +311,13 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
         results["serper_twitter"] = (
             await serper_twitter.collect(conn, settings, lexicon, source_reliability, db_pool=pool)
             if _collector_enabled("serper_twitter")
+            else {"inserted": 0, "seen": 0}
+        )
+        results["twitter_mcp"] = (
+            await twitter_mcp_collector.collect(
+                conn, settings, lexicon, source_reliability, db_pool=pool
+            )
+            if _collector_enabled("twitter_mcp")
             else {"inserted": 0, "seen": 0}
         )
         return results
