@@ -179,6 +179,16 @@ def get_account(account_id: str):
                     }
             detail["dimension_contributions"] = dimension_contributions
 
+        # Export dimension weights configuration for API transparency
+        detail["dimension_weights"] = {
+            dim: {
+                "weight": weight_config.weight,
+                "weight_pct": int(weight_config.weight * 100),
+                "ceiling": weight_config.ceiling,
+            }
+            for dim, weight_config in DEFAULT_DIMENSION_WEIGHTS.items()
+        }
+
         # Build per-dimension signal breakdown (top 5 signals per dimension)
         if detail.get("signals") and isinstance(detail["signals"], list):
             signals_by_dimension = {}
@@ -186,11 +196,15 @@ def get_account(account_id: str):
                 dim = signal.get("dimension", "unknown")
                 if dim not in signals_by_dimension:
                     signals_by_dimension[dim] = []
+                # Extract evidence snippet (first 120 chars of evidence_text)
+                evidence_text = signal.get("evidence_text", "")
+                snippet = (evidence_text[:120] + "...") if len(evidence_text) > 120 else evidence_text
                 signals_by_dimension[dim].append({
                     "signal_code": signal.get("signal_code", ""),
                     "source": signal.get("source", ""),
                     "component_score": float(signal.get("component_score") or 0),
                     "evidence_url": signal.get("evidence_url", ""),
+                    "evidence_snippet": snippet,
                     "observed_at": signal.get("observed_at", ""),
                 })
 

@@ -267,12 +267,17 @@
                     <div class="dimension-signals-list">
                       <template x-if="detail.signals_by_dimension[dim].length > 0">
                         <template x-for="sig in detail.signals_by_dimension[dim]" :key="sig.signal_code + '-' + sig.source">
-                          <div class="signal-row">
-                            <span class="sig-code" x-text="sig.signal_code"></span>
-                            <span class="sig-score" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
-                            <span class="sig-source" x-text="sig.source"></span>
-                            <template x-if="sig.evidence_url">
-                              <a :href="sig.evidence_url" target="_blank" class="sig-link" title="View evidence">↗</a>
+                          <div class="signal-row-item">
+                            <div class="signal-row">
+                              <span class="sig-code" x-text="sig.signal_code"></span>
+                              <span class="sig-score" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                              <span class="sig-source" x-text="sig.source"></span>
+                              <template x-if="sig.evidence_url">
+                                <a :href="sig.evidence_url" target="_blank" class="sig-link" title="View evidence">↗</a>
+                              </template>
+                            </div>
+                            <template x-if="sig.evidence_snippet">
+                              <div class="signal-snippet" x-text="sig.evidence_snippet"></div>
                             </template>
                           </div>
                         </template>

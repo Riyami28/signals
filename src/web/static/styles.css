@@ -353,10 +353,16 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 
 /* Expanded Signals List */
 .dimension-signals-list {
-  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 6px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 8px;
+}
+.signal-row-item {
+  display: flex; flex-direction: column; gap: 4px;
 }
 .signal-row {
   display: flex; gap: 10px; align-items: center; font-size: 11px; padding: 4px 0; color: var(--text-muted);
+}
+.signal-snippet {
+  font-size: 10px; color: var(--text-muted); line-height: 1.4; padding: 4px 6px; background: var(--bg-tertiary); border-left: 2px solid var(--border-light); border-radius: 2px; font-style: italic; margin-top: 2px;
 }
 .sig-code {
   font-family: var(--mono); color: var(--text-bright); flex: 0 0 auto; font-weight: 500; font-size: 11px;
