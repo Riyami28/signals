@@ -26,7 +26,6 @@ appended — but the score is capped at 1.0.
 from __future__ import annotations
 
 import logging
-from urllib.parse import urlparse, parse_qs
 
 from rapidfuzz import fuzz
 
@@ -96,7 +95,7 @@ def compute_warm_paths(
             contact_name=full_name,
             linkedin_url=linkedin_url,
             linkedin_threshold=90.0,  # 90%+ for LinkedIn matches
-            name_threshold=85.0,      # 85%+ for name matches
+            name_threshold=85.0,  # 85%+ for name matches
         )
         for match in direct_matches:
             team_member = match.get("team_member", "Talvinder")
@@ -341,16 +340,12 @@ def _find_network_matches_fuzzy(
 
             if net_url and net_name:
                 # Check LinkedIn URL match (strict: 95%+ threshold)
-                url_is_match, url_score = _fuzzy_match_linkedin(
-                    linkedin_url, net_url, threshold=95.0
-                )
+                url_is_match, url_score = _fuzzy_match_linkedin(linkedin_url, net_url, threshold=95.0)
 
                 if url_is_match:
                     # ADDITIONAL VALIDATION: Name must also match reasonably well
                     # This prevents "Abhijeet Mehrotra" matching "Abhijeet Malhotra"
-                    name_is_match, name_score = _fuzzy_match_name(
-                        contact_name, net_name, threshold=name_threshold
-                    )
+                    name_is_match, name_score = _fuzzy_match_name(contact_name, net_name, threshold=name_threshold)
 
                     if name_is_match:
                         # Both URL and name match = high confidence
