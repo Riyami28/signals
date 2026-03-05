@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signals Pipeline</title>
-<link rel="stylesheet" href="/static/styles.css?v=11">
+<link rel="stylesheet" href="/static/styles.css?v=12">
 <script>
   // Apply saved theme immediately to prevent flash
   (function() {
@@ -19,16 +19,18 @@
 
   <!-- Header -->
   <div class="header">
-    <h1>Signals Pipeline</h1>
-    <div class="header-right" style="display:flex;gap:8px;align-items:center;">
-      <!-- Theme Toggle -->
-      <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
-              x-text="theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'"></button>
-      <!-- Scoring Rubric -->
+    <div style="display:flex;align-items:center;gap:12px;">
+      <h1>Signals Pipeline</h1>
+      <!-- Scoring Rubric — anchored left so it stays visible when the detail panel is open -->
       <button class="btn" style="background:var(--bg-tertiary);color:var(--text);font-size:13px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;"
               @click="showRubricModal = true; loadRubric()">
         How Scoring Works
       </button>
+    </div>
+    <div class="header-right" style="display:flex;gap:8px;align-items:center;">
+      <!-- Theme Toggle -->
+      <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+              x-text="theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'"></button>
       <!-- CSV Import -->
       <input type="file" id="csvFileInput" accept=".csv" style="display:none"
              @change="handleCsvUpload($event)">
