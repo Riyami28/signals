@@ -1,15 +1,16 @@
 """Re-run scoring engine to pick up new firmographic signals."""
+
 from __future__ import annotations
 
-import sys
 import os
+import sys
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src import db
-from src.settings import load_settings
 from src.pipeline.score import run_scoring_stage
+from src.settings import load_settings
 
 
 def main():
