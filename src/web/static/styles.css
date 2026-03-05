@@ -370,3 +370,220 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* =========================================================
+   Score Waterfall (#43)
+   ========================================================= */
+.score-waterfall {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.waterfall-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.waterfall-total { font-size: 13px; color: var(--text-bright); }
+.waterfall-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.waterfall-dim {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 110px;
+  text-transform: capitalize;
+}
+.waterfall-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.waterfall-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .3s ease;
+}
+.waterfall-pts {
+  font-size: 11px;
+  font-family: var(--mono);
+  min-width: 54px;
+  text-align: right;
+}
+.pts-high { color: var(--green); }
+.pts-med  { color: var(--orange); }
+.pts-low  { color: var(--text-muted); }
+
+/* Top Reasons rows */
+.top-reason-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.reason-code { font-family: var(--mono); font-size: 11px; color: var(--cyan); flex: 1; min-width: 120px; }
+.reason-score { font-size: 11px; color: var(--green); font-family: var(--mono); }
+.reason-source { font-size: 10px; color: var(--text-muted); background: var(--border); padding: 1px 5px; border-radius: 3px; }
+.reason-link { font-size: 12px; color: var(--blue); text-decoration: none; }
+.reason-link:hover { text-decoration: underline; }
+
+/* =========================================================
+   Signal Cards — contribution & decay badges (#44)
+   ========================================================= */
+.contribution-badge {
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--tint-green);
+  color: var(--green);
+  font-weight: 600;
+}
+.decay-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.decay-fresh   { background: var(--tint-green);  color: var(--green); }
+.decay-active  { background: var(--tint-blue);   color: var(--blue); }
+.decay-aging   { background: var(--tint-orange); color: var(--orange); }
+.decay-stale   { background: var(--tint-red);    color: var(--red); }
+.signal-card-stale { opacity: 0.55; }
+
+/* =========================================================
+   Conversation Starters (#45)
+   ========================================================= */
+.starters-section {
+  margin: 16px 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.starters-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.starter-card {
+  display: flex;
+  gap: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-light);
+}
+.starter-card:last-child { border-bottom: none; }
+.starter-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 18px;
+  padding-top: 1px;
+}
+.recommended-approach-card {
+  background: linear-gradient(135deg, var(--tint-green), var(--tint-blue));
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+/* Dossier modal */
+.dossier-modal { max-width: 800px; width: 95vw; max-height: 88vh; display: flex; flex-direction: column; }
+.dossier-content {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  line-height: 1.6;
+  padding: 4px 0;
+}
+
+/* =========================================================
+   Scoring Rubric Modal (#46)
+   ========================================================= */
+.rubric-modal { max-width: 720px; width: 95vw; max-height: 88vh; overflow-y: auto; }
+.rubric-formula {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.rubric-formula-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  display: block;
+  margin-bottom: 4px;
+}
+.rubric-formula code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--cyan);
+  display: block;
+  word-break: break-all;
+}
+.rubric-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  margin: 16px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.rubric-dim-row {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.rubric-dim-name { font-size: 13px; color: var(--text-bright); font-weight: 600; text-transform: capitalize; }
+.rubric-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: var(--border);
+  color: var(--text-muted);
+}
+.rubric-dim-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+.rubric-dim-bar-fill { height: 100%; background: var(--blue); border-radius: 2px; }
+.rubric-tiers { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.rubric-tier-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 6px; }
+.rubric-sources { display: grid; gap: 4px; }
+.rubric-source-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.rubric-reliability-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.rubric-signals { display: grid; gap: 4px; }
+.rubric-signal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 5px;
+  flex-wrap: wrap;
+}
