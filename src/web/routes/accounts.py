@@ -157,6 +157,53 @@ def get_account(account_id: str):
                 reverse=True,
             )
 
+        # Calculate dimension contributions (score * weight)
+        # Import dimension weights from scoring engine
+        from src.scoring.engine import DEFAULT_DIMENSION_WEIGHTS
+
+        if detail.get("dimension_scores") and isinstance(detail["dimension_scores"], dict):
+            dimension_contributions = {}
+            for dim, raw_score in detail["dimension_scores"].items():
+                if dim in DEFAULT_DIMENSION_WEIGHTS:
+                    weight_config = DEFAULT_DIMENSION_WEIGHTS[dim]
+                    weight = weight_config.weight
+                    # Contribution = (dimension_score / 100) * weight * 100
+                    # This puts it back on the 0-100 scale relative to each dimension's ceiling
+                    contribution = (raw_score / 100.0) * weight * 100.0
+                    dimension_contributions[dim] = {
+                        "dimension_score": round(raw_score, 1),
+                        "weight": weight,
+                        "weight_pct": int(weight * 100),
+                        "ceiling": weight_config.ceiling,
+                        "contribution": round(contribution, 1),
+                    }
+            detail["dimension_contributions"] = dimension_contributions
+
+        # Build per-dimension signal breakdown (top 5 signals per dimension)
+        if detail.get("signals") and isinstance(detail["signals"], list):
+            signals_by_dimension = {}
+            for signal in detail["signals"]:
+                dim = signal.get("dimension", "unknown")
+                if dim not in signals_by_dimension:
+                    signals_by_dimension[dim] = []
+                signals_by_dimension[dim].append({
+                    "signal_code": signal.get("signal_code", ""),
+                    "source": signal.get("source", ""),
+                    "component_score": float(signal.get("component_score") or 0),
+                    "evidence_url": signal.get("evidence_url", ""),
+                    "observed_at": signal.get("observed_at", ""),
+                })
+
+            # Sort by component_score and keep top 5 per dimension
+            for dim in signals_by_dimension:
+                signals_by_dimension[dim].sort(
+                    key=lambda s: s["component_score"],
+                    reverse=True
+                )
+                signals_by_dimension[dim] = signals_by_dimension[dim][:5]
+
+            detail["signals_by_dimension"] = signals_by_dimension
+
         # Serialize datetimes
         _serialize_dates(detail)
         return detail

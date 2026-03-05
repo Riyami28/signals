@@ -329,6 +329,49 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .dimension-tier.tier-low { background: rgba(156, 163, 175, 0.15); color: var(--text-muted); }
 .dimension-arrow { font-size: 12px; color: var(--blue); opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 
+/* Expandable Dimensions Container */
+.dimensions-container { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+/* Expandable Dimension Row */
+.dimension-expandable {
+  cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+  transition: background-color 0.15s, border-color 0.15s; background: var(--bg-card);
+}
+.dimension-expandable:hover { background-color: var(--bg-tertiary); border-color: var(--text-muted); }
+.dimension-expandable.expanded { background-color: var(--bg-secondary); border-color: var(--blue); }
+
+/* Dimension Header Row */
+.dimension-header {
+  display: flex; align-items: center; gap: 10px; font-weight: 500;
+}
+.expand-arrow { font-size: 11px; color: var(--text-muted); min-width: 12px; flex-shrink: 0; }
+.dimension-label { text-transform: capitalize; min-width: 120px; font-size: 12px; color: var(--text); flex-shrink: 0; }
+.dimension-bar-bg { flex: 1; height: 18px; background-color: var(--border-light); border-radius: 3px; overflow: hidden; }
+.dimension-bar-fill { height: 100%; transition: width 0.3s ease; }
+.dimension-score { font-weight: 600; min-width: 35px; text-align: right; font-size: 13px; color: var(--text-bright); flex-shrink: 0; }
+.dimension-contrib-pts { font-size: 10px; color: var(--text-muted); min-width: 50px; text-align: right; flex-shrink: 0; }
+
+/* Expanded Signals List */
+.dimension-signals-list {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 6px;
+}
+.signal-row {
+  display: flex; gap: 10px; align-items: center; font-size: 11px; padding: 4px 0; color: var(--text-muted);
+}
+.sig-code {
+  font-family: var(--mono); color: var(--text-bright); flex: 0 0 auto; font-weight: 500; font-size: 11px;
+}
+.sig-score {
+  color: var(--green); font-weight: 600; min-width: 50px; text-align: right; flex-shrink: 0;
+}
+.sig-source {
+  background-color: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px; font-size: 9px; color: var(--text-muted); flex-shrink: 0;
+}
+.sig-link {
+  color: var(--blue); text-decoration: none; font-size: 11px; margin-left: 4px; flex-shrink: 0;
+}
+.sig-link:hover { text-decoration: underline; }
+
 /* Velocity Banner */
 .velocity-banner {
   display: flex; gap: 16px; align-items: center; padding: 10px 14px;

@@ -195,19 +195,12 @@
       <!-- Dimensions Tab -->
       <div x-show="dtab==='dimensions'"
            x-data="{
-             dimWeights: {trigger_intent:0.35, tech_fit:0.20, engagement_pql:0.25, firmographic:0.10, hiring_growth:0.10},
-             dimCeilings: {trigger_intent:60, tech_fit:40, engagement_pql:50, firmographic:30, hiring_growth:30},
-             rawScore(s) { return typeof s === 'object' ? (s.score || 0) : (s || 0) },
-             contribution(dim, s) {
-               const w = this.dimWeights[dim] || 0;
-               const ceil = this.dimCeilings[dim] || 100;
-               return ((this.rawScore(s) / 100) * ceil * w).toFixed(1);
-             },
-             totalContribution() {
-               if (!detail || !detail.dimension_scores) return 0;
-               return Object.entries(detail.dimension_scores).reduce((sum, [d, s]) => {
-                 return sum + parseFloat(this.contribution(d, s));
-               }, 0).toFixed(1);
+             expandedDim: null,
+             get totalScore() {
+               if (!detail || !detail.dimension_contributions) return 0;
+               return Object.values(detail.dimension_contributions)
+                 .reduce((sum, c) => sum + (parseFloat(c.contribution) || 0), 0)
+                 .toFixed(1);
              }
            }">
         <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
@@ -222,49 +215,73 @@
               </div>
             </template>
 
-            <!-- Score Waterfall -->
-            <div class="score-waterfall">
-              <div class="waterfall-header">
-                <span style="font-size:12px;color:var(--text-muted)">Score Breakdown</span>
-                <span class="waterfall-total">Total: <strong x-text="totalContribution()"></strong> pts</span>
-              </div>
-              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="'wf-'+dim">
-                <div class="waterfall-row">
-                  <span class="waterfall-dim" x-text="dim.replace(/_/g,' ')"></span>
-                  <div class="waterfall-bar-track">
-                    <div class="waterfall-bar-fill"
-                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'"
-                         :style="'width:' + Math.min(100, (parseFloat(contribution(dim,score)) / Math.max(parseFloat(totalContribution()), 1)) * 100) + '%'">
-                    </div>
-                  </div>
-                  <span class="waterfall-pts"
-                        :class="rawScore(score) >= 70 ? 'pts-high' : rawScore(score) >= 40 ? 'pts-med' : 'pts-low'"
-                        x-text="'+' + contribution(dim, score) + ' pts'"></span>
-                  <span style="font-size:10px;color:var(--text-muted);min-width:42px;text-align:right"
-                        x-text="Math.round(dimWeights[dim]*100) + '% wt'"></span>
+            <!-- Score Waterfall with Contributions -->
+            <template x-if="detail.dimension_contributions">
+              <div class="score-waterfall">
+                <div class="waterfall-header">
+                  <span style="font-size:12px;color:var(--text-muted)">Score Waterfall</span>
+                  <span class="waterfall-total">Total: <strong x-text="totalScore"></strong> pts</span>
                 </div>
-              </template>
-            </div>
-
-            <!-- Dimension Bars (drill-down to signals) -->
-            <div style="font-size:11px;color:var(--text-muted);margin:12px 0 6px">Click a dimension to filter signals</div>
-            <div class="dimension-grid">
-              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
-                <div class="dimension-row dimension-row-clickable"
-                     @click="dtab='signals'; signalSourceFilter = dim === 'firmographic' ? 'firmographic' : 'dim:' + dim"
-                     :title="'Click to view ' + dim.replace(/_/g, ' ') + ' signals'">
-                  <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
-                  <div class="dimension-bar-bg">
-                    <div class="dimension-bar-fill"
-                         :style="'width:' + Math.min(100, Math.max(0, rawScore(score))) + '%'"
-                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'">
+                <template x-for="[dim, contrib] in Object.entries(detail.dimension_contributions)" :key="'wf-'+dim">
+                  <div class="waterfall-row">
+                    <span class="waterfall-dim" x-text="dim.replace(/_/g,' ')"></span>
+                    <div class="waterfall-bar-track">
+                      <div class="waterfall-bar-fill"
+                           :class="contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'"
+                           :style="'width:' + Math.min(100, (contrib.contribution / Math.max(parseFloat(totalScore), 1)) * 100) + '%'">
+                      </div>
                     </div>
+                    <span class="waterfall-pts"
+                          :class="contrib.dimension_score >= 70 ? 'pts-high' : contrib.dimension_score >= 40 ? 'pts-med' : 'pts-low'"
+                          x-text="'+' + contrib.contribution + ' pts'"></span>
+                    <span style="font-size:10px;color:var(--text-muted);min-width:42px;text-align:right"
+                          x-text="contrib.weight_pct + '% wt'"></span>
                   </div>
-                  <span class="dimension-score" x-text="Math.round(rawScore(score))"></span>
-                  <span class="dimension-tier"
-                        :class="rawScore(score) >= 70 ? 'tier-high' : rawScore(score) >= 40 ? 'tier-medium' : 'tier-low'"
-                        x-text="rawScore(score) >= 70 ? 'Strong' : rawScore(score) >= 40 ? 'Moderate' : rawScore(score) > 0 ? 'Weak' : 'None'"></span>
-                  <span class="dimension-arrow">→</span>
+                </template>
+              </div>
+            </template>
+
+            <!-- Expandable Dimension Rows (click to show top signals) -->
+            <div style="font-size:11px;color:var(--text-muted);margin:16px 0 8px">Click dimensions to view contributing signals</div>
+            <div class="dimensions-container">
+              <template x-for="[dim, contrib] in Object.entries(detail.dimension_contributions || {})" :key="dim">
+                <div class="dimension-expandable"
+                     @click="expandedDim = expandedDim === dim ? null : dim"
+                     :class="{'expanded': expandedDim === dim}">
+                  <!-- Header row -->
+                  <div class="dimension-header">
+                    <span class="expand-arrow" x-text="expandedDim === dim ? '▼' : '▶'"></span>
+                    <span class="dimension-label" x-text="dim.replace(/_/g,' ')"></span>
+                    <div class="dimension-bar-bg">
+                      <div class="dimension-bar-fill"
+                           :style="'width:' + Math.min(100, contrib.dimension_score) + '%'"
+                           :class="contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'">
+                      </div>
+                    </div>
+                    <span class="dimension-score" x-text="Math.round(contrib.dimension_score)"></span>
+                    <span class="dimension-contrib-pts" x-text="'(+' + contrib.contribution + ')'"></span>
+                  </div>
+
+                  <!-- Expanded signals list (shown when clicked) -->
+                  <template x-if="expandedDim === dim && detail.signals_by_dimension && detail.signals_by_dimension[dim]">
+                    <div class="dimension-signals-list">
+                      <template x-if="detail.signals_by_dimension[dim].length > 0">
+                        <template x-for="sig in detail.signals_by_dimension[dim]" :key="sig.signal_code + '-' + sig.source">
+                          <div class="signal-row">
+                            <span class="sig-code" x-text="sig.signal_code"></span>
+                            <span class="sig-score" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                            <span class="sig-source" x-text="sig.source"></span>
+                            <template x-if="sig.evidence_url">
+                              <a :href="sig.evidence_url" target="_blank" class="sig-link" title="View evidence">↗</a>
+                            </template>
+                          </div>
+                        </template>
+                      </template>
+                      <template x-if="!detail.signals_by_dimension[dim] || detail.signals_by_dimension[dim].length === 0">
+                        <div style="font-size:11px;color:var(--text-muted);padding:6px 0">No signals in this dimension</div>
+                      </template>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
