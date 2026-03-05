@@ -1,3 +1,77 @@
+// Signal code → short human label (2-3 words max)
+const SIGNAL_LABELS = {
+  enterprise_modernization_program: 'Enterprise Modernization',
+  cloud_migration_intent: 'Cloud Migration',
+  devops_role_open: 'DevOps Hiring',
+  hiring_devops: 'DevOps Hiring',
+  finops_role_open: 'FinOps Hiring',
+  platform_role_open: 'Platform Hiring',
+  general_hiring_activity: 'General Hiring',
+  cost_optimization: 'Cost Optimization',
+  cost_reduction_mandate: 'Cost Reduction',
+  cloud_cost_spike: 'Cloud Cost Spike',
+  tech_evaluation_intent: 'Tech Evaluation',
+  infrastructure_pain: 'Infra Pain',
+  high_intent_phrase_devops_toil: 'DevOps Pain',
+  high_intent_phrase_cost_control: 'Cost Control',
+  high_intent_phrase_production_fast: 'Speed Signal',
+  vendor_evaluation: 'Vendor Eval',
+  vendor_consolidation_program: 'Vendor Consolidation',
+  cloud_migration_signal: 'Cloud Migration',
+  media_traffic_reliability_pressure: 'Reliability Issue',
+  compliance_initiative: 'Compliance Push',
+  compliance_governance_messaging: 'Governance Signal',
+  recent_funding_event: 'Funding Event',
+  funding_stage_series_a: 'Series A',
+  funding_stage_series_b_plus: 'Series B+',
+  kubernetes_detected: 'K8s Stack',
+  terraform_detected: 'Terraform Stack',
+  gitops_detected: 'GitOps Stack',
+  tooling_sprawl_detected: 'Tool Sprawl',
+  company_news_mention: 'News Mention',
+  launch_or_scale_event: 'Launch / Scale',
+  employee_growth_positive: 'Team Growth',
+  security_review_started: 'Security Review',
+  sap_erp_modernization: 'SAP Migration',
+  erp_s4_migration_milestone: 'ERP Migration',
+  supply_chain_platform_rollout: 'Supply Chain',
+  multi_cloud_strategy: 'Multi-Cloud',
+  data_platform_initiative: 'Data Platform',
+  devops_bottleneck_language: 'DevOps Pain',
+  idp_golden_path_initiative: 'IDP Initiative',
+  env_spinup_requests: 'Env Speed Need',
+  finops_tool_eval: 'FinOps Eval',
+  cloud_platform_messaging: 'Cloud Platform',
+  governance_enforcement_need: 'Governance Need',
+  demand_planning_platform: 'Demand Planning',
+  warehouse_digitization: 'Warehouse Digital',
+  security_baseline_as_default: 'Security Baseline',
+};
+
+// Sources that are "job" type
+const JOB_SOURCES = new Set(['jobs_csv','serper_jobs','greenhouse_api','lever_api','ashby_api','workday_api','jobs_pages']);
+
+function signalLabel(sig) {
+  if (JOB_SOURCES.has(sig.source)) {
+    // For jobs, show the role from evidence_text (first meaningful fragment)
+    const txt = (sig.evidence_text || '').split(/[\n\r|·—]/)[0].trim();
+    return txt.substring(0, 48) || SIGNAL_LABELS[sig.signal_code] || sig.signal_code.replace(/_/g,' ');
+  }
+  return SIGNAL_LABELS[sig.signal_code] || sig.signal_code.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function signalDate(sig) {
+  const d = (sig.observed_at || '').substring(0, 10);
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+function signalApp() {
+  return { signalLabel, signalDate, JOB_SOURCES };
+}
+
 function signalsApp() {
   return {
     // Data

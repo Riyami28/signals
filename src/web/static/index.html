@@ -331,58 +331,34 @@
             <div>
               <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
                 <div class="signal-card"
-                     :class="{'signal-card-high': sig.impact === 'high', 'signal-card-stale': _isStale(sig)}"
-                     x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)"
-                     x-data="{
-                       _isStale(s) {
-                         if (!s.observed_at || !s.half_life_days) return false;
-                         const days = (Date.now() - new Date(s.observed_at).getTime()) / 86400000;
-                         return days > (s.half_life_days * 2.5);
-                       },
-                       _decayLabel(s) {
-                         if (!s.observed_at || !s.half_life_days) return '';
-                         const days = (Date.now() - new Date(s.observed_at).getTime()) / 86400000;
-                         if (days < s.half_life_days * 0.5) return 'Fresh';
-                         if (days < s.half_life_days) return 'Active';
-                         if (days < s.half_life_days * 2) return 'Aging';
-                         return 'Stale';
-                       }
-                     }">
-                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                    <span class="signal-code" x-text="sig.signal_code"></span>
+                     :class="{'signal-card-high': sig.impact === 'high'}"
+                     x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
+                  <!-- Row 1: label · impact · pts -->
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="signalLabel(sig)"></span>
                     <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
-                          x-text="(sig.impact || 'low').toUpperCase() + ' IMPACT'"></span>
-                    <!-- Contribution badge (actual points contributed to score) -->
+                          x-text="(sig.impact || 'low').toUpperCase()"></span>
                     <template x-if="sig.component_score > 0">
-                      <span class="contribution-badge"
-                            x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                      <span class="contribution-badge" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
                     </template>
-                    <!-- Decay indicator -->
-                    <span class="decay-badge"
-                          :class="'decay-' + _decayLabel(sig).toLowerCase()"
-                          x-text="_decayLabel(sig)"
-                          x-show="_decayLabel(sig)"></span>
-                    <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)"
-                          x-text="'wt:' + (sig.base_weight || 0)"></span>
-                    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
-                    <template x-if="sig.dimension">
-                      <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--border-light);color:var(--cyan)" x-text="sig.dimension"></span>
-                    </template>
+                  </div>
+                  <!-- Row 2: source · date -->
+                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">
+                    <span x-text="sig.source"></span>
                     <template x-if="sig.observed_at">
-                      <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
+                      <span x-text="' · ' + signalDate(sig)"></span>
                     </template>
                   </div>
-                  <!-- Rubric tooltip row -->
-                  <div style="display:flex;gap:12px;font-size:10px;color:var(--text-muted);margin-bottom:4px;flex-wrap:wrap">
-                    <span x-show="sig.half_life_days" x-text="'half-life: ' + sig.half_life_days + 'd'"></span>
-                    <span x-show="sig.min_confidence" x-text="'min conf: ' + (sig.min_confidence * 100).toFixed(0) + '%'"></span>
-                    <span x-show="sig.confidence" x-text="'confidence: ' + (Number(sig.confidence) * 100).toFixed(0) + '%'"></span>
-                  </div>
-                  <div class="signal-evidence" x-text="sig.evidence_text"></div>
+                  <!-- Row 3: evidence text (news only — skip for jobs) -->
+                  <template x-if="!JOB_SOURCES.has(sig.source) && sig.evidence_text">
+                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;line-height:1.4"
+                         x-text="(sig.evidence_text || '').substring(0,140) + ((sig.evidence_text||'').length > 140 ? '…' : '')"></div>
+                  </template>
+                  <!-- Row 4: link -->
                   <template x-if="sig.evidence_url">
-                    <div style="margin-top:4px">
-                      <a class="signal-url" :href="sig.evidence_url" target="_blank" x-text="(sig.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
-                    </div>
+                    <a class="signal-url" :href="sig.evidence_url" target="_blank"
+                       x-text="(sig.evidence_url||'').replace(/^https?:\/\//,'').substring(0,70)"
+                       style="font-size:11px;display:block"></a>
                   </template>
                 </div>
               </template>
@@ -892,6 +868,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=11"></script>
+<script src="/static/app.js?v=12"></script>
 </body>
 </html>
