@@ -227,7 +227,10 @@
             <!-- Score Waterfall -->
             <div class="score-waterfall">
               <div class="waterfall-header">
-                <span style="font-size:12px;color:var(--text-muted)">Score Breakdown</span>
+                <div>
+                  <span style="font-size:12px;color:var(--text-muted)">Score Breakdown</span>
+                  <div style="font-size:10px;color:var(--text-muted);opacity:0.7">weighted pts contributed to total</div>
+                </div>
                 <span class="waterfall-total">Total: <strong x-text="totalContribution()"></strong> pts</span>
               </div>
               <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="'wf-'+dim">
@@ -249,7 +252,10 @@
             </div>
 
             <!-- Dimension Bars (drill-down to signals) -->
-            <div style="font-size:11px;color:var(--text-muted);margin:12px 0 6px">Click a dimension to filter signals</div>
+            <div style="margin:16px 0 6px">
+              <span style="font-size:11px;color:var(--text-muted)">Raw signal strength per dimension</span>
+              <span style="font-size:10px;color:var(--text-muted);opacity:0.7"> (0–100 · click to filter signals)</span>
+            </div>
             <div class="dimension-grid">
               <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
                 <div class="dimension-row dimension-row-clickable"
