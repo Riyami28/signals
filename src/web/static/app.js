@@ -400,7 +400,28 @@ function detailPanel() {
         (CLOUD_CODES.has(g.signalCode) ? cloud : nonCloud).push(g);
       }
       const byPts = (a, b) => b.pts - a.pts;
-      return { cloud: cloud.sort(byPts), nonCloud: nonCloud.sort(byPts) };
+      cloud.sort(byPts);
+      nonCloud.sort(byPts);
+
+      // Deduplicate evidence_text across cards in the same section:
+      // if multiple cards have identical snippet text, only the first keeps it.
+      const _dedup = (arr) => {
+        const seen = new Set();
+        for (const g of arr) {
+          const txt = (g.sources[0] && g.sources[0].evidence_text) || '';
+          const key = txt.trim().substring(0, 120);
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            g.snippetText = txt;
+          } else {
+            g.snippetText = '';
+          }
+        }
+      };
+      _dedup(cloud);
+      _dedup(nonCloud);
+
+      return { cloud, nonCloud };
     },
 
     async loadResearch(accountId) {

@@ -353,10 +353,10 @@
                                 @click="src.evidence_url && window.open(src.evidence_url, '_blank')"></span>
                         </template>
                       </div>
-                      <!-- Evidence text from first source -->
-                      <div x-show="g.sources[0] && g.sources[0].evidence_text"
+                      <!-- Evidence text — only shown if unique (deduplicated across section) -->
+                      <div x-show="g.snippetText"
                            style="font-size:12px;color:var(--text-secondary);line-height:1.4"
-                           x-text="(g.sources[0] && g.sources[0].evidence_text || '').substring(0,160) + ((g.sources[0] && g.sources[0].evidence_text||'').length > 160 ? '…' : '')"></div>
+                           x-text="(g.snippetText || '').substring(0,160) + ((g.snippetText||'').length > 160 ? '…' : '')"></div>
                     </div>
                   </template>
                 </div>
@@ -382,9 +382,10 @@
                                 @click="src.evidence_url && window.open(src.evidence_url, '_blank')"></span>
                         </template>
                       </div>
-                      <div x-show="g.sources[0] && g.sources[0].evidence_text"
+                      <!-- Evidence text — only shown if unique (deduplicated across section) -->
+                      <div x-show="g.snippetText"
                            style="font-size:12px;color:var(--text-secondary);line-height:1.4"
-                           x-text="(g.sources[0] && g.sources[0].evidence_text || '').substring(0,160) + ((g.sources[0] && g.sources[0].evidence_text||'').length > 160 ? '…' : '')"></div>
+                           x-text="(g.snippetText || '').substring(0,160) + ((g.snippetText||'').length > 160 ? '…' : '')"></div>
                     </div>
                   </template>
                 </div>
@@ -936,6 +937,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=13"></script>
+<script src="/static/app.js?v=14"></script>
 </body>
 </html>
