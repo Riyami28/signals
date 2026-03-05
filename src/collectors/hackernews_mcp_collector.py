@@ -214,9 +214,7 @@ def _make_observation(
     if not signal_code:
         return None
 
-    confidence = float(
-        classification.get("confidence", INTENT_CATEGORIES.get(intent, 0.65))
-    )
+    confidence = float(classification.get("confidence", INTENT_CATEGORIES.get(intent, 0.65)))
     evidence_text = str(classification.get("evidence_sentence", ""))[:500]
     evidence_url = str(item.get("url", ""))
 
@@ -337,9 +335,7 @@ async def collect(
 
                 for item in posts[:5]:  # max 5 posts per account
                     seen += 1
-                    classification = await _classify_with_claude(
-                        item, company_name, domain, claude_key, client
-                    )
+                    classification = await _classify_with_claude(item, company_name, domain, claude_key, client)
                     if not classification:
                         continue
                     obs = _make_observation(account_id, classification, item, source_reliability)
@@ -368,7 +364,5 @@ async def collect(
     conn.commit()
 
     dt = time.monotonic() - t0
-    logger.info(
-        "hackernews_mcp: seen=%d inserted=%d duration=%.1fs", seen, inserted, dt
-    )
+    logger.info("hackernews_mcp: seen=%d inserted=%d duration=%.1fs", seen, inserted, dt)
     return {"inserted": inserted, "seen": seen, "accounts_processed": len(accounts)}
