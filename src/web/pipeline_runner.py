@@ -165,10 +165,16 @@ def _run_pipeline_sync(
                                     {"type": "log", "stage": "ingest", "message": f"{label}: {ins} signals"},
                                 )
                             except Exception as legacy_exc:
-                                logger.warning("legacy_collector_error collector=%s error=%s", label, legacy_exc, exc_info=True)
+                                logger.warning(
+                                    "legacy_collector_error collector=%s error=%s", label, legacy_exc, exc_info=True
+                                )
                                 _emit(
                                     queue,
-                                    {"type": "log", "stage": "ingest", "message": f"⚠️ {label}: error — {str(legacy_exc)[:200]}"},
+                                    {
+                                        "type": "log",
+                                        "stage": "ingest",
+                                        "message": f"⚠️ {label}: error — {str(legacy_exc)[:200]}",
+                                    },
                                 )
 
                 # --- ALL external collectors in PARALLEL ---
@@ -186,7 +192,11 @@ def _run_pipeline_sync(
                     getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", "")
                 )
                 builtwith_enabled = _collector_enabled("builtwith_free") and settings.builtwith_api_key
-                firmographic_enabled = _collector_enabled("firmographic_google") and settings.serper_api_key and getattr(settings, "minimax_api_key", "")
+                firmographic_enabled = (
+                    _collector_enabled("firmographic_google")
+                    and settings.serper_api_key
+                    and getattr(settings, "minimax_api_key", "")
+                )
 
                 any_external = (
                     serper_news_enabled
@@ -426,10 +436,7 @@ def _run_pipeline_sync(
                             task_labels.append("github_stargazers")
 
                         # Wrap each task with a timeout so no single collector can hang
-                        wrapped = [
-                            asyncio.wait_for(t, timeout=_COLLECTOR_TIMEOUT)
-                            for t in tasks
-                        ]
+                        wrapped = [asyncio.wait_for(t, timeout=_COLLECTOR_TIMEOUT) for t in tasks]
                         results = await asyncio.gather(*wrapped, return_exceptions=True)
                         return list(zip(task_labels, results))
 
@@ -440,7 +447,11 @@ def _run_pipeline_sync(
                             logger.warning("collector_timeout collector=%s timeout=%ds", label, _COLLECTOR_TIMEOUT)
                             _emit(
                                 queue,
-                                {"type": "log", "stage": "ingest", "message": f"⚠️ {label}: timed out after {_COLLECTOR_TIMEOUT}s"},
+                                {
+                                    "type": "log",
+                                    "stage": "ingest",
+                                    "message": f"⚠️ {label}: timed out after {_COLLECTOR_TIMEOUT}s",
+                                },
                             )
                             continue
                         if isinstance(result, Exception):

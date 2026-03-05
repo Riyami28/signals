@@ -59,12 +59,12 @@ TARGET_SUBREDDITS = [
 
 # Intent categories Claude will classify posts into
 INTENT_CATEGORIES = {
-    "active_evaluation": 0.85,   # "We're evaluating tools for X" → high confidence
-    "pain_signal": 0.75,         # "Our infra is killing us / struggling with X" → medium-high
-    "migration_signal": 0.80,    # "Moving from X to Y" → high
-    "hiring_signal": 0.65,       # "We're hiring DevOps/SRE/FinOps" → medium
-    "vendor_mention": 0.60,      # Mentions a relevant vendor in context → medium
-    "passing_mention": None,     # No buying intent → skip
+    "active_evaluation": 0.85,  # "We're evaluating tools for X" → high confidence
+    "pain_signal": 0.75,  # "Our infra is killing us / struggling with X" → medium-high
+    "migration_signal": 0.80,  # "Moving from X to Y" → high
+    "hiring_signal": 0.65,  # "We're hiring DevOps/SRE/FinOps" → medium
+    "vendor_mention": 0.60,  # Mentions a relevant vendor in context → medium
+    "passing_mention": None,  # No buying intent → skip
 }
 
 # Maps intent category → signal_code in our registry
@@ -115,8 +115,7 @@ class _MCPServerProcess:
         """Start mcp-server-reddit as a local HTTP server. Returns True if started."""
         try:
             self._proc = subprocess.Popen(
-                [sys.executable, "-m", "mcp_server_reddit", "--transport", "streamable-http",
-                 "--port", "18765"],
+                [sys.executable, "-m", "mcp_server_reddit", "--transport", "streamable-http", "--port", "18765"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
@@ -128,9 +127,7 @@ class _MCPServerProcess:
                 return False
             return True
         except FileNotFoundError:
-            logger.warning(
-                "mcp-server-reddit not installed. Install with: pip install mcp-server-reddit"
-            )
+            logger.warning("mcp-server-reddit not installed. Install with: pip install mcp-server-reddit")
             return False
         except Exception as exc:
             logger.warning("Failed to start reddit_mcp server: %s", exc)
@@ -235,8 +232,7 @@ def _make_observation(
         post_url = f"https://reddit.com{post_url}"
 
     obs_id = stable_hash(
-        {"account_id": account_id, "signal_code": signal_code,
-         "source": SOURCE_NAME, "url": post_url},
+        {"account_id": account_id, "signal_code": signal_code, "source": SOURCE_NAME, "url": post_url},
         prefix="obs",
     )
     return SignalObservation(
@@ -289,7 +285,7 @@ async def collect(
                 return {"inserted": 0, "seen": 0}
 
             # Process accounts in batches to avoid overloading Claude API
-            for account in accounts[:settings.live_max_accounts]:
+            for account in accounts[: settings.live_max_accounts]:
                 account_id = str(account["account_id"])
                 company_name = str(account.get("company_name", ""))
                 domain = str(account.get("domain", ""))
@@ -314,7 +310,8 @@ async def collect(
                         name_lower = company_name.lower()
                         domain_lower = domain.lower().replace("www.", "")
                         relevant_posts = [
-                            p for p in posts
+                            p
+                            for p in posts
                             if name_lower in str(p.get("title", "")).lower()
                             or name_lower in str(p.get("selftext", "")).lower()
                             or domain_lower in str(p.get("url", "")).lower()
@@ -327,9 +324,7 @@ async def collect(
                             )
                             if not classification:
                                 continue
-                            obs = _make_observation(
-                                account_id, classification, post, subreddit, source_reliability
-                            )
+                            obs = _make_observation(account_id, classification, post, subreddit, source_reliability)
                             if obs and db.insert_signal_observation(conn, obs):
                                 inserted += 1
 
@@ -338,8 +333,7 @@ async def collect(
                             await asyncio.sleep(0.5)
 
                     except Exception as exc:
-                        logger.debug("reddit_mcp subreddit=%s account=%s error: %s",
-                                     subreddit, account_id, exc)
+                        logger.debug("reddit_mcp subreddit=%s account=%s error: %s", subreddit, account_id, exc)
                         continue
 
                 # Also do a cross-subreddit search for the company by name
@@ -351,20 +345,17 @@ async def collect(
                     )
                     posts = search_data if isinstance(search_data, list) else []
                     relevant = [
-                        p for p in posts
+                        p
+                        for p in posts
                         if name_lower in str(p.get("title", "")).lower()
                         or name_lower in str(p.get("selftext", "")).lower()
                     ]
                     for post in relevant[:2]:
                         seen += 1
-                        classification = await _classify_with_claude(
-                            post, "devops", settings.claude_api_key, client
-                        )
+                        classification = await _classify_with_claude(post, "devops", settings.claude_api_key, client)
                         if not classification:
                             continue
-                        obs = _make_observation(
-                            account_id, classification, post, "devops", source_reliability
-                        )
+                        obs = _make_observation(account_id, classification, post, "devops", source_reliability)
                         if obs and db.insert_signal_observation(conn, obs):
                             inserted += 1
                 except Exception as exc:

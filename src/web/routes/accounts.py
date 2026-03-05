@@ -535,14 +535,16 @@ def get_scoring_rubric():
                         hl = float(row.get("half_life_days", 30))
                     except (ValueError, TypeError):
                         hl = 30.0
-                    signals.append({
-                        "signal_code": code,
-                        "dimension": (row.get("dimension") or "").strip(),
-                        "category": (row.get("category") or "").strip(),
-                        "base_weight": weight,
-                        "half_life_days": hl,
-                        "description": (row.get("description") or "").strip(),
-                    })
+                    signals.append(
+                        {
+                            "signal_code": code,
+                            "dimension": (row.get("dimension") or "").strip(),
+                            "category": (row.get("category") or "").strip(),
+                            "base_weight": weight,
+                            "half_life_days": hl,
+                            "description": (row.get("description") or "").strip(),
+                        }
+                    )
     signals.sort(key=lambda s: s["base_weight"], reverse=True)
 
     return {

@@ -192,12 +192,36 @@ def _is_search_or_salary_page(link: str, title: str) -> bool:
 
 
 # Words to skip when extracting meaningful company keywords
-_COMPANY_STOP_WORDS = frozenset([
-    "the", "inc", "ltd", "llc", "corp", "corporation", "company", "co",
-    "group", "plc", "sa", "ag", "gmbh", "incorporated", "products",
-    "international", "worldwide", "global", "pvt", "private", "limited",
-    "holdings", "enterprises", "solutions", "technologies", "services",
-])
+_COMPANY_STOP_WORDS = frozenset(
+    [
+        "the",
+        "inc",
+        "ltd",
+        "llc",
+        "corp",
+        "corporation",
+        "company",
+        "co",
+        "group",
+        "plc",
+        "sa",
+        "ag",
+        "gmbh",
+        "incorporated",
+        "products",
+        "international",
+        "worldwide",
+        "global",
+        "pvt",
+        "private",
+        "limited",
+        "holdings",
+        "enterprises",
+        "solutions",
+        "technologies",
+        "services",
+    ]
+)
 
 
 def _ascii_lower(text: str) -> str:
@@ -281,8 +305,12 @@ def _is_company_job(title: str, snippet: str, link: str, company_name: str, doma
     #    Avoids: "clients include Condé Nast, Disney..."
     for kw in keywords:
         employer_patterns = [
-            f"at {kw}", f"{kw} hiring", f"join {kw}",
-            f"work at {kw}", f"{kw} is looking", f"{kw} is hiring",
+            f"at {kw}",
+            f"{kw} hiring",
+            f"join {kw}",
+            f"work at {kw}",
+            f"{kw} is looking",
+            f"{kw} is hiring",
             f"{kw} is seeking",
         ]
         if any(p in snippet_norm for p in employer_patterns):

@@ -1,4 +1,5 @@
 """One-time backfill: generate firmographic signals for already-enriched accounts."""
+
 from __future__ import annotations
 
 import json

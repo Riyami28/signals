@@ -1,4 +1,5 @@
 """Re-run scoring engine to pick up new firmographic signals."""
+
 from __future__ import annotations
 
 import os
