@@ -79,7 +79,7 @@ function signalsApp() {
           const count = data.row_count || 0;
           const errors = (data.validation_errors || []).length;
           alert(`Imported ${count} companies (batch: ${data.batch_id})` +
-                (errors > 0 ? `\n${errors} validation warning(s)` : ''));
+            (errors > 0 ? `\n${errors} validation warning(s)` : ''));
           await this.loadAccounts();
         }
       } catch (err) {
@@ -133,7 +133,7 @@ function signalsApp() {
         const medResp = await fetch('/api/accounts?tier=medium&per_page=1');
         const medData = await medResp.json();
         this.stats.medium = medData.total || 0;
-      } catch (e) {}
+      } catch (e) { }
     },
 
     setSort(col) {
@@ -245,27 +245,16 @@ function detailPanel() {
   return {
     dtab: 'dimensions',
     detail: null,
-    researchData: null,
-    accountLabels: [],
-    newLabel: '',
-    newNotes: '',
-
-    // Signal filter inside detail panel
-    signalSourceFilter: '',
-
-    // Timeline state
-    timelineItems: [],
-    timelineTotal: 0,
-    timelineOffset: 0,
-    timelineSignalCode: '',
-    timelineSource: '',
-
-    // Contacts state
-    contactsLoading: false,
-    enrichingContactId: null,
+    // Dossier & Starters
+    dossier: null,
+    dossierLoading: false,
+    showDossierModal: false,
+    conversationStarters: [],
 
     async load(accountId) {
       this.researchData = null;
+      this.dossier = null;
+      this.conversationStarters = [];
       try {
         const resp = await fetch(`/api/accounts/${accountId}`);
         this.detail = await resp.json();
@@ -277,10 +266,51 @@ function detailPanel() {
 
     async loadResearch(accountId) {
       this.researchData = null;
+      this.dossier = null;
+      this.conversationStarters = [];
       try {
         const resp = await fetch(`/api/research/${accountId}`);
         this.researchData = await resp.json();
-      } catch (e) {}
+
+        // If research exists, also fetch dossier
+        if (this.researchData && this.researchData.research) {
+          this.loadDossier(accountId);
+          this._extractStarters();
+        }
+      } catch (e) { }
+    },
+
+    async loadDossier(accountId) {
+      this.dossierLoading = true;
+      try {
+        const resp = await fetch(`/api/accounts/${accountId}/dossier`);
+        this.dossier = await resp.json();
+      } catch (e) {
+        console.error('Failed to load dossier:', e);
+      } finally {
+        this.dossierLoading = false;
+      }
+    },
+
+    _extractStarters() {
+      if (!this.researchData || !this.researchData.research || !this.researchData.research.research_profile) return;
+
+      const profile = this.researchData.research.research_profile;
+      // Regex to find "Conversation Starters" section and its list items
+      const match = profile.match(/##\s*Conversation\s*Starters?\s*\n([\s\S]*?)(?:\n##|\Z)/i);
+      if (match) {
+        const content = match[1].trim();
+        this.conversationStarters = content.split('\n')
+          .map(line => line.replace(/^[-*•]\s*/, '').trim())
+          .filter(line => line.length > 0);
+      }
+    },
+
+    copyDossier() {
+      if (!this.dossier || !this.dossier.markdown) return;
+      navigator.clipboard.writeText(this.dossier.markdown).then(() => {
+        alert('Dossier copied to clipboard!');
+      });
     },
 
     async loadLabels(accountId) {
@@ -288,7 +318,7 @@ function detailPanel() {
         const resp = await fetch(`/api/labels/${accountId}`);
         const data = await resp.json();
         this.accountLabels = data.labels || [];
-      } catch (e) {}
+      } catch (e) { }
     },
 
     async loadTimeline(accountId, append) {
