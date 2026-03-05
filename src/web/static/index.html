@@ -202,8 +202,7 @@
              rawScore(s) { return typeof s === 'object' ? (s.score || 0) : (s || 0) },
              contribution(dim, s) {
                const w = this.dimWeights[dim] || 0;
-               const ceil = this.dimCeilings[dim] || 100;
-               return ((this.rawScore(s) / 100) * ceil * w).toFixed(1);
+               return (this.rawScore(s) * w).toFixed(1);
              },
              totalContribution() {
                if (!detail || !detail.dimension_scores) return 0;
