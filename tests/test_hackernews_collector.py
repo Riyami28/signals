@@ -30,7 +30,6 @@ from src.collectors.hackernews_mcp_collector import (
     _make_observation,
 )
 
-
 # ---------------------------------------------------------------------------
 # Constants sanity checks
 # ---------------------------------------------------------------------------
@@ -349,9 +348,7 @@ class TestClassifyWithClaude:
 
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "content": [{"text": json.dumps(classification)}]
-        }
+        mock_response.json.return_value = {"content": [{"text": json.dumps(classification)}]}
 
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_response)
@@ -489,9 +486,7 @@ class TestCollectFunction:
         conn = MagicMock()
         conn.commit = MagicMock()
         # Account has no company_name and no domain
-        conn.execute.return_value.fetchall.return_value = [
-            {"account_id": "acc_1", "company_name": "", "domain": ""}
-        ]
+        conn.execute.return_value.fetchall.return_value = [{"account_id": "acc_1", "company_name": "", "domain": ""}]
 
         with patch("src.collectors.hackernews_mcp_collector.db.was_crawled_today", return_value=False):
             result = await collect(conn, settings)
@@ -570,7 +565,9 @@ class TestCollectFunction:
 
         with (
             patch("src.collectors.hackernews_mcp_collector.db.was_crawled_today", return_value=False),
-            patch("src.collectors.hackernews_mcp_collector._fetch_hn_posts", new_callable=AsyncMock, return_value=[post]),
+            patch(
+                "src.collectors.hackernews_mcp_collector._fetch_hn_posts", new_callable=AsyncMock, return_value=[post]
+            ),
             patch(
                 "src.collectors.hackernews_mcp_collector._classify_with_claude",
                 new_callable=AsyncMock,
@@ -608,7 +605,9 @@ class TestCollectFunction:
 
         with (
             patch("src.collectors.hackernews_mcp_collector.db.was_crawled_today", return_value=False),
-            patch("src.collectors.hackernews_mcp_collector._fetch_hn_posts", new_callable=AsyncMock, return_value=[post]),
+            patch(
+                "src.collectors.hackernews_mcp_collector._fetch_hn_posts", new_callable=AsyncMock, return_value=[post]
+            ),
             patch(
                 "src.collectors.hackernews_mcp_collector._classify_with_claude",
                 new_callable=AsyncMock,
