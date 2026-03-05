@@ -14,6 +14,7 @@ from src.collectors import (
     jobs,
     news,
     reddit_collector,
+    reddit_mcp_collector,
     reddit_official,
     serper_reddit,
     serper_twitter,
@@ -127,6 +128,13 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     results["serper_reddit"] = (
         await serper_reddit.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("serper_reddit")
+        else {"inserted": 0, "seen": 0}
+    )
+
+    # Reddit MCP — semantic LLM-classified Reddit signals (replaces keyword matching)
+    results["reddit_mcp"] = (
+        await reddit_mcp_collector.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("reddit_mcp")
         else {"inserted": 0, "seen": 0}
     )
 

@@ -51,10 +51,20 @@ def _get_signal_meta() -> dict[str, dict]:
                     weight = int(row.get("base_weight", 0))
                 except (ValueError, TypeError):
                     weight = 0
+                try:
+                    half_life = float(row.get("half_life_days", 30))
+                except (ValueError, TypeError):
+                    half_life = 30.0
+                try:
+                    min_conf = float(row.get("min_confidence", 0.5))
+                except (ValueError, TypeError):
+                    min_conf = 0.5
                 meta[code] = {
                     "dimension": (row.get("dimension") or "").strip(),
                     "category": (row.get("category") or "").strip(),
                     "base_weight": weight,
+                    "half_life_days": half_life,
+                    "min_confidence": min_conf,
                 }
     _signal_meta_cache = meta
     return meta
@@ -134,10 +144,16 @@ def get_account(account_id: str):
                 sig["base_weight"] = weight
                 sig["dimension"] = meta.get("dimension", "")
                 sig["category"] = meta.get("category", "")
+                sig["half_life_days"] = meta.get("half_life_days", 30.0)
+                sig["min_confidence"] = meta.get("min_confidence", 0.5)
                 sig["impact"] = "high" if weight >= 18 else "medium" if weight >= 10 else "low"
-            # Sort by weight DESC, then observed_at DESC
+            # Sort by component_score DESC (actual contribution), then base_weight, then date
             detail["signals"].sort(
-                key=lambda s: (s.get("base_weight", 0), s.get("observed_at", "")),
+                key=lambda s: (
+                    float(s.get("component_score") or 0),
+                    s.get("base_weight", 0),
+                    s.get("observed_at", ""),
+                ),
                 reverse=True,
             )
 
@@ -449,3 +465,101 @@ def export_accounts_csv(
         )
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Scoring Rubric — static config served to the UI
+# ---------------------------------------------------------------------------
+
+_DIMENSION_DESCRIPTIONS = {
+    "trigger_intent": "External events signalling active buying motion — funding rounds, exec changes, product launches, compliance deadlines.",
+    "tech_fit": "Technology stack signals indicating readiness for DevOps/Platform/FinOps solutions — K8s, Terraform, cloud-native tooling.",
+    "engagement_pql": "Product-qualified signals — community engagement, GitHub activity, documentation visits, trial/demo requests.",
+    "firmographic": "Company profile fit — size, industry, revenue range, growth stage.",
+    "hiring_growth": "Hiring patterns revealing infrastructure investment — DevOps, SRE, Platform Eng, FinOps roles being recruited.",
+}
+
+_DIMENSION_WEIGHTS = {
+    "trigger_intent": {"weight": 0.35, "ceiling": 60.0},
+    "tech_fit": {"weight": 0.20, "ceiling": 40.0},
+    "engagement_pql": {"weight": 0.25, "ceiling": 50.0},
+    "firmographic": {"weight": 0.10, "ceiling": 30.0},
+    "hiring_growth": {"weight": 0.10, "ceiling": 30.0},
+}
+
+
+@router.get("/scoring/rubric")
+def get_scoring_rubric():
+    """Return the scoring configuration for UI transparency."""
+    settings = load_settings()
+
+    # Load thresholds
+    tiers: list[dict] = []
+    threshold_path = settings.project_root / "config" / "thresholds.csv"
+    if threshold_path.exists():
+        with threshold_path.open("r", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                key = (row.get("key") or "").strip()
+                val = row.get("value", "")
+                if key and key.startswith("tier_"):
+                    tiers.append({"tier": key, "min_score": val})
+
+    # Load sources
+    sources: list[dict] = []
+    source_path = settings.source_registry_path
+    if source_path.exists():
+        with source_path.open("r", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                src = (row.get("source") or "").strip()
+                if src:
+                    try:
+                        rel = float(row.get("reliability", 0))
+                    except (ValueError, TypeError):
+                        rel = 0.0
+                    sources.append({"source": src, "reliability": rel, "enabled": row.get("enabled", "true")})
+    sources.sort(key=lambda s: s["reliability"], reverse=True)
+
+    # Load signal definitions
+    signals: list[dict] = []
+    signal_path = settings.signal_registry_path
+    if signal_path.exists():
+        with signal_path.open("r", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                code = (row.get("signal_code") or "").strip()
+                if code:
+                    try:
+                        weight = int(row.get("base_weight", 0))
+                    except (ValueError, TypeError):
+                        weight = 0
+                    try:
+                        hl = float(row.get("half_life_days", 30))
+                    except (ValueError, TypeError):
+                        hl = 30.0
+                    signals.append(
+                        {
+                            "signal_code": code,
+                            "dimension": (row.get("dimension") or "").strip(),
+                            "category": (row.get("category") or "").strip(),
+                            "base_weight": weight,
+                            "half_life_days": hl,
+                            "description": (row.get("description") or "").strip(),
+                        }
+                    )
+    signals.sort(key=lambda s: s["base_weight"], reverse=True)
+
+    return {
+        "formula": "score = base_weight × confidence × source_reliability × recency_decay(half_life_days)",
+        "anti_inflation": "Max 1 observation per source per signal; max 3 total per signal",
+        "dimensions": [
+            {
+                "name": dim,
+                "weight_pct": int(cfg["weight"] * 100),
+                "ceiling": cfg["ceiling"],
+                "description": _DIMENSION_DESCRIPTIONS.get(dim, ""),
+            }
+            for dim, cfg in _DIMENSION_WEIGHTS.items()
+        ],
+        "tiers": tiers,
+        "sources": sources[:30],  # Top 30 by reliability
+        "top_signals": signals[:20],  # Top 20 by base_weight
+    }

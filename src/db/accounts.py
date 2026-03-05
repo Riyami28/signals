@@ -1016,7 +1016,8 @@ def get_account_detail(conn, account_id: str) -> dict | None:
     # pipeline runs don't hide scores from prior full runs.
     scores = conn.execute(
         """
-        SELECT DISTINCT ON (s.product) s.product, s.score, s.tier, s.dimension_scores_json
+        SELECT DISTINCT ON (s.product) s.product, s.score, s.tier,
+               s.dimension_scores_json, s.top_reasons_json, s.confidence_band
         FROM account_scores s
         JOIN score_runs r ON s.run_id = r.run_id
         WHERE s.account_id = %s AND r.status = 'completed'
@@ -1026,11 +1027,31 @@ def get_account_detail(conn, account_id: str) -> dict | None:
     ).fetchall()
     result["scores"] = [dict(r) for r in scores]
 
+    # Include component_score so the UI can show per-signal contributions.
     signals = conn.execute(
-        """SELECT signal_code, source, evidence_url, evidence_text, observed_at
-           FROM signal_observations WHERE account_id = %s
-           AND observed_at::timestamptz >= NOW() - INTERVAL '14 days'
-           ORDER BY observed_at DESC LIMIT 50""",
+        """
+        SELECT so.signal_code, so.source, so.evidence_url, so.evidence_text,
+               so.observed_at, so.confidence,
+               sc.component_score
+        FROM signal_observations so
+        LEFT JOIN LATERAL (
+            SELECT sc2.component_score
+            FROM score_components sc2
+            WHERE sc2.account_id = so.account_id
+              AND sc2.signal_code = so.signal_code
+              AND sc2.run_id = (
+                  SELECT run_id FROM score_runs
+                  WHERE status = 'completed'
+                  ORDER BY started_at DESC LIMIT 1
+              )
+            ORDER BY sc2.component_score DESC
+            LIMIT 1
+        ) sc ON true
+        WHERE so.account_id = %s
+          AND so.observed_at::timestamptz >= NOW() - INTERVAL '14 days'
+        ORDER BY so.observed_at DESC
+        LIMIT 50
+        """,
         (account_id,),
     ).fetchall()
     result["signals"] = [dict(r) for r in signals]

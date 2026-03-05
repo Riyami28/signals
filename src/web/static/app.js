@@ -20,6 +20,10 @@ function signalsApp() {
     pipelineRunning: false,
     pipelineStages: [],
 
+    // Rubric modal
+    showRubricModal: false,
+    rubricData: null,
+
     // CSV Import/Export
     csvUploading: false,
 
@@ -120,6 +124,16 @@ function signalsApp() {
         }
       } catch (e) {
         console.error('Failed to load accounts:', e);
+      }
+    },
+
+    async loadRubric() {
+      if (this.rubricData) return; // already loaded
+      try {
+        const resp = await fetch('/api/scoring/rubric');
+        this.rubricData = await resp.json();
+      } catch(e) {
+        console.error('Failed to load rubric:', e);
       }
     },
 

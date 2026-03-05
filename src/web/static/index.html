@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signals Pipeline</title>
-<link rel="stylesheet" href="/static/styles.css?v=10">
+<link rel="stylesheet" href="/static/styles.css?v=11">
 <script>
   // Apply saved theme immediately to prevent flash
   (function() {
@@ -24,6 +24,11 @@
       <!-- Theme Toggle -->
       <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
               x-text="theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'"></button>
+      <!-- Scoring Rubric -->
+      <button class="btn" style="background:var(--bg-tertiary);color:var(--text);font-size:13px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;"
+              @click="showRubricModal = true; loadRubric()">
+        How Scoring Works
+      </button>
       <!-- CSV Import -->
       <input type="file" id="csvFileInput" accept=".csv" style="display:none"
              @change="handleCsvUpload($event)">
@@ -188,7 +193,23 @@
       </div>
 
       <!-- Dimensions Tab -->
-      <div x-show="dtab==='dimensions'">
+      <div x-show="dtab==='dimensions'"
+           x-data="{
+             dimWeights: {trigger_intent:0.35, tech_fit:0.20, engagement_pql:0.25, firmographic:0.10, hiring_growth:0.10},
+             dimCeilings: {trigger_intent:60, tech_fit:40, engagement_pql:50, firmographic:30, hiring_growth:30},
+             rawScore(s) { return typeof s === 'object' ? (s.score || 0) : (s || 0) },
+             contribution(dim, s) {
+               const w = this.dimWeights[dim] || 0;
+               const ceil = this.dimCeilings[dim] || 100;
+               return ((this.rawScore(s) / 100) * ceil * w).toFixed(1);
+             },
+             totalContribution() {
+               if (!detail || !detail.dimension_scores) return 0;
+               return Object.entries(detail.dimension_scores).reduce((sum, [d, s]) => {
+                 return sum + parseFloat(this.contribution(d, s));
+               }, 0).toFixed(1);
+             }
+           }">
         <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
           <div>
             <template x-if="detail.velocity">
@@ -200,6 +221,33 @@
                 <span class="velocity-delta">30d: <strong x-text="(detail.velocity['30d'] > 0 ? '+' : '') + detail.velocity['30d']"></strong></span>
               </div>
             </template>
+
+            <!-- Score Waterfall -->
+            <div class="score-waterfall">
+              <div class="waterfall-header">
+                <span style="font-size:12px;color:var(--text-muted)">Score Breakdown</span>
+                <span class="waterfall-total">Total: <strong x-text="totalContribution()"></strong> pts</span>
+              </div>
+              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="'wf-'+dim">
+                <div class="waterfall-row">
+                  <span class="waterfall-dim" x-text="dim.replace(/_/g,' ')"></span>
+                  <div class="waterfall-bar-track">
+                    <div class="waterfall-bar-fill"
+                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'"
+                         :style="'width:' + Math.min(100, (parseFloat(contribution(dim,score)) / Math.max(parseFloat(totalContribution()), 1)) * 100) + '%'">
+                    </div>
+                  </div>
+                  <span class="waterfall-pts"
+                        :class="rawScore(score) >= 70 ? 'pts-high' : rawScore(score) >= 40 ? 'pts-med' : 'pts-low'"
+                        x-text="'+' + contribution(dim, score) + ' pts'"></span>
+                  <span style="font-size:10px;color:var(--text-muted);min-width:42px;text-align:right"
+                        x-text="Math.round(dimWeights[dim]*100) + '% wt'"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Dimension Bars (drill-down to signals) -->
+            <div style="font-size:11px;color:var(--text-muted);margin:12px 0 6px">Click a dimension to filter signals</div>
             <div class="dimension-grid">
               <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
                 <div class="dimension-row dimension-row-clickable"
@@ -208,18 +256,35 @@
                   <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
                   <div class="dimension-bar-bg">
                     <div class="dimension-bar-fill"
-                         :style="'width:' + Math.min(100, Math.max(0, (typeof score === 'object' ? (score.score || 0) : score))) + '%'"
-                         :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'bar-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'bar-medium' : 'bar-low'">
+                         :style="'width:' + Math.min(100, Math.max(0, rawScore(score))) + '%'"
+                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'">
                     </div>
                   </div>
-                  <span class="dimension-score" x-text="Math.round(typeof score === 'object' ? (score.score || 0) : score)"></span>
+                  <span class="dimension-score" x-text="Math.round(rawScore(score))"></span>
                   <span class="dimension-tier"
-                        :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'tier-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'tier-medium' : 'tier-low'"
-                        x-text="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'Strong' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'Moderate' : (typeof score === 'object' ? (score.score || 0) : score) > 0 ? 'Weak' : 'None'"></span>
+                        :class="rawScore(score) >= 70 ? 'tier-high' : rawScore(score) >= 40 ? 'tier-medium' : 'tier-low'"
+                        x-text="rawScore(score) >= 70 ? 'Strong' : rawScore(score) >= 40 ? 'Moderate' : rawScore(score) > 0 ? 'Weak' : 'None'"></span>
                   <span class="dimension-arrow">→</span>
                 </div>
               </template>
             </div>
+
+            <!-- Top Reasons from scoring engine -->
+            <template x-if="detail.scores && detail.scores.length > 0 && detail.scores[0].top_reasons_json">
+              <div x-data="{ get reasons() { try { return JSON.parse(detail.scores[0].top_reasons_json || '[]') } catch(e) { return [] } } }">
+                <div style="font-size:11px;color:var(--text-muted);margin:16px 0 6px">Top Score Drivers</div>
+                <template x-for="r in reasons" :key="r.signal_code">
+                  <div class="top-reason-row">
+                    <span class="reason-code" x-text="r.signal_code"></span>
+                    <span class="reason-score" x-text="'+' + Number(r.component_score || 0).toFixed(1) + ' pts'"></span>
+                    <span class="reason-source" x-text="r.source || ''"></span>
+                    <template x-if="r.evidence_url">
+                      <a :href="r.evidence_url" target="_blank" class="reason-link" title="View evidence">↗</a>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
         </template>
         <div x-show="!detail || !detail.dimension_scores || Object.keys(detail.dimension_scores).length === 0" class="empty">No dimension scores available. Run scoring pipeline first.</div>
@@ -258,11 +323,38 @@
           <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
             <div>
               <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
-                <div class="signal-card" :class="{'signal-card-high': sig.impact === 'high'}" x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
+                <div class="signal-card"
+                     :class="{'signal-card-high': sig.impact === 'high', 'signal-card-stale': _isStale(sig)}"
+                     x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)"
+                     x-data="{
+                       _isStale(s) {
+                         if (!s.observed_at || !s.half_life_days) return false;
+                         const days = (Date.now() - new Date(s.observed_at).getTime()) / 86400000;
+                         return days > (s.half_life_days * 2.5);
+                       },
+                       _decayLabel(s) {
+                         if (!s.observed_at || !s.half_life_days) return '';
+                         const days = (Date.now() - new Date(s.observed_at).getTime()) / 86400000;
+                         if (days < s.half_life_days * 0.5) return 'Fresh';
+                         if (days < s.half_life_days) return 'Active';
+                         if (days < s.half_life_days * 2) return 'Aging';
+                         return 'Stale';
+                       }
+                     }">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
                     <span class="signal-code" x-text="sig.signal_code"></span>
                     <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
                           x-text="(sig.impact || 'low').toUpperCase() + ' IMPACT'"></span>
+                    <!-- Contribution badge (actual points contributed to score) -->
+                    <template x-if="sig.component_score > 0">
+                      <span class="contribution-badge"
+                            x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                    </template>
+                    <!-- Decay indicator -->
+                    <span class="decay-badge"
+                          :class="'decay-' + _decayLabel(sig).toLowerCase()"
+                          x-text="_decayLabel(sig)"
+                          x-show="_decayLabel(sig)"></span>
                     <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)"
                           x-text="'wt:' + (sig.base_weight || 0)"></span>
                     <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
@@ -272,6 +364,12 @@
                     <template x-if="sig.observed_at">
                       <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
                     </template>
+                  </div>
+                  <!-- Rubric tooltip row -->
+                  <div style="display:flex;gap:12px;font-size:10px;color:var(--text-muted);margin-bottom:4px;flex-wrap:wrap">
+                    <span x-show="sig.half_life_days" x-text="'half-life: ' + sig.half_life_days + 'd'"></span>
+                    <span x-show="sig.min_confidence" x-text="'min conf: ' + (sig.min_confidence * 100).toFixed(0) + '%'"></span>
+                    <span x-show="sig.confidence" x-text="'confidence: ' + (Number(sig.confidence) * 100).toFixed(0) + '%'"></span>
                   </div>
                   <div class="signal-evidence" x-text="sig.evidence_text"></div>
                   <template x-if="sig.evidence_url">
@@ -410,10 +508,78 @@
       </div>
 
       <!-- Research Tab -->
-      <div x-show="dtab==='research'">
+      <div x-show="dtab==='research'"
+           x-data="{
+             dossierLoading: false,
+             dossierData: null,
+             showDossier: false,
+             async loadDossier(accountId) {
+               this.dossierLoading = true;
+               try {
+                 const resp = await fetch('/api/accounts/' + accountId + '/dossier');
+                 this.dossierData = await resp.json();
+                 this.showDossier = true;
+               } catch(e) { console.error(e); }
+               finally { this.dossierLoading = false; }
+             },
+             copyDossier() {
+               if (!this.dossierData) return;
+               const text = this.dossierData.markdown || JSON.stringify(this.dossierData, null, 2);
+               navigator.clipboard.writeText(text).then(() => alert('Dossier copied to clipboard'));
+             },
+             get starters() {
+               if (!researchData || !researchData.research) return [];
+               const raw = researchData.research.research_profile;
+               if (!raw) return [];
+               try {
+                 const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                 if (parsed && Array.isArray(parsed.conversation_starters)) return parsed.conversation_starters;
+               } catch(e) {}
+               // Fallback: parse markdown bullet list
+               const match = (typeof raw === 'string' ? raw : '').match(/Conversation Starters[\s\S]*?((?:[-*]\s+.+\n?)+)/i);
+               if (match) return match[1].split('\n').map(l => l.replace(/^[-*]\s+/, '').trim()).filter(Boolean);
+               return [];
+             }
+           }">
         <template x-if="researchData && researchData.research">
           <div>
+            <!-- Action buttons -->
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <button class="btn btn-sm btn-blue"
+                      @click="loadDossier(expandedId)"
+                      :disabled="dossierLoading">
+                <span x-text="dossierLoading ? 'Loading...' : 'View Full Dossier'"></span>
+              </button>
+              <template x-if="dossierData">
+                <button class="btn btn-sm" @click="copyDossier()">Copy Dossier</button>
+              </template>
+            </div>
+
+            <!-- Recommended Approach (from dossier) -->
+            <template x-if="dossierData && dossierData.sections && dossierData.sections.recommended_approach">
+              <div class="recommended-approach-card">
+                <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Recommended Approach</div>
+                <div style="font-size:13px;color:var(--text)" x-text="dossierData.sections.recommended_approach"></div>
+              </div>
+            </template>
+
+            <!-- Research Brief -->
             <div class="research-brief" x-text="researchData.research.research_brief || 'No research brief available'"></div>
+
+            <!-- Conversation Starters -->
+            <template x-if="starters.length > 0">
+              <div class="starters-section">
+                <div class="starters-header">Conversation Starters</div>
+                <template x-for="(starter, idx) in starters" :key="idx">
+                  <div class="starter-card">
+                    <span class="starter-num" x-text="(idx + 1) + '.'"></span>
+                    <span x-text="starter"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- Enrichment Data -->
             <template x-if="researchData.research.enrichment_json">
               <div>
                 <h4 style="color:var(--blue);font-size:13px;margin-top:16px;margin-bottom:8px">Enrichment Data</h4>
@@ -424,6 +590,22 @@
                       <div class="enr-value" x-text="typeof v === 'object' ? JSON.stringify(v) : v"></div>
                     </div>
                   </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- Dossier Modal -->
+            <template x-if="showDossier && dossierData">
+              <div class="modal-overlay" @click.self="showDossier = false">
+                <div class="modal dossier-modal">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <h2 style="font-size:16px;margin:0">GTM Dossier</h2>
+                    <div style="display:flex;gap:8px">
+                      <button class="btn btn-sm" @click="copyDossier()">Copy</button>
+                      <button class="btn btn-sm" @click="showDossier = false">&times; Close</button>
+                    </div>
+                  </div>
+                  <div class="dossier-content" x-text="dossierData.markdown || 'No dossier content'"></div>
                 </div>
               </div>
             </template>
@@ -581,6 +763,92 @@
     <button class="btn btn-sm" @click="page = Math.min(totalPages, page+1); loadAccounts()" :disabled="page >= totalPages">Next</button>
   </div>
 
+  <!-- Scoring Rubric Modal -->
+  <template x-if="showRubricModal">
+    <div class="modal-overlay" @click.self="showRubricModal = false">
+      <div class="modal rubric-modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="font-size:16px;margin:0">How Scoring Works</h2>
+          <button class="btn btn-sm" @click="showRubricModal = false">&times; Close</button>
+        </div>
+
+        <template x-if="rubricData">
+          <div>
+            <!-- Formula -->
+            <div class="rubric-formula">
+              <span class="rubric-formula-label">Formula</span>
+              <code x-text="rubricData.formula"></code>
+              <div style="margin-top:6px;font-size:11px;color:var(--text-muted)" x-text="rubricData.anti_inflation"></div>
+            </div>
+
+            <!-- Dimensions -->
+            <h3 class="rubric-section-title">Score Dimensions</h3>
+            <template x-for="dim in rubricData.dimensions" :key="dim.name">
+              <div class="rubric-dim-row">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <span class="rubric-dim-name" x-text="dim.name.replace(/_/g,' ')"></span>
+                  <div style="display:flex;gap:8px">
+                    <span class="rubric-tag" x-text="dim.weight_pct + '% weight'"></span>
+                    <span class="rubric-tag" x-text="'ceil ' + dim.ceiling + ' pts'"></span>
+                  </div>
+                </div>
+                <div style="font-size:12px;color:var(--text-muted)" x-text="dim.description"></div>
+                <div class="rubric-dim-bar">
+                  <div :style="'width:' + dim.weight_pct + '%'" class="rubric-dim-bar-fill"></div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Tier Thresholds -->
+            <h3 class="rubric-section-title">Tier Boundaries</h3>
+            <div class="rubric-tiers">
+              <template x-for="t in rubricData.tiers" :key="t.tier">
+                <div class="rubric-tier-row">
+                  <span class="tier"
+                        :class="t.tier === 'tier_1' ? 'tier-high' : t.tier === 'tier_2' ? 'tier-medium' : 'tier-low'"
+                        x-text="t.tier === 'tier_1' ? 'HIGH' : t.tier === 'tier_2' ? 'MEDIUM' : t.tier === 'tier_3' ? 'LOW' : 'EXPLORE'"></span>
+                  <span style="font-size:12px;color:var(--text-muted)"
+                        x-text="'≥ ' + t.min_score + ' points'"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Source Reliability -->
+            <h3 class="rubric-section-title">Source Reliability</h3>
+            <div class="rubric-sources">
+              <template x-for="src in rubricData.sources.slice(0,15)" :key="src.source">
+                <div class="rubric-source-row">
+                  <span style="font-size:12px;color:var(--text)" x-text="src.source"></span>
+                  <div class="rubric-reliability-bar">
+                    <div :style="'width:' + (src.reliability * 100) + '%'"
+                         :class="src.reliability >= 0.8 ? 'bar-high' : src.reliability >= 0.6 ? 'bar-medium' : 'bar-low'"
+                         class="dimension-bar-fill"></div>
+                  </div>
+                  <span style="font-size:11px;font-family:var(--mono);color:var(--text-muted);min-width:36px;text-align:right"
+                        x-text="(src.reliability * 100).toFixed(0) + '%'"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Top Signals -->
+            <h3 class="rubric-section-title">Top Signal Weights</h3>
+            <div class="rubric-signals">
+              <template x-for="sig in rubricData.top_signals.slice(0,10)" :key="sig.signal_code">
+                <div class="rubric-signal-row">
+                  <span class="signal-code" x-text="sig.signal_code"></span>
+                  <span style="font-size:11px;color:var(--cyan)" x-text="sig.dimension || 'n/a'"></span>
+                  <span style="font-size:11px;color:var(--text-muted)" x-text="'hl: ' + sig.half_life_days + 'd'"></span>
+                  <span class="contribution-badge" x-text="'wt: ' + sig.base_weight"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        <div x-show="!rubricData" style="text-align:center;padding:32px;color:var(--text-muted)">Loading rubric...</div>
+      </div>
+    </div>
+  </template>
+
   <!-- Pipeline Modal -->
   <template x-if="showPipelineModal">
     <div class="modal-overlay" @click.self="!pipelineRunning && (showPipelineModal = false)">
@@ -617,6 +885,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=10"></script>
+<script src="/static/app.js?v=11"></script>
 </body>
 </html>
