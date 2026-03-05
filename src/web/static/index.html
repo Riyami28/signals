@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signals Pipeline</title>
-<link rel="stylesheet" href="/static/styles.css?v=11">
+<link rel="stylesheet" href="/static/styles.css?v=12">
 <script>
   // Apply saved theme immediately to prevent flash
   (function() {
@@ -19,7 +19,14 @@
 
   <!-- Header -->
   <div class="header">
-    <h1>Signals Pipeline</h1>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <h1>Signals Pipeline</h1>
+      <!-- Scoring Rubric — anchored left so it stays visible when the detail panel is open -->
+      <button class="btn" style="background:var(--bg-tertiary);color:var(--text);font-size:13px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;"
+              @click="showRubricModal = true; loadRubric()">
+        How Scoring Works
+      </button>
+    </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center;">
       <!-- Theme Toggle -->
       <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
@@ -254,6 +261,18 @@
                return Object.values(detail.dimension_contributions)
                  .reduce((sum, c) => sum + (parseFloat(c.contribution) || 0), 0)
                  .toFixed(1);
+             dimWeights: {trigger_intent:0.35, tech_fit:0.20, engagement_pql:0.25, firmographic:0.10, hiring_growth:0.10},
+             dimCeilings: {trigger_intent:60, tech_fit:40, engagement_pql:50, firmographic:30, hiring_growth:30},
+             rawScore(s) { return typeof s === 'object' ? (s.score || 0) : (s || 0) },
+             contribution(dim, s) {
+               const w = this.dimWeights[dim] || 0;
+               return (this.rawScore(s) * w).toFixed(1);
+             },
+             totalContribution() {
+               if (!detail || !detail.dimension_scores) return 0;
+               return Object.entries(detail.dimension_scores).reduce((sum, [d, s]) => {
+                 return sum + parseFloat(this.contribution(d, s));
+               }, 0).toFixed(1);
              }
            }">
         <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
@@ -283,6 +302,22 @@
                            :class="contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'"
                            :style="'width:' + Math.min(100, (contrib.contribution / Math.max(parseFloat(totalScore), 1)) * 100) + '%'">
                       </div>
+            <!-- Score Waterfall -->
+            <div class="score-waterfall">
+              <div class="waterfall-header">
+                <div>
+                  <span style="font-size:12px;color:var(--text-muted)">Score Breakdown</span>
+                  <div style="font-size:10px;color:var(--text-muted);opacity:0.7">weighted pts contributed to total</div>
+                </div>
+                <span class="waterfall-total">Total: <strong x-text="totalContribution()"></strong> pts</span>
+              </div>
+              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="'wf-'+dim">
+                <div class="waterfall-row">
+                  <span class="waterfall-dim" x-text="dim.replace(/_/g,' ')"></span>
+                  <div class="waterfall-bar-track">
+                    <div class="waterfall-bar-fill"
+                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'"
+                         :style="'width:' + Math.min(100, (parseFloat(contribution(dim,score)) / Math.max(parseFloat(totalContribution()), 1)) * 100) + '%'">
                     </div>
                     <span class="waterfall-pts"
                           :class="contrib.dimension_score >= 70 ? 'pts-high' : contrib.dimension_score >= 40 ? 'pts-med' : 'pts-low'"
@@ -310,6 +345,21 @@
                            :style="'width:' + Math.min(100, contrib.dimension_score) + '%'"
                            :class="contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'">
                       </div>
+            <!-- Dimension Bars (drill-down to signals) -->
+            <div style="margin:16px 0 6px">
+              <span style="font-size:11px;color:var(--text-muted)">Raw signal strength per dimension</span>
+              <span style="font-size:10px;color:var(--text-muted);opacity:0.7"> (0–100 · click to filter signals)</span>
+            </div>
+            <div class="dimension-grid">
+              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
+                <div class="dimension-row dimension-row-clickable"
+                     @click="dtab='signals'; signalSourceFilter = dim === 'firmographic' ? 'firmographic' : 'dim:' + dim"
+                     :title="'Click to view ' + dim.replace(/_/g, ' ') + ' signals'">
+                  <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
+                  <div class="dimension-bar-bg">
+                    <div class="dimension-bar-fill"
+                         :style="'width:' + Math.min(100, Math.max(0, rawScore(score))) + '%'"
+                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'">
                     </div>
                     <span class="dimension-score" x-text="Math.round(contrib.dimension_score)"></span>
                     <span class="dimension-contrib-pts" x-text="'(+' + contrib.contribution + ')'"></span>
@@ -395,68 +445,94 @@
 
         <!-- Signal Cards (shown when NOT firmographic enrichment pill) -->
         <div x-show="signalSourceFilter !== 'firmographic'">
-          <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
+
+          <!-- ── Tech Stack grouped view ── -->
+          <template x-if="signalSourceFilter === 'website_techscan,builtwith_free'">
+            <div x-data="{ get groups() { return techStackGroups(); } }">
+              <!-- Cloud Tech Stack — one merged block -->
+              <template x-if="groups.cloud.hasData">
+                <div class="signal-card" style="padding:12px 14px;margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <span style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--cyan);text-transform:uppercase">Cloud Tech Stack</span>
+                    <span x-show="groups.cloud.totalPts > 0" class="contribution-badge" x-text="'+' + groups.cloud.totalPts.toFixed(1) + ' pts'"></span>
+                  </div>
+                  <div x-show="groups.cloud.categories" style="font-size:10px;color:var(--text-muted);margin-bottom:8px" x-text="groups.cloud.categories"></div>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px">
+                    <template x-for="tag in groups.cloud.tags" :key="tag">
+                      <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(56,189,248,0.08);color:var(--text-primary);border:1px solid rgba(56,189,248,0.18)" x-text="tag"></span>
+                    </template>
+                    <span x-show="groups.cloud.tagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + groups.cloud.tagsExtra + ' more'"></span>
+                  </div>
+                  <span style="font-size:10px;"
+                        :style="groups.cloud.firstUrl ? 'color:var(--cyan);cursor:pointer' : 'color:var(--text-muted)'"
+                        @click="groups.cloud.firstUrl && window.open(groups.cloud.firstUrl, '_blank')"
+                        x-text="'via ' + groups.cloud.sourcesLine"></span>
+                </div>
+              </template>
+              <!-- Non-Cloud Stack — one merged block -->
+              <template x-if="groups.nonCloud.hasData">
+                <div class="signal-card" style="padding:12px 14px">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <span style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase">Non-Cloud Stack</span>
+                    <span x-show="groups.nonCloud.totalPts > 0" class="contribution-badge" x-text="'+' + groups.nonCloud.totalPts.toFixed(1) + ' pts'"></span>
+                  </div>
+                  <div x-show="groups.nonCloud.categories" style="font-size:10px;color:var(--text-muted);margin-bottom:8px" x-text="groups.nonCloud.categories"></div>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px">
+                    <template x-for="tag in groups.nonCloud.tags" :key="tag">
+                      <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,0.05);color:var(--text-primary);border:1px solid rgba(255,255,255,0.09)" x-text="tag"></span>
+                    </template>
+                    <span x-show="groups.nonCloud.tagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + groups.nonCloud.tagsExtra + ' more'"></span>
+                  </div>
+                  <span style="font-size:10px;"
+                        :style="groups.nonCloud.firstUrl ? 'color:var(--cyan);cursor:pointer' : 'color:var(--text-muted)'"
+                        @click="groups.nonCloud.firstUrl && window.open(groups.nonCloud.firstUrl, '_blank')"
+                        x-text="'via ' + groups.nonCloud.sourcesLine"></span>
+                </div>
+              </template>
+              <div x-show="!groups.cloud.hasData && !groups.nonCloud.hasData" class="empty">No tech stack signals detected.</div>
+            </div>
+          </template>
+
+          <!-- ── All other filters: standard card list ── -->
+          <template x-if="signalSourceFilter !== 'website_techscan,builtwith_free'">
             <div>
-              <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
-                <div class="signal-card"
-                     :class="{'signal-card-high': sig.impact === 'high', 'signal-card-stale': _isStale(sig)}"
-                     x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)"
-                     x-data="{
-                       _isStale(s) {
-                         if (!s.observed_at || !s.half_life_days) return false;
-                         const days = (Date.now() - new Date(s.observed_at).getTime()) / 86400000;
-                         return days > (s.half_life_days * 2.5);
-                       },
-                       _decayLabel(s) {
-                         if (!s.observed_at || !s.half_life_days) return '';
-                         const days = (Date.now() - new Date(s.observed_at).getTime()) / 86400000;
-                         if (days < s.half_life_days * 0.5) return 'Fresh';
-                         if (days < s.half_life_days) return 'Active';
-                         if (days < s.half_life_days * 2) return 'Aging';
-                         return 'Stale';
-                       }
-                     }">
-                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                    <span class="signal-code" x-text="sig.signal_code"></span>
-                    <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
-                          x-text="(sig.impact || 'low').toUpperCase() + ' IMPACT'"></span>
-                    <!-- Contribution badge (actual points contributed to score) -->
-                    <template x-if="sig.component_score > 0">
-                      <span class="contribution-badge"
-                            x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
-                    </template>
-                    <!-- Decay indicator -->
-                    <span class="decay-badge"
-                          :class="'decay-' + _decayLabel(sig).toLowerCase()"
-                          x-text="_decayLabel(sig)"
-                          x-show="_decayLabel(sig)"></span>
-                    <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)"
-                          x-text="'wt:' + (sig.base_weight || 0)"></span>
-                    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);color:var(--text-muted)" x-text="sig.source"></span>
-                    <template x-if="sig.dimension">
-                      <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--border-light);color:var(--cyan)" x-text="sig.dimension"></span>
-                    </template>
-                    <template x-if="sig.observed_at">
-                      <span style="font-size:11px;color:var(--text-muted)" x-text="(sig.observed_at || '').substring(0,10)"></span>
-                    </template>
-                  </div>
-                  <!-- Rubric tooltip row -->
-                  <div style="display:flex;gap:12px;font-size:10px;color:var(--text-muted);margin-bottom:4px;flex-wrap:wrap">
-                    <span x-show="sig.half_life_days" x-text="'half-life: ' + sig.half_life_days + 'd'"></span>
-                    <span x-show="sig.min_confidence" x-text="'min conf: ' + (sig.min_confidence * 100).toFixed(0) + '%'"></span>
-                    <span x-show="sig.confidence" x-text="'confidence: ' + (Number(sig.confidence) * 100).toFixed(0) + '%'"></span>
-                  </div>
-                  <div class="signal-evidence" x-text="sig.evidence_text"></div>
-                  <template x-if="sig.evidence_url">
-                    <div style="margin-top:4px">
-                      <a class="signal-url" :href="sig.evidence_url" target="_blank" x-text="(sig.evidence_url || '').substring(0,80)" style="font-size:12px"></a>
+              <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
+                <div>
+                  <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
+                    <div class="signal-card"
+                         :class="{'signal-card-high': sig.impact === 'high'}"
+                         x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                        <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="signalLabel(sig)"></span>
+                        <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
+                              x-text="(sig.impact || 'low').toUpperCase()"></span>
+                        <template x-if="sig.component_score > 0">
+                          <span class="contribution-badge" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                        </template>
+                      </div>
+                      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">
+                        <span x-text="sig.source"></span>
+                        <template x-if="sig.observed_at">
+                          <span x-text="' · ' + signalDate(sig)"></span>
+                        </template>
+                      </div>
+                      <template x-if="!JOB_SOURCES.has(sig.source) && sig.evidence_text">
+                        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;line-height:1.4"
+                             x-text="(sig.evidence_text || '').substring(0,140) + ((sig.evidence_text||'').length > 140 ? '…' : '')"></div>
+                      </template>
+                      <template x-if="sig.evidence_url">
+                        <a class="signal-url" :href="sig.evidence_url" target="_blank"
+                           x-text="(sig.evidence_url||'').replace(/^https?:\/\//,'').substring(0,70)"
+                           style="font-size:11px;display:block"></a>
+                      </template>
                     </div>
                   </template>
                 </div>
               </template>
+              <div x-show="signalSourceFilter === '' && (!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0)" class="empty">No real signals detected. Run pipeline to collect signals.</div>
             </div>
           </template>
-          <div x-show="signalSourceFilter === '' && (!detail || !detail.signals || detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length === 0)" class="empty">No real signals detected. Run pipeline to collect signals.</div>
+
         </div>
 
         <!-- Firmographic Data (shown when firmographic filter is active) -->
@@ -960,6 +1036,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=11"></script>
+<script src="/static/app.js?v=16"></script>
 </body>
 </html>

@@ -775,19 +775,35 @@ def get_scoring_rubric():
                 if key and key.startswith("tier_"):
                     tiers.append({"tier": key, "min_score": val})
 
-    # Load sources
+    # Load execution policy to know which sources are actually enabled
+    exec_policy: dict[str, bool] = {}
+    exec_policy_path = settings.project_root / "config" / "source_execution_policy.csv"
+    if exec_policy_path.exists():
+        with exec_policy_path.open("r", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                src = (row.get("source") or "").strip()
+                if src:
+                    exec_policy[src] = (row.get("enabled", "true").strip().lower() == "true")
+
+    # Load sources — only show those enabled in execution policy (or not in policy = CSV-based passive sources)
+    # Explicitly exclude known-unintegrated sources regardless
+    _UNINTEGRATED = {"bombora_api", "g2_api", "crunchbase", "story_hunt", "story_hunt_js", "gnews", "google_news_rss"}
     sources: list[dict] = []
     source_path = settings.source_registry_path
     if source_path.exists():
         with source_path.open("r", encoding="utf-8") as fh:
             for row in csv.DictReader(fh):
                 src = (row.get("source") or "").strip()
-                if src:
-                    try:
-                        rel = float(row.get("reliability", 0))
-                    except (ValueError, TypeError):
-                        rel = 0.0
-                    sources.append({"source": src, "reliability": rel, "enabled": row.get("enabled", "true")})
+                if not src or src in _UNINTEGRATED:
+                    continue
+                # If source is in execution policy, respect its enabled flag
+                if src in exec_policy and not exec_policy[src]:
+                    continue
+                try:
+                    rel = float(row.get("reliability", 0))
+                except (ValueError, TypeError):
+                    rel = 0.0
+                sources.append({"source": src, "reliability": rel})
     sources.sort(key=lambda s: s["reliability"], reverse=True)
 
     # Load signal definitions

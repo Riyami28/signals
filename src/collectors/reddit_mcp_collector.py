@@ -79,18 +79,28 @@ INTENT_TO_SIGNAL = {
 _CLASSIFY_PROMPT = """\
 You are a buying-signal analyst for enterprise infrastructure software (DevOps, Platform Engineering, FinOps).
 
-Analyze the Reddit post below and classify it.
+Target company: {company_name} (domain: {domain})
+
+Analyze the Reddit post below. First determine if the post is meaningfully relevant to the target company,
+then classify its buying intent.
 
 Return a JSON object with exactly these fields:
 {{
+  "relevant": <true | false>,
+  "relevance_reason": "<one sentence why this post is or is not relevant to the target company>",
   "intent": "<one of: active_evaluation | pain_signal | migration_signal | hiring_signal | vendor_mention | passing_mention>",
   "confidence": <float 0.0-1.0>,
   "evidence_sentence": "<1-2 sentence summary of the key signal, max 200 chars>",
-  "company_hint": "<company name or domain if clearly identifiable, else null>",
   "signal_code": "<from: tech_evaluation_intent | infrastructure_pain | cloud_migration_signal | devops_hiring | vendor_evaluation | null>"
 }}
 
-Definitions:
+Relevance rules:
+- Set relevant=true ONLY if the post is clearly about the target company or authored by someone at the company
+- A post is relevant if it explicitly names the company, its products, its domain, or its employees
+- A post discussing the same industry/problem space but NOT mentioning the target company is NOT relevant
+- If relevant=false, set intent to "passing_mention" and signal_code to null
+
+Intent definitions (only apply when relevant=true):
 - active_evaluation: Poster is actively comparing or trialling tools for DevOps/Platform/FinOps use case
 - pain_signal: Poster describes a specific infrastructure, cost, or reliability problem they're trying to solve
 - migration_signal: Poster is moving from one platform/tool to another (e.g. Jenkins → GitHub Actions, AWS → GCP)
@@ -174,14 +184,22 @@ async def _classify_with_claude(
     subreddit: str,
     api_key: str,
     client: httpx.AsyncClient,
+    company_name: str = "",
+    domain: str = "",
 ) -> dict | None:
-    """Use Claude claude-haiku-4-5 to semantically classify a Reddit post."""
+    """Use Claude Haiku to semantically classify a Reddit post and check company relevance."""
     title = str(post.get("title", ""))[:300]
     body = str(post.get("selftext", "") or post.get("body", ""))[:800]
     if not title and not body:
         return None
 
-    prompt = _CLASSIFY_PROMPT.format(title=title, body=body, subreddit=subreddit)
+    prompt = _CLASSIFY_PROMPT.format(
+        title=title,
+        body=body,
+        subreddit=subreddit,
+        company_name=company_name or "unknown",
+        domain=domain or "unknown",
+    )
     try:
         resp = await client.post(
             "https://api.anthropic.com/v1/messages",
@@ -217,6 +235,9 @@ def _make_observation(
     subreddit: str,
     source_reliability: float,
 ) -> SignalObservation | None:
+    # Skip posts Claude determined are not relevant to the target company
+    if not classification.get("relevant", True):
+        return None
     intent = classification.get("intent", "passing_mention")
     if intent == "passing_mention" or intent not in INTENT_TO_SIGNAL:
         return None
@@ -306,21 +327,29 @@ async def collect(
                         )
                         posts = posts_data if isinstance(posts_data, list) else []
 
-                        # Filter to posts that mention the company
+                        # Quick pre-filter: only pass posts where company name or domain
+                        # appears anywhere — avoids wasting Claude tokens on clearly unrelated posts.
+                        # Full semantic relevance check is done by Claude inside _classify_with_claude.
                         name_lower = company_name.lower()
                         domain_lower = domain.lower().replace("www.", "")
-                        relevant_posts = [
+                        candidate_posts = [
                             p
                             for p in posts
                             if name_lower in str(p.get("title", "")).lower()
                             or name_lower in str(p.get("selftext", "")).lower()
                             or domain_lower in str(p.get("url", "")).lower()
+                            or domain_lower in str(p.get("selftext", "")).lower()
                         ]
 
-                        for post in relevant_posts[:3]:  # Max 3 posts per subreddit per account
+                        for post in candidate_posts[:3]:  # Max 3 posts per subreddit per account
                             seen += 1
                             classification = await _classify_with_claude(
-                                post, subreddit, settings.claude_api_key, client
+                                post,
+                                subreddit,
+                                settings.claude_api_key,
+                                client,
+                                company_name=company_name,
+                                domain=domain,
                             )
                             if not classification:
                                 continue
@@ -329,7 +358,7 @@ async def collect(
                                 inserted += 1
 
                         # Rate-limit Claude calls
-                        if relevant_posts:
+                        if candidate_posts:
                             await asyncio.sleep(0.5)
 
                     except Exception as exc:
@@ -344,15 +373,24 @@ async def collect(
                         client,
                     )
                     posts = search_data if isinstance(search_data, list) else []
+                    # Pre-filter by name/domain before sending to Claude
                     relevant = [
                         p
                         for p in posts
                         if name_lower in str(p.get("title", "")).lower()
                         or name_lower in str(p.get("selftext", "")).lower()
+                        or domain_lower in str(p.get("selftext", "")).lower()
                     ]
                     for post in relevant[:2]:
                         seen += 1
-                        classification = await _classify_with_claude(post, "devops", settings.claude_api_key, client)
+                        classification = await _classify_with_claude(
+                            post,
+                            "devops",
+                            settings.claude_api_key,
+                            client,
+                            company_name=company_name,
+                            domain=domain,
+                        )
                         if not classification:
                             continue
                         obs = _make_observation(account_id, classification, post, "devops", source_reliability)

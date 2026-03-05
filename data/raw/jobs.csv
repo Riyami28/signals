@@ -1,7 +1,1 @@
 company_name,domain,title,description,url,observed_at,signal_code,confidence
-Coca-Cola India,coca-colaindia.com,Senior FinOps Manager,Lead cloud cost governance and savings execution,internal://jobs/cocacola/finops-manager,2026-02-17T00:00:00Z,finops_role_open,0.88
-Diageo India,diageoindia.com,FinOps Lead,Drive cloud unit economics and optimization program,internal://jobs/diageo/finops-lead,2026-02-17T00:00:00Z,finops_role_open,0.86
-Tata Consumer Products,tataconsumer.com,FinOps Analyst,Own cost observability and spend optimization reporting,internal://jobs/tataconsumer/finops-analyst,2026-02-17T00:00:00Z,finops_role_open,0.85
-Conde Nast,condenast.com,Principal DevOps Engineer,Scale platform reliability and deployment automation,internal://jobs/condenast/devops-principal,2026-02-17T00:00:00Z,devops_role_open,0.84
-Tata Digital,tatadigital.com,Staff Platform Engineer,Build golden path tooling and developer platform workflows,internal://jobs/tatadigital/platform-engineer,2026-02-17T00:00:00Z,platform_role_open,0.85
-Tata Digital,tatadigital.com,Senior DevOps Engineer,Improve release pipelines and reduce deployment toil,internal://jobs/tatadigital/devops-senior,2026-02-17T00:00:00Z,devops_role_open,0.84

@@ -1,3 +1,77 @@
+// Signal code → short human label (2-3 words max)
+const SIGNAL_LABELS = {
+  enterprise_modernization_program: 'Enterprise Modernization',
+  cloud_migration_intent: 'Cloud Migration',
+  devops_role_open: 'DevOps Hiring',
+  hiring_devops: 'DevOps Hiring',
+  finops_role_open: 'FinOps Hiring',
+  platform_role_open: 'Platform Hiring',
+  general_hiring_activity: 'General Hiring',
+  cost_optimization: 'Cost Optimization',
+  cost_reduction_mandate: 'Cost Reduction',
+  cloud_cost_spike: 'Cloud Cost Spike',
+  tech_evaluation_intent: 'Tech Evaluation',
+  infrastructure_pain: 'Infra Pain',
+  high_intent_phrase_devops_toil: 'DevOps Pain',
+  high_intent_phrase_cost_control: 'Cost Control',
+  high_intent_phrase_production_fast: 'Speed Signal',
+  vendor_evaluation: 'Vendor Eval',
+  vendor_consolidation_program: 'Vendor Consolidation',
+  cloud_migration_signal: 'Cloud Migration',
+  media_traffic_reliability_pressure: 'Reliability Issue',
+  compliance_initiative: 'Compliance Push',
+  compliance_governance_messaging: 'Governance Signal',
+  recent_funding_event: 'Funding Event',
+  funding_stage_series_a: 'Series A',
+  funding_stage_series_b_plus: 'Series B+',
+  kubernetes_detected: 'K8s Stack',
+  terraform_detected: 'Terraform Stack',
+  gitops_detected: 'GitOps Stack',
+  tooling_sprawl_detected: 'Tool Sprawl',
+  company_news_mention: 'News Mention',
+  launch_or_scale_event: 'Launch / Scale',
+  employee_growth_positive: 'Team Growth',
+  security_review_started: 'Security Review',
+  sap_erp_modernization: 'SAP Migration',
+  erp_s4_migration_milestone: 'ERP Migration',
+  supply_chain_platform_rollout: 'Supply Chain',
+  multi_cloud_strategy: 'Multi-Cloud',
+  data_platform_initiative: 'Data Platform',
+  devops_bottleneck_language: 'DevOps Pain',
+  idp_golden_path_initiative: 'IDP Initiative',
+  env_spinup_requests: 'Env Speed Need',
+  finops_tool_eval: 'FinOps Eval',
+  cloud_platform_messaging: 'Cloud Platform',
+  governance_enforcement_need: 'Governance Need',
+  demand_planning_platform: 'Demand Planning',
+  warehouse_digitization: 'Warehouse Digital',
+  security_baseline_as_default: 'Security Baseline',
+};
+
+// Sources that are "job" type
+const JOB_SOURCES = new Set(['jobs_csv','serper_jobs','greenhouse_api','lever_api','ashby_api','workday_api','jobs_pages']);
+
+function signalLabel(sig) {
+  if (JOB_SOURCES.has(sig.source)) {
+    // For jobs, show the role from evidence_text (first meaningful fragment)
+    const txt = (sig.evidence_text || '').split(/[\n\r|·—]/)[0].trim();
+    return txt.substring(0, 48) || SIGNAL_LABELS[sig.signal_code] || sig.signal_code.replace(/_/g,' ');
+  }
+  return SIGNAL_LABELS[sig.signal_code] || sig.signal_code.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function signalDate(sig) {
+  const d = (sig.observed_at || '').substring(0, 10);
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+function signalApp() {
+  return { signalLabel, signalDate, JOB_SOURCES };
+}
+
 function signalsApp() {
   return {
     // Data
@@ -289,6 +363,57 @@ function detailPanel() {
       } catch (e) {
         console.error('Failed to load detail:', e);
       }
+    },
+
+    // Returns merged tech stack sections: { cloud, nonCloud }
+    // Each section: { tags, tagsExtra, categories, sourcesLine, firstUrl, totalPts, hasData }
+    techStackGroups() {
+      const TECH_SOURCES = new Set(['website_techscan', 'builtwith_free', 'technographics_csv', 'website_scan']);
+      const CLOUD_CODES = new Set([
+        'cloud_infrastructure_detected', 'cloud_platform_messaging', 'multi_cloud_strategy',
+        'kubernetes_detected', 'cloud_connected', 'cloud_migration_intent', 'cloud_migration_signal',
+      ]);
+
+      const parseTags = (txt) => {
+        if (!txt) return [];
+        const cleaned = txt.replace(/^Tech Stack\s*(\(\d+\s*technologies?\))?:\s*/i, '');
+        return cleaned.split(',').map(t => t.trim()).filter(t => t.length > 0 && t.length < 50);
+      };
+
+      const sigs = (this.detail?.signals || []).filter(s =>
+        TECH_SOURCES.has(s.source) && (!s.evidence_url || !s.evidence_url.startsWith('internal://'))
+      );
+
+      // Accumulate all tags+sources per section (cloud vs non-cloud)
+      const sec = {
+        cloud:    { _tags: new Set(), _srcs: new Set(), _urls: {}, _cats: new Set(), pts: 0 },
+        nonCloud: { _tags: new Set(), _srcs: new Set(), _urls: {}, _cats: new Set(), pts: 0 },
+      };
+
+      for (const s of sigs) {
+        const bucket = CLOUD_CODES.has(s.signal_code) ? sec.cloud : sec.nonCloud;
+        for (const tag of parseTags(s.evidence_text)) bucket._tags.add(tag);
+        bucket._srcs.add(s.source);
+        if (s.evidence_url && !bucket._urls[s.source]) bucket._urls[s.source] = s.evidence_url;
+        bucket._cats.add(signalLabel(s));
+        bucket.pts += s.component_score || 0;
+      }
+
+      const MAX_TAGS = 24;
+      const finalise = (b) => {
+        const allTags = [...b._tags];
+        return {
+          tags: allTags.slice(0, MAX_TAGS),
+          tagsExtra: Math.max(0, allTags.length - MAX_TAGS),
+          categories: [...b._cats].join(' · '),
+          sourcesLine: [...b._srcs].join(', '),
+          firstUrl: Object.values(b._urls)[0] || '',
+          totalPts: Math.round(b.pts * 10) / 10,
+          hasData: allTags.length > 0,
+        };
+      };
+
+      return { cloud: finalise(sec.cloud), nonCloud: finalise(sec.nonCloud) };
     },
 
     async loadResearch(accountId) {
