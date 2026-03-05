@@ -6,11 +6,10 @@ import csv
 import io
 import json
 import re
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-
-from datetime import datetime, timedelta
 
 from src import db
 from src.export.dossier import render_dossier
