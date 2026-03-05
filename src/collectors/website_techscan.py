@@ -112,13 +112,13 @@ def _build_observation(
     payload: dict[str, Any],
 ) -> SignalObservation:
     raw_hash = stable_hash(payload, prefix="raw")
+    # Use account+signal+source for dedup (not observed_at) — each account
+    # can only have one tech detection per signal per source.
     obs_id = stable_hash(
         {
             "account_id": account_id,
             "signal_code": signal_code,
             "source": source,
-            "observed_at": observed_at,
-            "raw": raw_hash,
         },
         prefix="obs",
     )

@@ -77,11 +77,11 @@
       <option value="">All Sources</option>
       <option value="serper_news">News</option>
       <option value="serper_jobs">Jobs</option>
-      <option value="website_techscan">Tech Scan</option>
+      <option value="website_techscan">Tech Stack</option>
+      <option value="serper_reddit">Reddit</option>
+      <option value="serper_twitter">Twitter</option>
       <option value="github_stargazers">GitHub Stars</option>
-      <option value="reddit_api">Reddit</option>
       <option value="first_party_csv">First Party</option>
-      <option value="website_scan">Website</option>
     </select>
   </div>
 
@@ -202,7 +202,9 @@
             </template>
             <div class="dimension-grid">
               <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
-                <div class="dimension-row">
+                <div class="dimension-row dimension-row-clickable"
+                     @click="dtab='signals'; signalSourceFilter = dim === 'firmographic' ? 'firmographic' : 'dim:' + dim"
+                     :title="'Click to view ' + dim.replace(/_/g, ' ') + ' signals'">
                   <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
                   <div class="dimension-bar-bg">
                     <div class="dimension-bar-fill"
@@ -210,7 +212,11 @@
                          :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'bar-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'bar-medium' : 'bar-low'">
                     </div>
                   </div>
-                  <span class="dimension-score" x-text="typeof score === 'object' ? (score.score || 0) : score"></span>
+                  <span class="dimension-score" x-text="Math.round(typeof score === 'object' ? (score.score || 0) : score)"></span>
+                  <span class="dimension-tier"
+                        :class="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'tier-high' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'tier-medium' : 'tier-low'"
+                        x-text="(typeof score === 'object' ? (score.score || 0) : score) >= 70 ? 'Strong' : (typeof score === 'object' ? (score.score || 0) : score) >= 40 ? 'Moderate' : (typeof score === 'object' ? (score.score || 0) : score) > 0 ? 'Weak' : 'None'"></span>
+                  <span class="dimension-arrow">→</span>
                 </div>
               </template>
             </div>
@@ -225,21 +231,21 @@
              x-data="{ _real() { return (detail && detail.signals ? detail.signals : []).filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')) },
                         _cnt(src) { return this._real().filter(s => s.source === src).length },
                         _hasFirmo() { try { return !!(researchData && researchData.research && researchData.research.enrichment_json && Object.keys(JSON.parse(researchData.research.enrichment_json)).length > 0) } catch(e) { return false } },
+                        _cntMulti(keys) { return this._real().filter(s => keys.includes(s.source)).length },
                         _sources: [
-                          {key:'serper_news', label:'News'},
-                          {key:'serper_jobs', label:'Jobs'},
-                          {key:'website_techscan', label:'Tech Scan'},
-                          {key:'website_scan', label:'Website'},
-                          {key:'reddit_api', label:'Reddit'},
-                          {key:'github_stargazers', label:'GitHub Stars'},
-                          {key:'twitter_api', label:'Twitter'},
+                          {keys:['serper_news'], label:'News'},
+                          {keys:['serper_jobs'], label:'Jobs'},
+                          {keys:['website_techscan','builtwith_free'], label:'Tech Stack'},
+                          {keys:['serper_reddit','reddit_api'], label:'Reddit'},
+                          {keys:['serper_twitter','twitter_api'], label:'Twitter'},
+                          {keys:['github_stargazers'], label:'GitHub Stars'},
                         ] }">
           <button class="signal-filter-pill" :class="{'active': signalSourceFilter === ''}" @click="signalSourceFilter = ''">
             All <span class="pill-count" x-text="_real().length"></span>
           </button>
           <template x-for="s in _sources">
-            <button class="signal-filter-pill" :class="{'active': signalSourceFilter === s.key, 'pill-zero': _cnt(s.key) === 0}" @click="signalSourceFilter = s.key">
-              <span x-text="s.label"></span> <span class="pill-count" x-text="_cnt(s.key)"></span>
+            <button class="signal-filter-pill" :class="{'active': signalSourceFilter === s.keys.join(','), 'pill-zero': _cntMulti(s.keys) === 0}" @click="signalSourceFilter = s.keys.join(',')">
+              <span x-text="s.label"></span> <span class="pill-count" x-text="_cntMulti(s.keys)"></span>
             </button>
           </template>
           <button class="signal-filter-pill" :class="{'active': signalSourceFilter === 'firmographic', 'pill-zero': !_hasFirmo()}" @click="signalSourceFilter = 'firmographic'">
@@ -247,12 +253,12 @@
           </button>
         </div>
 
-        <!-- Signal Cards (shown when NOT firmographic filter) -->
+        <!-- Signal Cards (shown when NOT firmographic enrichment pill) -->
         <div x-show="signalSourceFilter !== 'firmographic'">
           <template x-if="detail && detail.signals && detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://')).length > 0">
             <div>
               <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
-                <div class="signal-card" :class="{'signal-card-high': sig.impact === 'high'}" x-show="!signalSourceFilter || sig.source === signalSourceFilter">
+                <div class="signal-card" :class="{'signal-card-high': sig.impact === 'high'}" x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
                     <span class="signal-code" x-text="sig.signal_code"></span>
                     <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
@@ -411,7 +417,7 @@
             <template x-if="researchData.research.enrichment_json">
               <div>
                 <h4 style="color:var(--blue);font-size:13px;margin-top:16px;margin-bottom:8px">Enrichment Data</h4>
-                <div class="enrichment-grid" x-data="{ enr: JSON.parse(researchData.research.enrichment_json || '{}') }">
+                <div class="enrichment-grid" x-data="{ get enr() { try { return JSON.parse(researchData.research.enrichment_json || '{}') } catch(e) { return {} } } }">
                   <template x-for="[k,v] in Object.entries(enr).filter(([k]) => !k.endsWith('_confidence') && !k.endsWith('_source'))">
                     <div class="enr-item">
                       <div class="enr-label" x-text="k.replace(/_/g, ' ')"></div>

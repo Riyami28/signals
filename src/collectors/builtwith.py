@@ -91,13 +91,13 @@ def _build_observation(
     payload: dict[str, Any],
 ) -> SignalObservation:
     raw_hash = stable_hash(payload, prefix="raw")
+    # Use account+signal+source for dedup (not observed_at) — each account
+    # can only have one tech detection per signal per source.
     obs_id = stable_hash(
         {
             "account_id": account_id,
             "signal_code": signal_code,
             "source": SOURCE_NAME,
-            "observed_at": observed_at,
-            "raw": raw_hash,
         },
         prefix="obs",
     )
@@ -306,8 +306,18 @@ async def collect(
         )
     else:
         cursor.execute(
-            "SELECT account_id, company_name, domain FROM signals.accounts ORDER BY company_name LIMIT %s",
-            (settings.live_max_accounts,),
+            """SELECT a.account_id, a.company_name, a.domain
+               FROM signals.accounts a
+               LEFT JOIN signals.crawl_checkpoints cp
+                 ON cp.account_id = a.account_id
+                 AND cp.source = 'builtwith_free'
+               WHERE COALESCE(a.domain, '') <> ''
+               ORDER BY
+                   CASE WHEN cp.last_crawled_at IS NULL THEN 0 ELSE 1 END,
+                   cp.last_crawled_at ASC,
+                   a.company_name ASC
+               LIMIT %s""",
+            (min(settings.live_max_accounts, 50),),
         )
     accounts = [dict(row) for row in cursor.fetchall()]
 

@@ -38,13 +38,14 @@ def _build_observation(
     payload: dict[str, Any],
 ) -> SignalObservation:
     raw_hash = stable_hash(payload, prefix="raw")
+    # Use evidence_url for dedup so same article URL across runs
+    # doesn't create duplicate observations.
     obs_id = stable_hash(
         {
             "account_id": account_id,
             "signal_code": signal_code,
             "source": source,
-            "observed_at": observed_at,
-            "raw": raw_hash,
+            "evidence_url": evidence_url,
         },
         prefix="obs",
     )

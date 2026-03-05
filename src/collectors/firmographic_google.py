@@ -19,7 +19,9 @@ from typing import Any
 import httpx
 
 from src import db
+from src.models import SignalObservation
 from src.settings import Settings
+from src.utils import stable_hash, utc_now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +251,99 @@ def _is_already_enriched(conn, account_id: str) -> bool:
     return bool(enr.get("employee_range")) and bool(enr.get("industry"))
 
 
+def _backfill_signals_if_needed(conn, account_id: str) -> None:
+    """Generate firmographic signals for already-enriched accounts that lack them."""
+    # Check if firmographic signals already exist
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM signals.signal_observations WHERE account_id = %s AND source = %s LIMIT 1",
+        (account_id, SOURCE_NAME),
+    )
+    if cursor.fetchone():
+        return  # Signals already exist
+
+    # Load enrichment data and generate signals
+    existing = db.get_company_research(conn, account_id)
+    if not existing:
+        return
+    try:
+        enr = json.loads(existing.get("enrichment_json", "{}") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return
+
+    sig_count = _generate_firmographic_signals(conn, account_id, enr)
+    if sig_count:
+        conn.commit()
+        logger.info("firmographic_backfill account=%s signals=%d", account_id, sig_count)
+
+
+def _generate_firmographic_signals(
+    conn, account_id: str, enrichment: dict[str, Any], source_reliability: float = 0.80
+) -> int:
+    """Create firmographic signal observations from enrichment data.
+
+    Evaluates enrichment fields (employee range, tech stack, industry) against
+    ICP criteria and inserts matching firmographic signals. Returns count inserted.
+    """
+    inserted = 0
+    now = utc_now_iso()
+
+    def _insert(signal_code: str, confidence: float, evidence_text: str) -> bool:
+        obs_id = stable_hash(
+            {"account_id": account_id, "signal_code": signal_code, "source": SOURCE_NAME},
+            prefix="obs",
+        )
+        raw_hash = stable_hash(
+            {"account_id": account_id, "signal_code": signal_code, "data": evidence_text},
+            prefix="raw",
+        )
+        obs = SignalObservation(
+            obs_id=obs_id,
+            account_id=account_id,
+            signal_code=signal_code,
+            product="shared",
+            source=SOURCE_NAME,
+            observed_at=now,
+            evidence_url="",
+            evidence_text=evidence_text[:500],
+            confidence=confidence,
+            source_reliability=source_reliability,
+            raw_payload_hash=raw_hash,
+        )
+        return db.insert_signal_observation(conn, obs, commit=False)
+
+    # 1) Employee count in ICP range (51–10,000+)
+    emp_range = str(enrichment.get("employee_range", "") or "")
+    if emp_range:
+        # Parse ranges like "1001-5000", "501-1000", "10001+", etc.
+        nums = [int(x) for x in re.findall(r"\d+", emp_range.replace(",", ""))]
+        if nums:
+            min_emp = min(nums)
+            if min_emp >= 51:
+                if _insert("employee_count_in_range", 0.75, f"Employee range: {emp_range}"):
+                    inserted += 1
+
+    # 2) Cloud/DevOps tech stack detected → indicates tech fit relevance
+    tech_stack = enrichment.get("tech_stack", [])
+    if isinstance(tech_stack, list) and tech_stack:
+        cloud_keywords = {"aws", "azure", "gcp", "cloud", "kubernetes", "k8s", "docker",
+                          "terraform", "devops", "ci/cd", "jenkins", "datadog", "grafana",
+                          "prometheus", "ansible", "chef", "puppet", "cloudflare"}
+        matched = [t for t in tech_stack if any(kw in t.lower() for kw in cloud_keywords)]
+        if matched:
+            if _insert("cloud_infrastructure_detected", 0.70,
+                        f"Cloud/DevOps tech: {', '.join(matched[:5])}"):
+                inserted += 1
+
+    # 3) Employee growth positive (if we have the data)
+    growth = enrichment.get("employee_growth")
+    if growth and isinstance(growth, (int, float)) and growth > 10:
+        if _insert("employee_growth_positive", 0.65, f"Employee growth: {growth}%"):
+            inserted += 1
+
+    return inserted
+
+
 # ─── Per-account collection ──────────────────────────────────────────
 
 async def _collect_one_account(
@@ -270,8 +365,9 @@ async def _collect_one_account(
     if not company_name:
         return "skipped"
 
-    # Skip if already enriched
+    # Skip if already enriched — but still generate signals if missing
     if _is_already_enriched(conn, account_id):
+        _backfill_signals_if_needed(conn, account_id)
         return "skipped"
 
     # Check crawl checkpoint (don't re-process daily)
@@ -303,6 +399,12 @@ async def _collect_one_account(
 
     # Step 3: Merge into enrichment_json
     wrote = _merge_enrichment(conn, account_id, extracted)
+
+    # Step 4: Generate firmographic signals from enrichment data
+    if wrote:
+        sig_count = _generate_firmographic_signals(conn, account_id, extracted)
+        if sig_count:
+            logger.info("firmographic_signals account=%s inserted=%d", account_id, sig_count)
 
     db.record_crawl_attempt(
         conn, source=SOURCE_NAME, account_id=account_id,
@@ -347,8 +449,18 @@ async def collect(
         )
     else:
         cursor.execute(
-            "SELECT account_id, company_name, domain FROM signals.accounts ORDER BY company_name LIMIT %s",
-            (settings.live_max_accounts,),
+            """SELECT a.account_id, a.company_name, a.domain
+               FROM signals.accounts a
+               LEFT JOIN signals.crawl_checkpoints cp
+                 ON cp.account_id = a.account_id
+                 AND cp.source = 'firmographic_google'
+               WHERE COALESCE(a.company_name, '') <> ''
+               ORDER BY
+                   CASE WHEN cp.last_crawled_at IS NULL THEN 0 ELSE 1 END,
+                   cp.last_crawled_at ASC,
+                   a.company_name ASC
+               LIMIT %s""",
+            (min(settings.live_max_accounts, 30),),
         )
     accounts = [dict(row) for row in cursor.fetchall()]
 

@@ -335,13 +335,14 @@ def _build_observation(
     payload: dict[str, Any],
 ) -> SignalObservation:
     raw_hash = stable_hash(payload, prefix="raw")
+    # Use evidence_url for dedup (not observed_at) so the same job URL
+    # across multiple runs doesn't create duplicate observations.
     obs_id = stable_hash(
         {
             "account_id": account_id,
             "signal_code": signal_code,
             "source": source,
-            "observed_at": observed_at,
-            "raw": raw_hash,
+            "evidence_url": evidence_url,
         },
         prefix="obs",
     )
@@ -572,7 +573,14 @@ async def collect(
         accounts = [
             dict(r)
             for r in conn.execute(
-                "SELECT account_id, company_name, domain FROM accounts ORDER BY company_name LIMIT %s",
+                """SELECT a.account_id, a.company_name, a.domain
+                   FROM accounts a
+                   LEFT JOIN crawl_checkpoints cp
+                     ON cp.account_id = a.account_id AND cp.source = 'serper_jobs'
+                   WHERE COALESCE(a.domain, '') <> ''
+                   ORDER BY CASE WHEN cp.last_crawled_at IS NULL THEN 0 ELSE 1 END,
+                            cp.last_crawled_at ASC, a.company_name ASC
+                   LIMIT %s""",
                 (max_accounts,),
             ).fetchall()
         ]

@@ -15,6 +15,7 @@ from src.collectors import (
     news,
     reddit_collector,
     reddit_official,
+    serper_reddit,
     serper_twitter,
     technographics,
     twitter,
@@ -119,6 +120,13 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     results["serper_twitter"] = (
         await serper_twitter.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("serper_twitter")
+        else {"inserted": 0, "seen": 0}
+    )
+
+    # Serper Reddit (Google-indexed Reddit posts about companies + cloud/devops)
+    results["serper_reddit"] = (
+        await serper_reddit.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("serper_reddit")
         else {"inserted": 0, "seen": 0}
     )
 

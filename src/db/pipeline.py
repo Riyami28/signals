@@ -10,8 +10,14 @@ from src.utils import utc_now_iso
 # ---------------------------------------------------------------------------
 
 
-def create_ui_pipeline_run(conn, account_ids: list[str], stages: list[str]) -> str:
-    run_id = f"prun_{uuid.uuid4().hex[:12]}"
+def create_ui_pipeline_run(conn, run_id: str, account_ids: list[str], stages: list[str]) -> str:
+    """Insert a new pipeline_runs row using the caller-supplied run_id.
+
+    Previously this function generated its own UUID, which led to a mismatch:
+    pipeline_runner.py created run_id A, this function inserted run_id B,
+    and finish_ui_pipeline_run tried to UPDATE run_id A — so the DB row
+    stayed stuck as 'running' forever.
+    """
     conn.execute(
         """INSERT INTO pipeline_runs (pipeline_run_id, account_ids_json, stages_json)
            VALUES (%s, %s, %s)""",
