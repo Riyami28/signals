@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import json
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src import db
-from src.settings import load_settings
 from src.collectors.firmographic_google import _generate_firmographic_signals
+from src.settings import load_settings
 
 
 def main():
