@@ -363,6 +363,46 @@ function detailPanel() {
       }
     },
 
+    // Returns grouped tech stack signals: { cloud: [...], nonCloud: [...] }
+    // Each item: { label, signalCode, impact, pts, sources: [{source, observed_at, evidence_url, evidence_text}] }
+    techStackGroups() {
+      const TECH_SOURCES = new Set(['website_techscan', 'builtwith_free', 'technographics_csv', 'website_scan']);
+      const CLOUD_CODES = new Set([
+        'cloud_infrastructure_detected', 'cloud_platform_messaging', 'multi_cloud_strategy',
+        'kubernetes_detected', 'cloud_connected', 'cloud_migration_intent', 'cloud_migration_signal',
+      ]);
+      const sigs = (this.detail?.signals || []).filter(s =>
+        TECH_SOURCES.has(s.source) && (!s.evidence_url || !s.evidence_url.startsWith('internal://'))
+      );
+      // Group by signal_code
+      const groups = {};
+      for (const s of sigs) {
+        const key = s.signal_code;
+        if (!groups[key]) {
+          groups[key] = {
+            label: signalLabel(s),
+            signalCode: key,
+            impact: s.impact || 'low',
+            pts: 0,
+            sources: [],
+          };
+        }
+        groups[key].pts = Math.max(groups[key].pts, s.component_score || 0);
+        groups[key].sources.push({
+          source: s.source,
+          observed_at: s.observed_at,
+          evidence_url: s.evidence_url,
+          evidence_text: s.evidence_text,
+        });
+      }
+      const cloud = [], nonCloud = [];
+      for (const g of Object.values(groups)) {
+        (CLOUD_CODES.has(g.signalCode) ? cloud : nonCloud).push(g);
+      }
+      const byPts = (a, b) => b.pts - a.pts;
+      return { cloud: cloud.sort(byPts), nonCloud: nonCloud.sort(byPts) };
+    },
+
     async loadResearch(accountId) {
       this.researchData = null;
       try {
