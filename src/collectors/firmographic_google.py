@@ -59,6 +59,7 @@ JSON:"""
 
 # ─── Serper fetch ────────────────────────────────────────────────────
 
+
 async def _fetch_snippets(
     client: httpx.AsyncClient,
     api_key: str,
@@ -95,6 +96,7 @@ async def _fetch_snippets(
 
 
 # ─── MiniMax LLM extraction ─────────────────────────────────────────
+
 
 async def _extract_with_llm(
     client: httpx.AsyncClient,
@@ -133,11 +135,7 @@ async def _extract_with_llm(
         resp.raise_for_status()
         data = resp.json()
 
-        text = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
+        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
         # Strip <think>...</think> reasoning blocks (MiniMax sometimes adds these)
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
@@ -182,11 +180,22 @@ async def _extract_with_llm(
 
 # ─── Merge into enrichment_json ──────────────────────────────────────
 
-_FIRMOGRAPHIC_FIELDS = frozenset([
-    "employee_count", "employee_range", "revenue", "revenue_range",
-    "headquarters", "city", "state", "country",
-    "industry", "sub_industry", "company_type", "founded_year",
-])
+_FIRMOGRAPHIC_FIELDS = frozenset(
+    [
+        "employee_count",
+        "employee_range",
+        "revenue",
+        "revenue_range",
+        "headquarters",
+        "city",
+        "state",
+        "country",
+        "industry",
+        "sub_industry",
+        "company_type",
+        "founded_year",
+    ]
+)
 
 
 def _merge_enrichment(conn, account_id: str, new_fields: dict[str, Any]) -> bool:
@@ -326,13 +335,29 @@ def _generate_firmographic_signals(
     # 2) Cloud/DevOps tech stack detected → indicates tech fit relevance
     tech_stack = enrichment.get("tech_stack", [])
     if isinstance(tech_stack, list) and tech_stack:
-        cloud_keywords = {"aws", "azure", "gcp", "cloud", "kubernetes", "k8s", "docker",
-                          "terraform", "devops", "ci/cd", "jenkins", "datadog", "grafana",
-                          "prometheus", "ansible", "chef", "puppet", "cloudflare"}
+        cloud_keywords = {
+            "aws",
+            "azure",
+            "gcp",
+            "cloud",
+            "kubernetes",
+            "k8s",
+            "docker",
+            "terraform",
+            "devops",
+            "ci/cd",
+            "jenkins",
+            "datadog",
+            "grafana",
+            "prometheus",
+            "ansible",
+            "chef",
+            "puppet",
+            "cloudflare",
+        }
         matched = [t for t in tech_stack if any(kw in t.lower() for kw in cloud_keywords)]
         if matched:
-            if _insert("cloud_infrastructure_detected", 0.70,
-                        f"Cloud/DevOps tech: {', '.join(matched[:5])}"):
+            if _insert("cloud_infrastructure_detected", 0.70, f"Cloud/DevOps tech: {', '.join(matched[:5])}"):
                 inserted += 1
 
     # 3) Employee growth positive (if we have the data)
@@ -345,6 +370,7 @@ def _generate_firmographic_signals(
 
 
 # ─── Per-account collection ──────────────────────────────────────────
+
 
 async def _collect_one_account(
     conn,
@@ -379,9 +405,13 @@ async def _collect_one_account(
     snippets = await _fetch_snippets(client, serper_key, company_name)
     if not snippets:
         db.record_crawl_attempt(
-            conn, source=SOURCE_NAME, account_id=account_id,
-            endpoint=endpoint, status="exception",
-            error_summary="no_snippets", commit=False,
+            conn,
+            source=SOURCE_NAME,
+            account_id=account_id,
+            endpoint=endpoint,
+            status="exception",
+            error_summary="no_snippets",
+            commit=False,
         )
         db.mark_crawled(conn, source=SOURCE_NAME, account_id=account_id, endpoint=endpoint, commit=False)
         return "error"
@@ -390,9 +420,13 @@ async def _collect_one_account(
     extracted = await _extract_with_llm(client, minimax_key, minimax_model, company_name, snippets)
     if not extracted:
         db.record_crawl_attempt(
-            conn, source=SOURCE_NAME, account_id=account_id,
-            endpoint=endpoint, status="exception",
-            error_summary="llm_extraction_failed", commit=False,
+            conn,
+            source=SOURCE_NAME,
+            account_id=account_id,
+            endpoint=endpoint,
+            status="exception",
+            error_summary="llm_extraction_failed",
+            commit=False,
         )
         db.mark_crawled(conn, source=SOURCE_NAME, account_id=account_id, endpoint=endpoint, commit=False)
         return "error"
@@ -407,8 +441,13 @@ async def _collect_one_account(
             logger.info("firmographic_signals account=%s inserted=%d", account_id, sig_count)
 
     db.record_crawl_attempt(
-        conn, source=SOURCE_NAME, account_id=account_id,
-        endpoint=endpoint, status="success", error_summary="", commit=False,
+        conn,
+        source=SOURCE_NAME,
+        account_id=account_id,
+        endpoint=endpoint,
+        status="success",
+        error_summary="",
+        commit=False,
     )
     db.mark_crawled(conn, source=SOURCE_NAME, account_id=account_id, endpoint=endpoint, commit=False)
 
@@ -416,6 +455,7 @@ async def _collect_one_account(
 
 
 # ─── Main entry point ────────────────────────────────────────────────
+
 
 async def collect(
     conn,
@@ -479,7 +519,12 @@ async def collect(
         for i, account in enumerate(accounts, 1):
             try:
                 result = await _collect_one_account(
-                    conn, client, serper_key, minimax_key, minimax_model, account,
+                    conn,
+                    client,
+                    serper_key,
+                    minimax_key,
+                    minimax_model,
+                    account,
                 )
                 if result == "enriched":
                     enriched += 1
@@ -493,7 +538,11 @@ async def collect(
                     conn.commit()
                     logger.info(
                         "firmographic progress %d/%d enriched=%d skipped=%d errors=%d",
-                        i, len(accounts), enriched, skipped, errors,
+                        i,
+                        len(accounts),
+                        enriched,
+                        skipped,
+                        errors,
                     )
 
             except Exception as exc:
@@ -508,7 +557,11 @@ async def collect(
     dt = time.monotonic() - t0
     logger.info(
         "firmographic done accounts=%d enriched=%d skipped=%d errors=%d duration=%.1fs",
-        len(accounts), enriched, skipped, errors, dt,
+        len(accounts),
+        enriched,
+        skipped,
+        errors,
+        dt,
     )
 
     return {

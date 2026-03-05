@@ -37,14 +37,12 @@ _CATEGORY_SIGNAL_MAP: dict[str, tuple[str, float]] = {
     "Cloud Hosting": ("cloud_infrastructure_detected", 0.75),
     "Cloud PaaS": ("cloud_infrastructure_detected", 0.80),
     "Edge Delivery Network": ("cloud_infrastructure_detected", 0.60),
-
     # Modern stack
     "Framework": ("modern_stack_detected", 0.65),
     "JavaScript Library": ("modern_stack_detected", 0.55),
     "Headless": ("modern_stack_detected", 0.70),
     "Error Tracking": ("modern_stack_detected", 0.65),
     "AI": ("modern_stack_detected", 0.70),
-
     # Enterprise SaaS
     "CRM": ("enterprise_saas_detected", 0.75),
     "Marketing Automation": ("enterprise_saas_detected", 0.70),
@@ -52,7 +50,6 @@ _CATEGORY_SIGNAL_MAP: dict[str, tuple[str, float]] = {
     "Live Chat": ("enterprise_saas_detected", 0.55),
     "Ticketing System": ("enterprise_saas_detected", 0.60),
     "Enterprise": ("enterprise_saas_detected", 0.65),
-
     # Data platform
     "A/B Testing": ("data_platform_detected", 0.65),
     "Application Performance": ("data_platform_detected", 0.70),
@@ -67,15 +64,37 @@ _TOOLING_SPRAWL_THRESHOLD = 50  # total live techs across all groups
 
 # Categories to include in tech stack summary (meaningful tech, not hosting locations)
 _TECH_DISPLAY_CATEGORIES = frozenset(
-    list(_CATEGORY_SIGNAL_MAP.keys()) + [
-        "CDN", "SSL Certificate", "DNS", "Enterprise DNS",
-        "Tag Management", "DDoS Protection", "API", "Containerization",
-        "CI/CD", "Web Server", "Programming Language",
-        "Operating System", "Load Balancer", "Database",
-        "Message Queue", "Search Engine", "Content Management",
-        "Ecommerce", "Payment", "Hosting", "Monitoring",
-        "Logging", "Caching", "API Gateway", "Service Mesh",
-        "DMARC", "Privacy Compliance", "Schema", "Responsive",
+    list(_CATEGORY_SIGNAL_MAP.keys())
+    + [
+        "CDN",
+        "SSL Certificate",
+        "DNS",
+        "Enterprise DNS",
+        "Tag Management",
+        "DDoS Protection",
+        "API",
+        "Containerization",
+        "CI/CD",
+        "Web Server",
+        "Programming Language",
+        "Operating System",
+        "Load Balancer",
+        "Database",
+        "Message Queue",
+        "Search Engine",
+        "Content Management",
+        "Ecommerce",
+        "Payment",
+        "Hosting",
+        "Monitoring",
+        "Logging",
+        "Caching",
+        "API Gateway",
+        "Service Mesh",
+        "DMARC",
+        "Privacy Compliance",
+        "Schema",
+        "Responsive",
     ]
 )
 
@@ -163,7 +182,11 @@ def _map_categories_to_signals(
 
     # Tooling sprawl detection — companies with lots of live tech often need consolidation
     if total_live >= _TOOLING_SPRAWL_THRESHOLD and "tooling_sprawl_detected" not in seen_signals:
-        evidence = f"Tech Stack ({total_live} technologies): {tech_summary}" if tech_summary else f"BuiltWith: {total_live} technologies"
+        evidence = (
+            f"Tech Stack ({total_live} technologies): {tech_summary}"
+            if tech_summary
+            else f"BuiltWith: {total_live} technologies"
+        )
         signals.append(("tooling_sprawl_detected", 0.60, evidence))
 
     return signals
@@ -350,7 +373,10 @@ async def collect(
                     conn.commit()
                     logger.info(
                         "builtwith progress %d/%d inserted=%d seen=%d",
-                        i, len(accounts), total_inserted, total_seen,
+                        i,
+                        len(accounts),
+                        total_inserted,
+                        total_seen,
                     )
 
             except Exception as exc:
@@ -365,7 +391,10 @@ async def collect(
     dt = time.monotonic() - t0
     logger.info(
         "builtwith done accounts=%d inserted=%d seen=%d duration=%.1fs",
-        processed, total_inserted, total_seen, dt,
+        processed,
+        total_inserted,
+        total_seen,
+        dt,
     )
 
     return {"inserted": total_inserted, "seen": total_seen, "accounts_processed": processed}
