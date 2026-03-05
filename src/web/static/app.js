@@ -6,6 +6,7 @@ function signalsApp() {
     selected: [],
     search: '',
     tierFilter: '',
+    readinessFilter: '',
     labelFilter: '',
     sourceFilter: '',
     sortBy: 'score',
@@ -101,6 +102,7 @@ function signalsApp() {
         sort: this.sortBy,
         dir: this.sortDir,
         tier: this.tierFilter,
+        readiness: this.readinessFilter,
         label: this.labelFilter,
         q: this.search,
         source: this.sourceFilter,
@@ -119,7 +121,7 @@ function signalsApp() {
         this.stats.labeled = this.accounts.filter(a => a.labels).length;
 
         // Load full stats once
-        if (this.page === 1 && !this.search && !this.tierFilter && !this.labelFilter && !this.sourceFilter) {
+        if (this.page === 1 && !this.search && !this.tierFilter && !this.readinessFilter && !this.labelFilter && !this.sourceFilter) {
           this._loadFullStats();
         }
       } catch (e) {

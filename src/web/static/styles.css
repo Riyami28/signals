@@ -142,6 +142,12 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .tier-medium { background: var(--tint-orange); color: var(--orange); }
 .tier-low { background: var(--border-light); color: var(--text-muted); }
 
+/* Readiness Badge */
+.readiness-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: help; }
+.readiness-action_ready { background: var(--tint-green); color: var(--green); }
+.readiness-review { background: var(--tint-orange); color: var(--orange); }
+.readiness-needs_research { background: var(--tint-red); color: var(--red); }
+
 /* Label Badge */
 .label-badge {
   display: inline-block; padding: 2px 8px; border-radius: 10px;

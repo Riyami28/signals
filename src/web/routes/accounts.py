@@ -10,6 +10,8 @@ import re
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from datetime import datetime, timedelta
+
 from src import db
 from src.export.dossier import render_dossier
 from src.settings import load_settings
@@ -76,6 +78,164 @@ def _sanitize_search(q: str) -> str:
     return cleaned[:_MAX_SEARCH_LENGTH]
 
 
+def _calculate_readiness_score(account_detail: dict) -> dict:
+    """Calculate Account Readiness Score from 5 weighted components.
+
+    Returns:
+        {
+            "score": 0-100,
+            "status": "action_ready" | "review" | "needs_research",
+            "components": {
+                "signal_freshness": {
+                    "label": "Signal Freshness",
+                    "value": 0-100,
+                    "weight_pct": 30,
+                    "explanation": "% of signals within 14 days"
+                },
+                "source_diversity": {...},
+                "evidence_quality": {...},
+                "research_complete": {...},
+                "contact_available": {...}
+            }
+        }
+    """
+    components = {}
+
+    # 1. Signal Freshness (30%)
+    signals = account_detail.get("signals", [])
+    if signals:
+        now = datetime.utcnow()
+        fresh_count = 0
+        for sig in signals:
+            observed_at_str = sig.get("observed_at", "")
+            if observed_at_str:
+                try:
+                    # Handle both ISO format and timezone-aware strings
+                    if observed_at_str.endswith('Z'):
+                        obs_dt = datetime.fromisoformat(observed_at_str.replace('Z', '+00:00'))
+                    else:
+                        obs_dt = datetime.fromisoformat(observed_at_str.split('+')[0])
+                    age_days = (now - obs_dt).days
+                    if age_days <= 14:
+                        fresh_count += 1
+                except (ValueError, TypeError):
+                    pass
+        signal_freshness = min(100, int((fresh_count / len(signals)) * 100) if signals else 0)
+    else:
+        signal_freshness = 0
+
+    components["signal_freshness"] = {
+        "label": "Signal Freshness",
+        "value": signal_freshness,
+        "weight_pct": 30,
+        "explanation": f"{signal_freshness}% of signals within 14 days"
+    }
+
+    # 2. Source Diversity (25%)
+    # Map distinct source count to 0-100: 1=20, 2=40, 3=60, 4=80, 5+=100
+    distinct_sources = set()
+    for sig in signals:
+        source = sig.get("source", "").strip()
+        if source:
+            distinct_sources.add(source)
+
+    source_count = len(distinct_sources)
+    source_diversity_mapping = {0: 0, 1: 20, 2: 40, 3: 60, 4: 80}
+    source_diversity = source_diversity_mapping.get(min(source_count, 4), 100)
+
+    components["source_diversity"] = {
+        "label": "Source Diversity",
+        "value": source_diversity,
+        "weight_pct": 25,
+        "explanation": f"{source_count} distinct source(s)"
+    }
+
+    # 3. Evidence Quality (20%)
+    # Average confidence across all signals
+    if signals:
+        confidences = []
+        for sig in signals:
+            conf = sig.get("confidence")
+            if conf is not None:
+                try:
+                    confidences.append(float(conf))
+                except (ValueError, TypeError):
+                    pass
+        evidence_quality = int(sum(confidences) / len(confidences) * 100) if confidences else 0
+    else:
+        evidence_quality = 0
+
+    components["evidence_quality"] = {
+        "label": "Evidence Quality",
+        "value": evidence_quality,
+        "weight_pct": 20,
+        "explanation": f"Avg confidence: {evidence_quality / 100:.2f}" if evidence_quality > 0 else "No signals"
+    }
+
+    # 4. Research Complete (15%)
+    # Binary: has enrichment OR research brief
+    research = account_detail.get("research", {})
+    research_complete = 100 if (
+        research and (
+            research.get("enrichment_json") or
+            research.get("research_brief") or
+            research.get("research_status") == "completed"
+        )
+    ) else 0
+
+    components["research_complete"] = {
+        "label": "Research Complete",
+        "value": research_complete,
+        "weight_pct": 15,
+        "explanation": "Has enrichment + brief" if research_complete == 100 else "Needs research"
+    }
+
+    # 5. Contact Available (10%)
+    # Binary: has verified decision-maker contact
+    contacts = account_detail.get("contacts", [])
+    contact_available = 0
+    for contact in contacts:
+        # Consider contact available if they have a status (discovered, ranked, enriched, verified)
+        if contact.get("status") in ["enriched", "verified"]:
+            contact_available = 100
+            break
+    if contact_available == 0 and contacts:
+        # If no verified contact, but has any contact, give partial credit
+        contact_available = 50
+
+    components["contact_available"] = {
+        "label": "Contact Available",
+        "value": contact_available,
+        "weight_pct": 10,
+        "explanation": f"{len(contacts)} contact(s)" if contacts else "No contacts"
+    }
+
+    # Calculate weighted average
+    total_score = (
+        (components["signal_freshness"]["value"] * 0.30) +
+        (components["source_diversity"]["value"] * 0.25) +
+        (components["evidence_quality"]["value"] * 0.20) +
+        (components["research_complete"]["value"] * 0.15) +
+        (components["contact_available"]["value"] * 0.10)
+    )
+
+    readiness_score = round(total_score)
+
+    # Determine status
+    if readiness_score >= 70:
+        status = "action_ready"
+    elif readiness_score >= 40:
+        status = "review"
+    else:
+        status = "needs_research"
+
+    return {
+        "score": readiness_score,
+        "status": status,
+        "components": components
+    }
+
+
 @router.get("/accounts")
 def list_accounts(
     page: int = Query(1, ge=1),
@@ -86,6 +246,7 @@ def list_accounts(
     label: str = Query(""),
     q: str = Query(""),
     source: str = Query(""),
+    readiness: str = Query(""),
 ):
     if sort not in _ALLOWED_SORT_FIELDS:
         raise HTTPException(status_code=400, detail=f"invalid sort field, allowed: {sorted(_ALLOWED_SORT_FIELDS)}")
@@ -93,6 +254,8 @@ def list_accounts(
         raise HTTPException(status_code=400, detail="invalid sort direction, allowed: asc, desc")
     if tier and tier.lower() not in _ALLOWED_TIERS:
         raise HTTPException(status_code=400, detail=f"invalid tier filter, allowed: {sorted(_ALLOWED_TIERS - {''})}")
+    if readiness and readiness.lower() not in {"action_ready", "review", "needs_research"}:
+        raise HTTPException(status_code=400, detail="invalid readiness filter, allowed: action_ready, review, needs_research")
 
     safe_search = _sanitize_search(q)
     safe_label = label.strip()[:100]
@@ -111,11 +274,34 @@ def list_accounts(
             search=safe_search,
             source_filter=safe_source,
         )
+
+        # Calculate readiness score for each account
+        for r in rows:
+            account_id = str(r.get("account_id", ""))
+            try:
+                detail = db.get_account_detail(conn, account_id)
+                if detail:
+                    readiness_data = _calculate_readiness_score(detail)
+                    r["readiness_score"] = readiness_data["score"]
+                    r["readiness_status"] = readiness_data["status"]
+                else:
+                    r["readiness_score"] = 0
+                    r["readiness_status"] = "needs_research"
+            except Exception:
+                r["readiness_score"] = 0
+                r["readiness_status"] = "needs_research"
+
+        # Filter by readiness if requested
+        if readiness:
+            rows = [r for r in rows if r.get("readiness_status", "") == readiness]
+            total = len(rows)
+
         # Serialize datetimes
         for r in rows:
             for k, v in r.items():
                 if hasattr(v, "isoformat"):
                     r[k] = v.isoformat()
+
         return {
             "items": rows,
             "total": total,
@@ -133,6 +319,12 @@ def get_account(account_id: str):
         detail = db.get_account_detail(conn, account_id)
         if not detail:
             return {"error": "not found"}, 404
+
+        # Calculate readiness score
+        readiness_data = _calculate_readiness_score(detail)
+        detail["readiness_score"] = readiness_data["score"]
+        detail["readiness_status"] = readiness_data["status"]
+        detail["readiness_components"] = readiness_data["components"]
 
         # Enrich signals with impact metadata from registry
         signal_meta = _get_signal_meta()

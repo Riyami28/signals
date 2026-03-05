@@ -69,6 +69,12 @@
       <option value="medium">Medium</option>
       <option value="low">Low</option>
     </select>
+    <select class="filter-select" x-model="readinessFilter" @change="loadAccounts()">
+      <option value="">All Readiness</option>
+      <option value="action_ready">Action Ready</option>
+      <option value="review">Review</option>
+      <option value="needs_research">Needs Research</option>
+    </select>
     <select class="filter-select" x-model="labelFilter" @change="loadAccounts()">
       <option value="">All Labels</option>
       <option value="qualified">Qualified</option>
@@ -121,6 +127,7 @@
           <th @click="setSort('domain')">Domain</th>
           <th @click="setSort('score')" :class="{'sorted': sortBy==='score'}">Score</th>
           <th>Tier</th>
+          <th>Readiness</th>
           <th>Research</th>
           <th>Labels</th>
           <th style="width:36px"></th>
@@ -136,6 +143,12 @@
               <span class="score" :class="'score-' + (acc.tier || 'low')" x-text="Number(acc.score || 0).toFixed(1)"></span>
             </td>
             <td><span class="tier" :class="'tier-' + acc.tier" x-text="acc.tier ? acc.tier.toUpperCase() : ''"></span></td>
+            <td>
+              <span class="readiness-badge"
+                    :class="'readiness-' + (acc.readiness_status || 'needs_research')"
+                    x-text="acc.readiness_status ? acc.readiness_status.replace(/_/g, ' ').toUpperCase() : 'NEEDS RESEARCH'"
+                    :title="acc.readiness_score ? 'Readiness: ' + acc.readiness_score + '%' : 'Readiness: Unknown'"></span>
+            </td>
             <td>
               <span x-show="acc.research_status === 'completed'" style="color:var(--green);font-size:12px">Done</span>
               <span x-show="acc.research_status === 'in_progress'" style="color:var(--blue);font-size:12px">Running</span>
@@ -176,6 +189,10 @@
                 x-text="Number((accounts.find(a => a.account_id === expandedId) || {}).score || 0).toFixed(1)"></span>
           <span class="tier" :class="'tier-' + ((accounts.find(a => a.account_id === expandedId) || {}).tier || '')"
                 x-text="((accounts.find(a => a.account_id === expandedId) || {}).tier || '').toUpperCase()"></span>
+          <span class="readiness-badge"
+                :class="'readiness-' + (detail.readiness_status || 'needs_research')"
+                x-text="detail.readiness_status ? detail.readiness_status.replace(/_/g, ' ').toUpperCase() : 'NEEDS RESEARCH'"
+                :title="detail.readiness_score ? 'Readiness: ' + detail.readiness_score + '%' : 'Readiness: Unknown'"></span>
         </div>
       </div>
       <button class="side-panel-close" @click="expandedId = null">&times;</button>
@@ -183,6 +200,42 @@
 
     <!-- Body -->
     <div class="side-panel-body">
+      <!-- Readiness Score Summary -->
+      <template x-if="detail && detail.readiness_score !== undefined">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Account Readiness</span>
+            <span class="readiness-badge"
+                  :class="'readiness-' + (detail.readiness_status || 'needs_research')"
+                  x-text="detail.readiness_status ? detail.readiness_status.replace(/_/g, ' ').toUpperCase() : 'NEEDS RESEARCH'"></span>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+              <span style="font-size:13px;color:var(--text)">Score</span>
+              <span style="font-size:24px;font-weight:700;color:var(--blue)" x-text="detail.readiness_score"></span>
+            </div>
+            <div style="width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+              <div style="height:100%;background:var(--blue);border-radius:4px;transition:width 0.3s ease"
+                   :style="'width:' + detail.readiness_score + '%'"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px">
+            <template x-for="(comp, key) in detail.readiness_components || {}" :key="key">
+              <div style="padding:8px;background:var(--bg-tertiary);border-radius:4px">
+                <div style="color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px" x-text="comp.label"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div style="flex:1;height:4px;background:var(--border);border-radius:2px;margin-right:6px;overflow:hidden">
+                    <div style="height:100%;background:var(--green);border-radius:2px"
+                         :style="'width:' + comp.value + '%'"></div>
+                  </div>
+                  <span style="font-weight:600;color:var(--text-bright);min-width:28px;text-align:right" x-text="comp.value"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
       <!-- Tabs -->
       <div class="tabs">
         <div class="tab" :class="{'active': dtab==='dimensions'}" @click="dtab='dimensions'">Dimensions</div>
