@@ -75,9 +75,16 @@ def postgres_test_isolation(monkeypatch: pytest.MonkeyPatch):
 
     yield
 
-    conn = db.get_connection(pg_dsn)
-    _clear_all_tables(conn)
-    conn.close()
+    try:
+        conn = db.get_connection(pg_dsn)
+        _clear_all_tables(conn)
+        conn.close()
+    except Exception:
+        # Teardown cleanup is best-effort; setup truncation handles the next test.
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
