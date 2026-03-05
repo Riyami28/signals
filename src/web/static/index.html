@@ -334,29 +334,28 @@
               <!-- Cloud Tech Stack section -->
               <template x-if="groups.cloud.length > 0">
                 <div>
-                  <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--cyan);text-transform:uppercase;margin:12px 0 6px">Cloud Tech Stack</div>
+                  <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--cyan);text-transform:uppercase;margin:12px 0 8px">Cloud Tech Stack</div>
                   <template x-for="g in groups.cloud" :key="g.signalCode">
-                    <div class="signal-card">
-                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <div class="signal-card" style="padding:10px 12px">
+                      <!-- Header: label + impact + pts -->
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
                         <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="g.label"></span>
                         <span class="impact-badge" :class="'impact-' + g.impact" x-text="g.impact.toUpperCase()"></span>
-                        <template x-if="g.pts > 0">
-                          <span class="contribution-badge" x-text="'+' + Number(g.pts).toFixed(1) + ' pts'"></span>
-                        </template>
+                        <span x-show="g.pts > 0" class="contribution-badge" x-text="'+' + Number(g.pts).toFixed(1) + ' pts'"></span>
                       </div>
-                      <!-- Source badges (deduplicated) — single element avoids nested template x-if issues -->
-                      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
-                        <template x-for="src in g.sources" :key="src.source + src.observed_at">
-                          <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);"
-                                :style="src.evidence_url ? 'color:var(--cyan);cursor:pointer' : 'color:var(--text-muted)'"
-                                x-text="src.source + ' · ' + signalDate(src)"
-                                @click="src.evidence_url && window.open(src.evidence_url, '_blank')"></span>
+                      <!-- Tech tags as chips -->
+                      <div x-show="g.techTags.length > 0" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px">
+                        <template x-for="tag in g.techTags" :key="tag">
+                          <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,0.06);color:var(--text-primary);border:1px solid rgba(255,255,255,0.09)" x-text="tag"></span>
                         </template>
+                        <span x-show="g.techTagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + g.techTagsExtra + ' more'"></span>
                       </div>
-                      <!-- Evidence text — only shown if unique (deduplicated across section) -->
-                      <div x-show="g.snippetText"
-                           style="font-size:12px;color:var(--text-secondary);line-height:1.4"
-                           x-text="(g.snippetText || '').substring(0,160) + ((g.snippetText||'').length > 160 ? '…' : '')"></div>
+                      <!-- Single source line -->
+                      <div style="font-size:10px;color:var(--text-muted)">
+                        <span :style="g.firstUrl ? 'color:var(--cyan);cursor:pointer' : ''"
+                              @click="g.firstUrl && window.open(g.firstUrl, '_blank')"
+                              x-text="'via ' + g.sourcesLine"></span>
+                      </div>
                     </div>
                   </template>
                 </div>
@@ -364,28 +363,25 @@
               <!-- Non-Cloud Stack section -->
               <template x-if="groups.nonCloud.length > 0">
                 <div>
-                  <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase;margin:12px 0 6px">Non-Cloud Stack</div>
+                  <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase;margin:12px 0 8px">Non-Cloud Stack</div>
                   <template x-for="g in groups.nonCloud" :key="g.signalCode">
-                    <div class="signal-card">
-                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+                    <div class="signal-card" style="padding:10px 12px">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
                         <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="g.label"></span>
                         <span class="impact-badge" :class="'impact-' + g.impact" x-text="g.impact.toUpperCase()"></span>
-                        <template x-if="g.pts > 0">
-                          <span class="contribution-badge" x-text="'+' + Number(g.pts).toFixed(1) + ' pts'"></span>
-                        </template>
+                        <span x-show="g.pts > 0" class="contribution-badge" x-text="'+' + Number(g.pts).toFixed(1) + ' pts'"></span>
                       </div>
-                      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
-                        <template x-for="src in g.sources" :key="src.source + src.observed_at">
-                          <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--bg-tertiary);"
-                                :style="src.evidence_url ? 'color:var(--cyan);cursor:pointer' : 'color:var(--text-muted)'"
-                                x-text="src.source + ' · ' + signalDate(src)"
-                                @click="src.evidence_url && window.open(src.evidence_url, '_blank')"></span>
+                      <div x-show="g.techTags.length > 0" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px">
+                        <template x-for="tag in g.techTags" :key="tag">
+                          <span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,0.06);color:var(--text-primary);border:1px solid rgba(255,255,255,0.09)" x-text="tag"></span>
                         </template>
+                        <span x-show="g.techTagsExtra > 0" style="font-size:11px;padding:2px 6px;color:var(--text-muted)" x-text="'+' + g.techTagsExtra + ' more'"></span>
                       </div>
-                      <!-- Evidence text — only shown if unique (deduplicated across section) -->
-                      <div x-show="g.snippetText"
-                           style="font-size:12px;color:var(--text-secondary);line-height:1.4"
-                           x-text="(g.snippetText || '').substring(0,160) + ((g.snippetText||'').length > 160 ? '…' : '')"></div>
+                      <div style="font-size:10px;color:var(--text-muted)">
+                        <span :style="g.firstUrl ? 'color:var(--cyan);cursor:pointer' : ''"
+                              @click="g.firstUrl && window.open(g.firstUrl, '_blank')"
+                              x-text="'via ' + g.sourcesLine"></span>
+                      </div>
                     </div>
                   </template>
                 </div>
@@ -937,6 +933,6 @@
   </template>
 </div>
 
-<script src="/static/app.js?v=14"></script>
+<script src="/static/app.js?v=15"></script>
 </body>
 </html>
