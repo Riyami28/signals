@@ -516,7 +516,12 @@ def get_scoring_rubric():
 
     # Load sources — only show those enabled in execution policy (or not in policy = CSV-based passive sources)
     # Explicitly exclude known-unintegrated sources regardless
-    _UNINTEGRATED = {"bombora_api", "g2_api", "crunchbase", "story_hunt", "story_hunt_js", "gnews", "google_news_rss"}
+    _UNINTEGRATED = {
+        "bombora_api", "g2_api", "crunchbase", "story_hunt", "story_hunt_js", "gnews", "google_news_rss",
+        # Internal CSV import sources — not real signal collectors
+        "first_party_csv", "jobs_csv", "news_csv", "technographics_csv",
+        "manual_review_import", "review_import",
+    }
     sources: list[dict] = []
     source_path = settings.source_registry_path
     if source_path.exists():
@@ -524,6 +529,9 @@ def get_scoring_rubric():
             for row in csv.DictReader(fh):
                 src = (row.get("source") or "").strip()
                 if not src or src in _UNINTEGRATED:
+                    continue
+                # Hide all CSV-import and internal sources (end with _csv or _import)
+                if src.endswith("_csv") or src.endswith("_import"):
                     continue
                 # If source is in execution policy, respect its enabled flag
                 if src in exec_policy and not exec_policy[src]:
