@@ -50,6 +50,10 @@ recent_funding_event,shared,firmographic,12,60,0.65,true,firmographic
 employee_growth_positive,shared,firmographic,10,45,0.6,true,firmographic
 employee_count_in_range,shared,firmographic,8,90,0.7,true,firmographic
 repo_starred,shared,pql,12,30,0.5,true,engagement_pql
+github_migration_pr,shared,tooling_eval,18,21,0.55,true,tech_fit
+github_infra_issue,shared,behavioral,12,14,0.5,true,trigger_intent
+github_evaluation,shared,tooling_eval,15,21,0.5,true,tech_fit
+github_stargazer_velocity,shared,pql,14,14,0.5,true,engagement_pql
 cloud_infrastructure_detected,shared,technographic,7,45,0.4,true,tech_fit
 modern_stack_detected,shared,technographic,5,45,0.3,true,tech_fit
 enterprise_saas_detected,shared,technographic,6,45,0.4,true,tech_fit

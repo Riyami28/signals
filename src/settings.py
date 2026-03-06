@@ -143,6 +143,14 @@ class Settings(BaseSettings):
     github_token: str = Field(default="")
     github_repos: tuple[str, ...] = Field(default=("zopdev/zop-api", "zopdev/zop-cli", "zopdev/zopdev"))
 
+    # --- GitHub MCP signal collection (issues, discussions, migration PRs) ---
+    # Repos to scan for infra issues/discussions/migration PRs (public repos)
+    github_signal_repos: tuple[str, ...] = Field(default=())
+    # How many days back to search GitHub items
+    github_signal_lookback_days: int = Field(default=30, ge=1, le=180)
+    # Velocity window for stargazer burst detection (days)
+    github_stargazer_velocity_days: int = Field(default=7, ge=1, le=30)
+
     # --- connection pooling ---
     db_pool_min_size: int = Field(default=4, ge=1)
     db_pool_max_size: int = Field(default=32, ge=1)
