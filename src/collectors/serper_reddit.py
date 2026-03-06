@@ -93,7 +93,7 @@ Is the Reddit post below meaningfully relevant to this specific target company?
 Return a JSON object with exactly these fields:
 {{
   "relevant": <true | false>,
-  "signal_code": "<from: tech_evaluation_intent | infrastructure_pain | cloud_migration_signal | devops_hiring | vendor_evaluation | null>",
+  "signal_code": "<from: tech_evaluation_intent | infrastructure_pain | cloud_migration_intent | hiring_devops | vendor_evaluation | null>",
   "confidence": <float 0.0-1.0>,
   "evidence_sentence": "<1-2 sentence summary of the key signal, max 200 chars — empty string if not relevant>"
 }}

@@ -54,3 +54,6 @@ cloud_infrastructure_detected,shared,technographic,7,45,0.4,true,tech_fit
 modern_stack_detected,shared,technographic,5,45,0.3,true,tech_fit
 enterprise_saas_detected,shared,technographic,6,45,0.4,true,tech_fit
 data_platform_detected,shared,technographic,8,45,0.4,true,tech_fit
+tech_evaluation_intent,shared,tooling_eval,12,21,0.5,true,tech_fit
+infrastructure_pain,shared,behavioral,10,14,0.5,true,trigger_intent
+vendor_evaluation,shared,tooling_eval,10,30,0.5,true,tech_fit
