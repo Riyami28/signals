@@ -221,6 +221,132 @@ def get_score_delta_7d(conn: Any, account_id: str, product: str, run_date: str) 
     return round(float(current_row["score"]) - float(row["score"]), 2)
 
 
+def get_latest_completed_run_id(conn: Any) -> str | None:
+    """Return the run_id of the most recent completed score run."""
+    cur = conn.execute(
+        """
+        SELECT run_id FROM score_runs
+        WHERE status = 'completed'
+        ORDER BY started_at DESC
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    return None if not row else str(row["run_id"])
+
+
+def get_latest_account_tier(conn: Any, account_id: str) -> dict[str, str]:
+    """Return the current tier per product for an account from the latest completed run."""
+    cur = conn.execute(
+        """
+        SELECT product, tier
+        FROM account_scores
+        WHERE account_id = %s
+          AND run_id = (
+              SELECT run_id FROM score_runs
+              WHERE status = 'completed'
+              ORDER BY started_at DESC
+              LIMIT 1
+          )
+        """,
+        (account_id,),
+    )
+    return {str(row["product"]): str(row["tier"]) for row in cur.fetchall()}
+
+
+def fetch_observations_for_account(
+    conn: Any,
+    account_id: str,
+    lookback_days: int = 120,
+) -> list[dict[str, Any]]:
+    """Fetch all signal observations for a single account within the lookback window."""
+    from src.utils import utc_now_iso  # avoid circular at module level
+
+    run_date = utc_now_iso()[:10]
+    cur = conn.execute(
+        """
+        SELECT obs_id, account_id, signal_code, product, source, observed_at,
+               evidence_url, evidence_text, document_id, mention_id,
+               evidence_sentence, evidence_sentence_en, matched_phrase, language,
+               speaker_name, speaker_role, evidence_quality, relevance_score,
+               confidence, source_reliability, raw_payload_hash
+        FROM signal_observations
+        WHERE account_id = %s
+          AND observed_at::date <= %s::date
+          AND observed_at::date >= (%s::date + %s::interval)
+        """,
+        (account_id, run_date, run_date, f"-{lookback_days} days"),
+    )
+    return list(cur.fetchall())
+
+
+def upsert_account_scores_for_run(
+    conn: Any,
+    run_id: str,
+    component_scores: list[ComponentScore],
+    account_scores: list[AccountScore],
+) -> None:
+    """Upsert scores for a single account into an existing run — does NOT touch other accounts."""
+    if component_scores:
+        conn.cursor().executemany(
+            """
+            INSERT INTO score_components (run_id, account_id, product, signal_code, component_score)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (run_id, account_id, product, signal_code) DO UPDATE
+              SET component_score = excluded.component_score
+            """,
+            [(c.run_id, c.account_id, c.product, c.signal_code, c.component_score) for c in component_scores],
+        )
+
+    if account_scores:
+        conn.cursor().executemany(
+            """
+            INSERT INTO account_scores (
+                run_id, account_id, product, score, tier, tier_v2,
+                top_reasons_json, delta_7d, velocity_7d, velocity_14d,
+                velocity_30d, velocity_category, confidence_band,
+                dimension_scores_json, dimension_confidence_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (run_id, account_id, product) DO UPDATE SET
+                score = excluded.score,
+                tier = excluded.tier,
+                tier_v2 = excluded.tier_v2,
+                top_reasons_json = excluded.top_reasons_json,
+                delta_7d = excluded.delta_7d,
+                velocity_7d = excluded.velocity_7d,
+                velocity_14d = excluded.velocity_14d,
+                velocity_30d = excluded.velocity_30d,
+                velocity_category = excluded.velocity_category,
+                confidence_band = excluded.confidence_band,
+                dimension_scores_json = excluded.dimension_scores_json,
+                dimension_confidence_json = excluded.dimension_confidence_json
+            """,
+            [
+                (
+                    s.run_id,
+                    s.account_id,
+                    s.product,
+                    s.score,
+                    s.tier,
+                    s.tier_v2,
+                    s.top_reasons_json,
+                    s.delta_7d,
+                    s.velocity_7d,
+                    s.velocity_14d,
+                    s.velocity_30d,
+                    s.velocity_category,
+                    s.confidence_band,
+                    s.dimension_scores_json,
+                    s.dimension_confidence_json,
+                )
+                for s in account_scores
+            ],
+        )
+
+    conn.commit()
+
+
 def get_latest_run_id_for_date(conn: Any, run_date: str) -> str | None:
     cur = conn.execute(
         """
