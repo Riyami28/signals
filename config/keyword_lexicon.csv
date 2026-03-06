@@ -3,7 +3,7 @@ jobs,devops_role_open,devops engineer,0.7
 jobs,devops_role_open,site reliability engineer,0.75
 jobs,platform_role_open,platform engineer,0.7
 jobs,platform_role_open,internal developer platform,0.8
-jobs,platform_role_open,cloud platform engineer,0.75
+jobs,cloud_infra_role_open,cloud platform engineer,0.8
 jobs,finops_role_open,finops,0.8
 jobs,finops_role_open,cloud cost management,0.8
 jobs,finops_role_open,cost governance,0.8
@@ -11,6 +11,15 @@ jobs,devops_bottleneck_language,reduce devops toil,0.8
 jobs,idp_golden_path_initiative,golden path,0.8
 jobs,idp_golden_path_initiative,paved road,0.8
 jobs,idp_golden_path_initiative,self-serve environments,0.8
+jobs,cloud_infra_role_open,cloud engineer,0.8
+jobs,cloud_infra_role_open,cloud architect,0.85
+jobs,cloud_infra_role_open,cloud infrastructure engineer,0.85
+jobs,cloud_infra_role_open,aws engineer,0.8
+jobs,cloud_infra_role_open,gcp engineer,0.8
+jobs,cloud_infra_role_open,azure engineer,0.8
+jobs,cloud_infra_role_open,cloud native engineer,0.8
+jobs,cloud_infra_role_open,kubernetes engineer,0.8
+jobs,cloud_infra_role_open,cloud operations engineer,0.75
 news,compliance_initiative,soc 2,0.8
 news,compliance_initiative,iso 27001,0.8
 news,compliance_initiative,hipaa,0.8
