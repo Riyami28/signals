@@ -30,3 +30,4 @@ twitter_mcp,4,1.0,30,2,3,50,true
 hackernews_mcp,4,1.0,30,2,3,50,true
 twitter_semantic,2,0.1,20,2,15,50,true
 linkedin_mcp,4,1.0,30,2,3,50,true
+crunchbase,4,0.5,30,2,3,100,true
