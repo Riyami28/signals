@@ -49,14 +49,17 @@ async def _run_in_thread(
         try:
             settings = load_settings()
             conn = db.get_connection(settings.pg_dsn)
-            db.finish_ui_pipeline_run(conn, run_id, "failed", {"error": "Pipeline timeout"})
-            conn.close()
+            try:
+                db.finish_ui_pipeline_run(conn, run_id, "failed", {"error": "Pipeline timeout"})
+            finally:
+                conn.close()
         except Exception:
             pass
     except Exception as exc:
         await queue.put({"type": "error", "message": str(exc)})
     finally:
         await queue.put({"type": "done", "pipeline_run_id": run_id})
+        ACTIVE_QUEUES.pop(run_id, None)
 
 
 def _emit(queue: asyncio.Queue, event: dict):
@@ -191,6 +194,9 @@ def _run_pipeline_sync(
                 twitter_live_enabled = _collector_enabled("twitter_api") and (
                     getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", "")
                 )
+                twitter_semantic_enabled = _collector_enabled("twitter_semantic") and (
+                    getattr(settings, "twitter_rapidapi_key", "") or getattr(settings, "twitter_bearer_token", "")
+                )
                 builtwith_enabled = _collector_enabled("builtwith_free") and settings.builtwith_api_key
                 firmographic_enabled = (
                     _collector_enabled("firmographic_google")
@@ -209,6 +215,7 @@ def _run_pipeline_sync(
                     or reddit_enabled
                     or reddit_official_enabled
                     or twitter_live_enabled
+                    or twitter_semantic_enabled
                     or builtwith_enabled
                     or firmographic_enabled
                 )
@@ -233,6 +240,8 @@ def _run_pipeline_sync(
                         active_sources.append("reddit_official")
                     if twitter_live_enabled:
                         active_sources.append("twitter_live")
+                    if twitter_semantic_enabled:
+                        active_sources.append("twitter_semantic")
                     if builtwith_enabled:
                         active_sources.append("builtwith")
                     if firmographic_enabled:
@@ -393,6 +402,21 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("twitter_live")
+
+                        # --- Twitter Semantic (LLM-based intent classification — highest reliability 0.80) ---
+                        if twitter_semantic_enabled:
+                            from src.collectors import twitter_semantic
+
+                            tasks.append(
+                                twitter_semantic.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("twitter_semantic")
 
                         # --- BuiltWith Free API (tech stack from builtwith.com) ---
                         if builtwith_enabled:
