@@ -389,12 +389,23 @@ def run_scoring(
 
         _vel_cat = classify_velocity(vel_7d)  # noqa: F841
 
-        # Compute per-dimension confidence bands
+        # Compute per-dimension confidence bands and source lists
         dim_bands: dict[str, str] = {}
+        dim_sources_detail: dict[str, list[str]] = {}
         for (a_id, prod, dim), sources in dimension_sources.items():
             if a_id == account_id and prod == product:
                 dim_bands[dim] = classify_confidence_band(len(sources))
-        _conf_band = overall_confidence_band(dim_bands)  # noqa: F841
+                dim_sources_detail[dim] = sorted(sources)
+        conf_band = overall_confidence_band(dim_bands)
+
+        dim_conf_data: dict[str, dict] = {}
+        for dim, band in dim_bands.items():
+            src_list = dim_sources_detail.get(dim, [])
+            dim_conf_data[dim] = {
+                "band": band,
+                "source_count": len(src_list),
+                "sources": src_list,
+            }
 
         account_models.append(
             AccountScore(
@@ -407,6 +418,8 @@ def run_scoring(
                 top_reasons_json=reasons_to_json(top_reasons),
                 delta_7d=delta,
                 dimension_scores_json=json.dumps(dimension_scores, sort_keys=True),
+                confidence_band=conf_band,
+                dimension_confidence_json=json.dumps(dim_conf_data, sort_keys=True),
             )
         )
 

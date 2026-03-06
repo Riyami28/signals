@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from src import db
 from src.export.dossier import render_dossier
+from src.scoring.engine import DEFAULT_DIMENSION_WEIGHTS
 from src.settings import load_settings
 
 router = APIRouter(tags=["accounts"])
@@ -249,7 +250,6 @@ def list_accounts(
     label: str = Query(""),
     q: str = Query(""),
     source: str = Query(""),
-    readiness: str = Query(""),
 ):
     if sort not in _ALLOWED_SORT_FIELDS:
         raise HTTPException(
@@ -265,15 +265,6 @@ def list_accounts(
         raise HTTPException(
             status_code=400,
             detail=f"invalid tier filter, allowed: {sorted(_ALLOWED_TIERS - {''})}",
-        )
-    if readiness and readiness.lower() not in {
-        "action_ready",
-        "review",
-        "needs_research",
-    }:
-        raise HTTPException(
-            status_code=400,
-            detail=("invalid readiness filter, allowed: action_ready, review, needs_research"),
         )
 
     safe_search = _sanitize_search(q)
@@ -293,27 +284,6 @@ def list_accounts(
             search=safe_search,
             source_filter=safe_source,
         )
-
-        # Calculate readiness score for each account
-        for r in rows:
-            account_id = str(r.get("account_id", ""))
-            try:
-                detail = db.get_account_detail(conn, account_id)
-                if detail:
-                    readiness_data = _calculate_readiness_score(detail)
-                    r["readiness_score"] = readiness_data["score"]
-                    r["readiness_status"] = readiness_data["status"]
-                else:
-                    r["readiness_score"] = 0
-                    r["readiness_status"] = "needs_research"
-            except Exception:
-                r["readiness_score"] = 0
-                r["readiness_status"] = "needs_research"
-
-        # Filter by readiness if requested
-        if readiness:
-            rows = [r for r in rows if r.get("readiness_status", "") == readiness]
-            total = len(rows)
 
         # Serialize datetimes
         for r in rows:
@@ -369,9 +339,6 @@ def get_account(account_id: str):
             )
 
         # Calculate dimension contributions (score * weight)
-        # Import dimension weights from scoring engine
-        from src.scoring.engine import DEFAULT_DIMENSION_WEIGHTS
-
         if detail.get("dimension_scores") and isinstance(detail["dimension_scores"], dict):
             dimension_contributions = {}
             for dim, raw_score in detail["dimension_scores"].items():

@@ -76,12 +76,6 @@
       <option value="medium">Medium</option>
       <option value="low">Low</option>
     </select>
-    <select class="filter-select" x-model="readinessFilter" @change="loadAccounts()">
-      <option value="">All Readiness</option>
-      <option value="action_ready">Action Ready</option>
-      <option value="review">Review</option>
-      <option value="needs_research">Needs Research</option>
-    </select>
     <select class="filter-select" x-model="labelFilter" @change="loadAccounts()">
       <option value="">All Labels</option>
       <option value="qualified">Qualified</option>
@@ -134,7 +128,6 @@
           <th @click="setSort('domain')">Domain</th>
           <th @click="setSort('score')" :class="{'sorted': sortBy==='score'}">Score</th>
           <th>Tier</th>
-          <th>Readiness</th>
           <th>Research</th>
           <th>Labels</th>
           <th style="width:36px"></th>
@@ -150,12 +143,6 @@
               <span class="score" :class="'score-' + (acc.tier || 'low')" x-text="Number(acc.score || 0).toFixed(1)"></span>
             </td>
             <td><span class="tier" :class="'tier-' + acc.tier" x-text="acc.tier ? acc.tier.toUpperCase() : ''"></span></td>
-            <td>
-              <span class="readiness-badge"
-                    :class="'readiness-' + (acc.readiness_status || 'needs_research')"
-                    x-text="acc.readiness_status ? acc.readiness_status.replace(/_/g, ' ').toUpperCase() : 'NEEDS RESEARCH'"
-                    :title="acc.readiness_score ? 'Readiness: ' + acc.readiness_score + '%' : 'Readiness: Unknown'"></span>
-            </td>
             <td>
               <span x-show="acc.research_status === 'completed'" style="color:var(--green);font-size:12px">Done</span>
               <span x-show="acc.research_status === 'in_progress'" style="color:var(--blue);font-size:12px">Running</span>
@@ -284,48 +271,6 @@
                 <span class="velocity-delta">7d: <strong x-text="(detail.velocity['7d'] > 0 ? '+' : '') + detail.velocity['7d']"></strong></span>
                 <span class="velocity-delta">14d: <strong x-text="(detail.velocity['14d'] > 0 ? '+' : '') + detail.velocity['14d']"></strong></span>
                 <span class="velocity-delta">30d: <strong x-text="(detail.velocity['30d'] > 0 ? '+' : '') + detail.velocity['30d']"></strong></span>
-              </div>
-            </template>
-
-            <!-- Score Waterfall with Contributions -->
-            <template x-if="detail.dimension_contributions">
-              <div class="score-waterfall">
-                <div class="waterfall-header">
-                  <span style="font-size:12px;color:var(--text-muted)">Score Waterfall</span>
-                  <span class="waterfall-total">Total: <strong x-text="totalScore"></strong> pts</span>
-                </div>
-                <template x-for="[dim, contrib] in Object.entries(detail.dimension_contributions)" :key="'wf-'+dim">
-                  <div class="waterfall-row">
-                    <span class="waterfall-dim" x-text="dim.replace(/_/g,' ')"></span>
-                    <div class="waterfall-bar-track">
-                      <div class="waterfall-bar-fill"
-                           :class="contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'"
-                           :style="'width:' + Math.min(100, (contrib.contribution / Math.max(parseFloat(totalScore), 1)) * 100) + '%'">
-                      </div>
-            <!-- Score Waterfall -->
-            <div class="score-waterfall">
-              <div class="waterfall-header">
-                <div>
-                  <span style="font-size:12px;color:var(--text-muted)">Score Breakdown</span>
-                  <div style="font-size:10px;color:var(--text-muted);opacity:0.7">weighted pts contributed to total</div>
-                </div>
-                <span class="waterfall-total">Total: <strong x-text="totalContribution()"></strong> pts</span>
-              </div>
-              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="'wf-'+dim">
-                <div class="waterfall-row">
-                  <span class="waterfall-dim" x-text="dim.replace(/_/g,' ')"></span>
-                  <div class="waterfall-bar-track">
-                    <div class="waterfall-bar-fill"
-                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'"
-                         :style="'width:' + Math.min(100, (parseFloat(contribution(dim,score)) / Math.max(parseFloat(totalContribution()), 1)) * 100) + '%'">
-                    </div>
-                    <span class="waterfall-pts"
-                          :class="contrib.dimension_score >= 70 ? 'pts-high' : contrib.dimension_score >= 40 ? 'pts-med' : 'pts-low'"
-                          x-text="'+' + contrib.contribution + ' pts'"></span>
-                    <span style="font-size:10px;color:var(--text-muted);min-width:42px;text-align:right"
-                          x-text="contrib.weight_pct + '% wt'"></span>
-                  </div>
-                </template>
               </div>
             </template>
 
