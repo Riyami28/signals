@@ -18,6 +18,7 @@ from src.collectors import (
     reddit_collector,
     reddit_mcp_collector,
     reddit_official,
+    serper_conference,
     serper_reddit,
     serper_twitter,
     technographics,
@@ -89,10 +90,17 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
         else {"inserted": 0, "seen": 0}
     )
 
-    # Conference/event attendance signals (CSV-based)
+    # Conference/event attendance signals (CSV-based — disabled, replaced by serper_conference)
     results["conference_events"] = (
         await conference_events.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("conference_event_csv")
+        else {"inserted": 0, "seen": 0}
+    )
+
+    # Serper Conference (Google-indexed conference attendance/sponsorship/speaking)
+    results["serper_conference"] = (
+        await serper_conference.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("serper_conference")
         else {"inserted": 0, "seen": 0}
     )
 

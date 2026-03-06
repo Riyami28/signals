@@ -189,6 +189,7 @@ def _run_pipeline_sync(
                 stargazer_enabled = _collector_enabled("github_stargazers")
                 serper_twitter_enabled = _collector_enabled("serper_twitter") and settings.serper_api_key
                 serper_reddit_enabled = _collector_enabled("serper_reddit") and settings.serper_api_key
+                serper_conference_enabled = _collector_enabled("serper_conference") and settings.serper_api_key
                 reddit_enabled = _collector_enabled("reddit_api")
                 reddit_official_enabled = _collector_enabled("reddit_official")
                 twitter_live_enabled = _collector_enabled("twitter_api") and (
@@ -212,6 +213,7 @@ def _run_pipeline_sync(
                     or stargazer_enabled
                     or serper_twitter_enabled
                     or serper_reddit_enabled
+                    or serper_conference_enabled
                     or reddit_enabled
                     or reddit_official_enabled
                     or twitter_live_enabled
@@ -234,6 +236,8 @@ def _run_pipeline_sync(
                         active_sources.append("serper_twitter")
                     if serper_reddit_enabled:
                         active_sources.append("serper_reddit")
+                    if serper_conference_enabled:
+                        active_sources.append("serper_conference")
                     if reddit_enabled:
                         active_sources.append("reddit")
                     if reddit_official_enabled:
@@ -358,6 +362,21 @@ def _run_pipeline_sync(
                                 )
                             )
                             task_labels.append("serper_reddit")
+
+                        # --- Serper Conference (Google-indexed conference signals) ---
+                        if serper_conference_enabled:
+                            from src.collectors import serper_conference
+
+                            tasks.append(
+                                serper_conference.collect(
+                                    conn,
+                                    settings,
+                                    lexicon_by_source=keyword_lexicon,
+                                    source_reliability=source_registry,
+                                    account_ids=account_ids if account_ids else None,
+                                )
+                            )
+                            task_labels.append("serper_conference")
 
                         # --- Reddit collectors (FREE — public Reddit JSON API) ---
                         if reddit_enabled:
