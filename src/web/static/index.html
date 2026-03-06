@@ -385,7 +385,9 @@
                   <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
                     <div class="signal-card"
                          :class="{'signal-card-high': sig.impact === 'high'}"
+                         x-data="{ showLineage: false }"
                          x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
+                      <!-- Row 1: label + badges -->
                       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
                         <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="signalLabel(sig)"></span>
                         <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
@@ -396,21 +398,55 @@
                         <template x-if="sig.is_breaking">
                           <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(88,166,255,0.15);color:var(--blue);font-weight:700;letter-spacing:0.05em">NEW</span>
                         </template>
+                        <template x-if="sig.evidence_quality > 0">
+                          <span class="quality-badge"
+                                :class="sig.evidence_quality >= 0.7 ? 'quality-strong' : sig.evidence_quality >= 0.4 ? 'quality-moderate' : 'quality-weak'"
+                                x-text="sig.evidence_quality >= 0.7 ? 'Strong Evidence' : sig.evidence_quality >= 0.4 ? 'Moderate' : 'Weak'"></span>
+                        </template>
+                        <template x-if="sig.language && sig.language !== 'en' && sig.language !== ''">
+                          <span class="lang-indicator"
+                                :title="sig.evidence_sentence ? 'Original: ' + sig.evidence_sentence : 'Translated'"
+                                x-text="'🌐 ' + sig.language.toUpperCase()"></span>
+                        </template>
                       </div>
+                      <!-- Row 2: source + date -->
                       <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">
                         <span x-text="sig.source"></span>
                         <template x-if="sig.observed_at">
                           <span x-text="' · ' + signalDate(sig)"></span>
                         </template>
                       </div>
-                      <template x-if="!JOB_SOURCES.has(sig.source) && sig.evidence_text">
-                        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;line-height:1.4"
-                             x-text="(sig.evidence_text || '').substring(0,140) + ((sig.evidence_text||'').length > 140 ? '…' : '')"></div>
+                      <!-- Speaker attribution -->
+                      <template x-if="sig.speaker_name">
+                        <div class="speaker-attr">
+                          Quoted: <span class="speaker-name" x-text="sig.speaker_name"></span><template x-if="sig.speaker_role"><span x-text="', ' + sig.speaker_role"></span></template>
+                        </div>
                       </template>
+                      <!-- Evidence text (prefer translated sentence) -->
+                      <template x-if="!JOB_SOURCES.has(sig.source) && (sig.evidence_sentence_en || sig.evidence_text)">
+                        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;line-height:1.4"
+                             x-text="((sig.evidence_sentence_en || sig.evidence_text) || '').substring(0,140) + (((sig.evidence_sentence_en || sig.evidence_text)||'').length > 140 ? '…' : '')"></div>
+                      </template>
+                      <!-- Evidence URL -->
                       <template x-if="sig.evidence_url">
                         <a class="signal-url" :href="sig.evidence_url" target="_blank"
                            x-text="(sig.evidence_url||'').replace(/^https?:\/\//,'').substring(0,70)"
                            style="font-size:11px;display:block"></a>
+                      </template>
+                      <!-- Source article lineage -->
+                      <template x-if="sig.doc_title">
+                        <div style="margin-top:5px">
+                          <button class="lineage-toggle" @click="showLineage = !showLineage"
+                                  x-text="showLineage ? '▲ Hide source' : '▼ View source article'"></button>
+                          <div class="lineage-doc" x-show="showLineage">
+                            <div style="font-weight:600" x-text="sig.doc_title"></div>
+                            <div style="margin-top:2px;color:var(--text-muted)">
+                              <template x-if="sig.doc_author"><span x-text="sig.doc_author"></span></template>
+                              <template x-if="sig.doc_author && sig.doc_published_at"><span> · </span></template>
+                              <template x-if="sig.doc_published_at"><span x-text="(sig.doc_published_at||'').substring(0,10)"></span></template>
+                            </div>
+                          </div>
+                        </div>
                       </template>
                     </div>
                   </template>
