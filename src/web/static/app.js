@@ -156,9 +156,11 @@ function signalsApp() {
         } else {
           const count = data.row_count || 0;
           const errors = (data.validation_errors || []).length;
-          alert(`Imported ${count} companies (batch: ${data.batch_id})` +
-                (errors > 0 ? `\n${errors} validation warning(s)` : ''));
-          await this.loadAccounts();
+          this.csvUploading = false;
+          event.target.value = '';
+          // Auto-run pipeline with batch_id to create accounts and score them
+          await this._runPipeline([], ['ingest', 'score', 'research', 'export'], data.batch_id);
+          return;
         }
       } catch (err) {
         alert('Upload failed: ' + err.message);
@@ -283,16 +285,18 @@ function signalsApp() {
       await this._runPipeline(this.selected, ['ingest', 'score', 'research', 'export']);
     },
 
-    async _runPipeline(accountIds, stages) {
+    async _runPipeline(accountIds, stages, batchId) {
       this.pipelineStages = this._initStages();
       this.showPipelineModal = true;
       this.pipelineRunning = true;
 
       try {
+        const payload = { account_ids: accountIds, stages };
+        if (batchId) payload.batch_id = batchId;
         const resp = await fetch('/api/pipeline/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_ids: accountIds, stages }),
+          body: JSON.stringify(payload),
         });
         const data = await resp.json();
         const runId = data.pipeline_run_id;
