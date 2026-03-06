@@ -142,6 +142,12 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .tier-medium { background: var(--tint-orange); color: var(--orange); }
 .tier-low { background: var(--border-light); color: var(--text-muted); }
 
+/* Readiness Badge */
+.readiness-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: help; }
+.readiness-action_ready { background: var(--tint-green); color: var(--green); }
+.readiness-review { background: var(--tint-orange); color: var(--orange); }
+.readiness-needs_research { background: var(--tint-red); color: var(--red); }
+
 /* Label Badge */
 .label-badge {
   display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -328,6 +334,55 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .dimension-tier.tier-medium { background: rgba(251, 191, 36, 0.15); color: var(--orange); }
 .dimension-tier.tier-low { background: rgba(156, 163, 175, 0.15); color: var(--text-muted); }
 .dimension-arrow { font-size: 12px; color: var(--blue); opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+
+/* Expandable Dimensions Container */
+.dimensions-container { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+/* Expandable Dimension Row */
+.dimension-expandable {
+  cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+  transition: background-color 0.15s, border-color 0.15s; background: var(--bg-card);
+}
+.dimension-expandable:hover { background-color: var(--bg-tertiary); border-color: var(--text-muted); }
+.dimension-expandable.expanded { background-color: var(--bg-secondary); border-color: var(--blue); }
+
+/* Dimension Header Row */
+.dimension-header {
+  display: flex; align-items: center; gap: 10px; font-weight: 500;
+}
+.expand-arrow { font-size: 11px; color: var(--text-muted); min-width: 12px; flex-shrink: 0; }
+.dimension-label { text-transform: capitalize; min-width: 120px; font-size: 12px; color: var(--text); flex-shrink: 0; }
+.dimension-bar-bg { flex: 1; height: 18px; background-color: var(--border-light); border-radius: 3px; overflow: hidden; }
+.dimension-bar-fill { height: 100%; transition: width 0.3s ease; }
+.dimension-score { font-weight: 600; min-width: 35px; text-align: right; font-size: 13px; color: var(--text-bright); flex-shrink: 0; }
+.dimension-contrib-pts { font-size: 10px; color: var(--text-muted); min-width: 50px; text-align: right; flex-shrink: 0; }
+
+/* Expanded Signals List */
+.dimension-signals-list {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 8px;
+}
+.signal-row-item {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.signal-row {
+  display: flex; gap: 10px; align-items: center; font-size: 11px; padding: 4px 0; color: var(--text-muted);
+}
+.signal-snippet {
+  font-size: 10px; color: var(--text-muted); line-height: 1.4; padding: 4px 6px; background: var(--bg-tertiary); border-left: 2px solid var(--border-light); border-radius: 2px; font-style: italic; margin-top: 2px;
+}
+.sig-code {
+  font-family: var(--mono); color: var(--text-bright); flex: 0 0 auto; font-weight: 500; font-size: 11px;
+}
+.sig-score {
+  color: var(--green); font-weight: 600; min-width: 50px; text-align: right; flex-shrink: 0;
+}
+.sig-source {
+  background-color: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px; font-size: 9px; color: var(--text-muted); flex-shrink: 0;
+}
+.sig-link {
+  color: var(--blue); text-decoration: none; font-size: 11px; margin-left: 4px; flex-shrink: 0;
+}
+.sig-link:hover { text-decoration: underline; }
 
 /* Velocity Banner */
 .velocity-banner {
@@ -587,3 +642,31 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
   border-radius: 5px;
   flex-wrap: wrap;
 }
+
+/* Confidence Overlay on Dimension Bars */
+.dimension-bar-fill.confidence-medium {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent, transparent 4px,
+    rgba(255,255,255,0.15) 4px,
+    rgba(255,255,255,0.15) 8px
+  );
+}
+.dimension-bar-fill.confidence-low { opacity: 0.35; }
+.confidence-low-label { font-size: 9px; color: var(--text-muted); font-style: italic; margin-left: 6px; }
+
+/* Staleness Warning Banner */
+.staleness-banner {
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 14px; background: var(--tint-orange); border: 1px solid var(--warm-border);
+  border-radius: 8px; margin-bottom: 12px; font-size: 12px; color: var(--orange);
+}
+.staleness-banner .staleness-icon { font-size: 16px; flex-shrink: 0; }
+
+/* Signal Freshness Indicator on Account List */
+.freshness-indicator { font-size: 11px; font-weight: 500; }
+.freshness-green { color: var(--green); }
+.freshness-yellow { color: var(--orange); }
+.freshness-red { color: var(--red); }
+.freshness-none { color: var(--text-muted); }

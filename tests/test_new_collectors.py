@@ -31,7 +31,7 @@ class TestSerperNewsCollect:
         conn = MagicMock()
         conn.commit = MagicMock()
 
-        result = await collect(conn, settings)
+        result = await collect(conn, settings, lexicon_rows=[])
         assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     @pytest.mark.asyncio
@@ -43,7 +43,7 @@ class TestSerperNewsCollect:
         conn.commit = MagicMock()
         conn.execute.return_value.fetchall.return_value = []
 
-        result = await collect(conn, settings)
+        result = await collect(conn, settings, lexicon_rows=[])
         assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     @pytest.mark.asyncio
@@ -58,7 +58,7 @@ class TestSerperNewsCollect:
         ]
 
         with patch("src.collectors.serper_news.db.was_crawled_today", return_value=True):
-            result = await collect(conn, settings)
+            result = await collect(conn, settings, lexicon_rows=[])
 
         assert result["inserted"] == 0
         assert result["seen"] == 0
@@ -80,7 +80,7 @@ class TestSerperNewsCollect:
             patch("src.collectors.serper_news.db.record_crawl_attempt") as mock_record,
             patch("src.collectors.serper_news.db.mark_crawled"),
         ):
-            result = await collect(conn, settings)
+            result = await collect(conn, settings, lexicon_rows=[])
 
         assert result["inserted"] == 0
         mock_record.assert_called_once()
@@ -94,7 +94,7 @@ class TestSerperNewsCollect:
         conn.commit = MagicMock()
         conn.execute.return_value.fetchall.return_value = []
 
-        result = await collect(conn, settings, account_ids=["acc_1"])
+        result = await collect(conn, settings, lexicon_rows=[], account_ids=["acc_1"])
         assert result["accounts_processed"] == 0
 
 
@@ -117,7 +117,7 @@ class TestSerperJobsCollect:
         conn = MagicMock()
         conn.commit = MagicMock()
 
-        result = await collect(conn, settings)
+        result = await collect(conn, settings, lexicon_rows=[])
         assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     @pytest.mark.asyncio
@@ -129,7 +129,7 @@ class TestSerperJobsCollect:
         conn.commit = MagicMock()
         conn.execute.return_value.fetchall.return_value = []
 
-        result = await collect(conn, settings)
+        result = await collect(conn, settings, lexicon_rows=[])
         assert result == {"inserted": 0, "seen": 0, "accounts_processed": 0}
 
     @pytest.mark.asyncio
@@ -144,7 +144,7 @@ class TestSerperJobsCollect:
         ]
 
         with patch("src.collectors.serper_jobs.db.was_crawled_today", return_value=True):
-            result = await collect(conn, settings)
+            result = await collect(conn, settings, lexicon_rows=[])
 
         assert result["inserted"] == 0
 
@@ -157,7 +157,7 @@ class TestSerperJobsCollect:
         conn.commit = MagicMock()
         conn.execute.return_value.fetchall.return_value = []
 
-        result = await collect(conn, settings, account_ids=["acc_1"])
+        result = await collect(conn, settings, lexicon_rows=[], account_ids=["acc_1"])
         assert result["accounts_processed"] == 0
 
 
@@ -240,7 +240,21 @@ class TestGithubStargazersCollect:
         conn.commit = MagicMock()
         conn.execute.return_value.fetchall.return_value = []
 
-        with patch("src.collectors.github_stargazers.db.was_crawled_today", return_value=False):
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with (
+            patch("src.collectors.github_stargazers.db.was_crawled_today", return_value=False),
+            patch("src.collectors.github_stargazers.httpx.AsyncClient", return_value=mock_client),
+            patch("src.collectors.github_stargazers.db.mark_crawled"),
+        ):
             result = await collect(conn, settings)
         assert result["inserted"] == 0
         assert result["seen"] == 0
@@ -256,7 +270,21 @@ class TestGithubStargazersCollect:
         conn.commit = MagicMock()
         conn.execute.return_value.fetchall.return_value = []
 
-        with patch("src.collectors.github_stargazers.db.was_crawled_today", return_value=False):
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with (
+            patch("src.collectors.github_stargazers.db.was_crawled_today", return_value=False),
+            patch("src.collectors.github_stargazers.httpx.AsyncClient", return_value=mock_client),
+            patch("src.collectors.github_stargazers.db.mark_crawled"),
+        ):
             result = await collect(conn, settings, account_ids=["acc_1"])
         assert result["inserted"] == 0
 

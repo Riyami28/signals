@@ -8,9 +8,9 @@ from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src import db
-from src.pipeline.score import run_scoring_stage
-from src.settings import load_settings
+from src import db  # noqa: E402
+from src.pipeline.score import run_scoring_stage  # noqa: E402
+from src.settings import load_settings  # noqa: E402
 
 
 def main():

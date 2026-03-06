@@ -8,9 +8,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src import db
-from src.collectors.firmographic_google import _generate_firmographic_signals
-from src.settings import load_settings
+from src import db  # noqa: E402
+from src.collectors.firmographic_google import _generate_firmographic_signals  # noqa: E402
+from src.settings import load_settings  # noqa: E402
 
 
 def main():
