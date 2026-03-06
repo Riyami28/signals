@@ -477,6 +477,7 @@ def _run_pipeline_sync(
                         ins = result.get("inserted", 0)
                         seen = result.get("seen", 0)
                         accts = result.get("accounts_processed", 0)
+                        skipped = result.get("skipped", 0)
                         total_inserted += ins
                         if ins == 0 and accts == 0:
                             _emit(
@@ -488,12 +489,17 @@ def _run_pipeline_sync(
                                 },
                             )
                         else:
+                            msg = f"{label}: {ins} signals from {accts} accounts ({seen} matches)"
+                            if ins == 0 and seen == 0 and accts > 0:
+                                msg = f"{label}: already crawled today — {accts} accounts skipped"
+                            elif skipped > 0:
+                                msg += f", {skipped} skipped"
                             _emit(
                                 queue,
                                 {
                                     "type": "log",
                                     "stage": "ingest",
-                                    "message": f"{label}: {ins} signals from {accts} accounts ({seen} matches)",
+                                    "message": msg,
                                 },
                             )
 
@@ -504,7 +510,7 @@ def _run_pipeline_sync(
                         "type": "stage",
                         "stage": "ingest",
                         "status": "completed",
-                        "message": f"Ingested {total_inserted} signals in {dt:.1f}s",
+                        "message": f"Ingested {total_inserted} new signals in {dt:.1f}s" if total_inserted > 0 else f"No new signals (all sources already crawled today) in {dt:.1f}s",
                     },
                 )
             except Exception as exc:
