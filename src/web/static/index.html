@@ -194,10 +194,10 @@
                 x-text="Number((accounts.find(a => a.account_id === expandedId) || {}).score || 0).toFixed(1)"></span>
           <span class="tier" :class="'tier-' + ((accounts.find(a => a.account_id === expandedId) || {}).tier || '')"
                 x-text="((accounts.find(a => a.account_id === expandedId) || {}).tier || '').toUpperCase()"></span>
-          <span class="readiness-badge"
-                :class="'readiness-' + (detail.readiness_status || 'needs_research')"
-                x-text="detail.readiness_status ? detail.readiness_status.replace(/_/g, ' ').toUpperCase() : 'NEEDS RESEARCH'"
-                :title="detail.readiness_score ? 'Readiness: ' + detail.readiness_score + '%' : 'Readiness: Unknown'"></span>
+          <span class="readiness-badge" x-show="detail"
+                :class="'readiness-' + (detail ? (detail.readiness_status || 'needs_research') : 'needs_research')"
+                x-text="detail && detail.readiness_status ? detail.readiness_status.replace(/_/g, ' ').toUpperCase() : 'NEEDS RESEARCH'"
+                :title="detail && detail.readiness_score ? 'Readiness: ' + detail.readiness_score + '%' : 'Readiness: Unknown'"></span>
         </div>
       </div>
       <button class="side-panel-close" @click="expandedId = null">&times;</button>
@@ -259,6 +259,7 @@
                return Object.values(detail.dimension_contributions)
                  .reduce((sum, c) => sum + (parseFloat(c.contribution) || 0), 0)
                  .toFixed(1);
+             },
              dimWeights: {trigger_intent:0.35, tech_fit:0.20, engagement_pql:0.25, firmographic:0.10, hiring_growth:0.10},
              dimCeilings: {trigger_intent:60, tech_fit:40, engagement_pql:50, firmographic:30, hiring_growth:30},
              rawScore(s) { return typeof s === 'object' ? (s.score || 0) : (s || 0) },
