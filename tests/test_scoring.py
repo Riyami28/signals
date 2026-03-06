@@ -283,11 +283,11 @@ def test_dimension_weighted_composite_and_persisted_dimension_scores():
         },
     ]
     weights = {
-        "trigger_intent": DimensionWeight("trigger_intent", 0.35, 60.0),
-        "tech_fit": DimensionWeight("tech_fit", 0.20, 40.0),
-        "engagement_pql": DimensionWeight("engagement_pql", 0.25, 50.0),
-        "firmographic": DimensionWeight("firmographic", 0.10, 30.0),
-        "hiring_growth": DimensionWeight("hiring_growth", 0.10, 30.0),
+        "trigger_intent": DimensionWeight("trigger_intent", 0.40, 70.0),
+        "engagement_pql": DimensionWeight("engagement_pql", 0.30, 60.0),
+        "hiring_growth": DimensionWeight("hiring_growth", 0.15, 40.0),
+        "tech_fit": DimensionWeight("tech_fit", 0.10, 30.0),
+        "firmographic": DimensionWeight("firmographic", 0.05, 20.0),
     }
 
     output = run_scoring(
@@ -303,11 +303,13 @@ def test_dimension_weighted_composite_and_persisted_dimension_scores():
     assert len(output.account_scores) == 1
     score = output.account_scores[0]
     dimensions = json.loads(score.dimension_scores_json)
-    assert dimensions["trigger_intent"] == 100.0
-    assert dimensions["tech_fit"] == 50.0
-    assert round(score.score, 2) == 45.0
-    # tier_2 (score=45 >= threshold 45) → legacy "high"
-    assert score.tier == "high"
+    # trigger_intent: raw=60, ceiling=70 → 85.71; tech_fit: raw=20, ceiling=30 → 66.67
+    assert round(dimensions["trigger_intent"], 1) == 85.7
+    assert round(dimensions["tech_fit"], 1) == 66.7
+    # 85.71 * 0.40 + 66.67 * 0.10 = 40.95
+    assert round(score.score, 2) == 40.95
+    # tier_2 (score=40.95 < threshold 45) → legacy "medium"
+    assert score.tier == "medium"
 
 
 def test_dimension_ceiling_caps_inflation():
