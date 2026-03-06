@@ -119,7 +119,11 @@ class Settings(BaseSettings):
     ops_metrics_lookback_days: int = Field(default=14, ge=1)
 
     # --- LLM research (two-pass Claude integration) ---
-    claude_api_key: str = Field(default="")
+    # Reads SIGNALS_CLAUDE_API_KEY first, falls back to ANTHROPIC_API_KEY
+    claude_api_key: str = Field(default_factory=lambda: (
+        __import__("os").environ.get("SIGNALS_CLAUDE_API_KEY", "")
+        or __import__("os").environ.get("ANTHROPIC_API_KEY", "")
+    ))
     claude_model: str = Field(default="claude-sonnet-4-5")
     research_max_accounts: int = Field(default=20, ge=1, le=200)
     research_stale_days: int = Field(default=30, ge=1)
