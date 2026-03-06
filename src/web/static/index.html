@@ -69,7 +69,7 @@
   <!-- Toolbar -->
   <div class="toolbar">
     <input class="search-input" type="text" placeholder="Search company or domain..."
-           x-model.debounce.300ms="search" @input="loadAccounts()">
+           x-model="search" @input.debounce.300ms="loadAccounts()">
     <select class="filter-select" x-model="tierFilter" @change="loadAccounts()">
       <option value="">All Tiers</option>
       <option value="high">High</option>
