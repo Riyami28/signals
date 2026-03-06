@@ -61,26 +61,36 @@ _JOB_SEARCH_SUFFIXES = [
 # Direct title-to-signal mapping — TITLE ONLY, no snippet matching.
 # Match DevOps/Platform/FinOps/Cloud role titles.
 _ROLE_SIGNAL_MAP = {
+    # --- Cloud-direct (specific public cloud roles) ---
+    "cloud infrastructure engineer": "cloud_infra_role_open",
+    "cloud native engineer": "cloud_infra_role_open",
+    "cloud architect": "cloud_infra_role_open",
+    "cloud infrastructure": "cloud_infra_role_open",
+    "cloud engineer": "cloud_infra_role_open",
+    "aws engineer": "cloud_infra_role_open",
+    "gcp engineer": "cloud_infra_role_open",
+    "azure engineer": "cloud_infra_role_open",
+    "kubernetes engineer": "cloud_infra_role_open",
+    "cloud operations": "cloud_infra_role_open",
+    "cloud admin": "cloud_infra_role_open",
+    "cloud security": "cloud_infra_role_open",
+    # --- FinOps ---
     "finops": "finops_role_open",
     "cloud cost": "finops_role_open",
     "cost optimization": "finops_role_open",
-    "platform engineer": "platform_role_open",
+    # --- Platform (IDP-focused) ---
     "internal developer platform": "platform_role_open",
     "cloud platform": "platform_role_open",
+    "platform engineer": "platform_role_open",
+    # --- Cloud-adjacent (DevOps/SRE/Infra — may be hybrid/on-prem) ---
     "devops": "devops_role_open",
     "sre": "devops_role_open",
     "site reliability": "devops_role_open",
-    "cloud engineer": "devops_role_open",
     "infrastructure engineer": "devops_role_open",
-    "cloud architect": "devops_role_open",
-    "cloud infrastructure": "devops_role_open",
     "server engineer": "devops_role_open",
     "storage engineer": "devops_role_open",
-    "cloud operations": "devops_role_open",
-    "cloud admin": "devops_role_open",
     "network engineer": "devops_role_open",
     "systems engineer": "devops_role_open",
-    "cloud security": "devops_role_open",
 }
 
 # Domains that are known job board sites

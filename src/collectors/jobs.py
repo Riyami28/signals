@@ -28,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 
 FALLBACK_ROLE_SIGNALS = {
+    # Cloud-direct (explicitly public cloud infrastructure)
+    "cloud engineer": "cloud_infra_role_open",
+    "cloud architect": "cloud_infra_role_open",
+    "cloud infrastructure": "cloud_infra_role_open",
+    "aws engineer": "cloud_infra_role_open",
+    "gcp engineer": "cloud_infra_role_open",
+    "azure engineer": "cloud_infra_role_open",
+    "cloud native": "cloud_infra_role_open",
+    "kubernetes engineer": "cloud_infra_role_open",
+    # Cloud-adjacent (DevOps/Platform/SRE — could be on-prem or hybrid)
     "finops": "finops_role_open",
     "platform engineer": "platform_role_open",
     "platform": "platform_role_open",

@@ -22,6 +22,7 @@ poc_stage_progression,shared,pql,24,14,0.75,true,engagement_pql
 devops_role_open,shared,hiring,12,30,0.5,true,hiring_growth
 finops_role_open,shared,hiring,14,30,0.5,true,hiring_growth
 platform_role_open,shared,hiring,12,30,0.5,true,hiring_growth
+cloud_infra_role_open,shared,hiring,16,30,0.5,true,hiring_growth
 kubernetes_detected,shared,technographic,4,45,0.5,true,tech_fit
 terraform_detected,shared,technographic,5,45,0.4,true,tech_fit
 gitops_detected,shared,technographic,5,45,0.4,true,tech_fit
