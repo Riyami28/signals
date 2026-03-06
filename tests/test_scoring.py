@@ -411,3 +411,69 @@ def test_classify_tier_applies_upgrade_rules():
         dimension_scores={"engagement_pql": 81.0, "trigger_intent": 75.0},
     )
     assert tier == "tier_1"
+
+
+# --- Issue #57: tier-change alert tests ---
+
+
+def test_tier_rank_ordering():
+    from src.notifier import _tier_rank
+
+    assert _tier_rank("low") < _tier_rank("medium") < _tier_rank("high")
+    assert _tier_rank("unknown") == -1
+
+
+def test_send_tier_change_alerts_builds_message(tmp_path):
+    from src.notifier import send_tier_change_alerts
+    from src.settings import Settings
+
+    settings = Settings(
+        project_root=str(tmp_path),
+        out_dir=str(tmp_path / "out"),
+        gchat_webhook_url="",
+        alert_email_to="",
+    )
+    changes = [
+        {
+            "company_name": "Acme Corp",
+            "product": "zopdev",
+            "old_tier": "medium",
+            "new_tier": "high",
+            "score": 75.0,
+            "delta_7d": 15.2,
+            "top_reason": "cost_reduction_mandate",
+            "velocity_category": "surging",
+        },
+        {
+            "company_name": "Beta Inc",
+            "product": "zopnight",
+            "old_tier": "high",
+            "new_tier": "medium",
+            "score": 35.0,
+            "delta_7d": -12.0,
+            "top_reason": "",
+            "velocity_category": "decelerating",
+        },
+    ]
+    result = send_tier_change_alerts(settings, changes)
+    assert "local_log" in result["delivered_channels"]
+    # Verify alert was written
+    log_path = tmp_path / "out" / "alerts.log"
+    assert log_path.exists()
+    content = log_path.read_text()
+    assert "Acme Corp" in content
+    assert "Beta Inc" in content
+    assert "1 up" in content
+    assert "1 down" in content
+
+
+def test_send_tier_change_alerts_empty_list(tmp_path):
+    from src.notifier import send_tier_change_alerts
+    from src.settings import Settings
+
+    settings = Settings(
+        project_root=str(tmp_path),
+        out_dir=str(tmp_path / "out"),
+    )
+    result = send_tier_change_alerts(settings, [])
+    assert result["delivered_channels"] == []

@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     alert_retry_depth_threshold: int = Field(default=2, ge=1)
     alert_min_high_precision: float = Field(default=0.65, ge=0.0, le=1.0)
     alert_min_medium_precision: float = Field(default=0.55, ge=0.0, le=1.0)
+    alert_on_tier_change: bool = Field(default=True)
+    alert_min_tier: str = Field(default="medium")
+    alert_velocity_threshold: float = Field(default=20.0, ge=0.0)
     ops_metrics_lookback_days: int = Field(default=14, ge=1)
 
     # --- LLM research (two-pass Claude integration) ---

@@ -504,6 +504,19 @@ def get_account(account_id: str):
         conn.close()
 
 
+@router.get("/tier-changes")
+def get_tier_changes():
+    """Return accounts whose tier changed between the two most recent scoring runs."""
+    conn = _get_conn()
+    try:
+        changes = db.get_tier_changes_today(conn)
+        for c in changes:
+            _serialize_dates(c)
+        return {"count": len(changes), "changes": changes}
+    finally:
+        conn.close()
+
+
 @router.get("/accounts/{account_id}/dossier")
 def get_account_dossier(
     account_id: str,

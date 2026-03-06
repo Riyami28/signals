@@ -40,7 +40,7 @@ from src.export import csv_exporter
 from src.integrations.zoho_dedup import ZohoCRMDedupClient, check_crm_dedup
 from src.logging_config import configure_logging
 from src.models import AccountScore
-from src.notifier import send_alert
+from src.notifier import _tier_rank, send_alert, send_tier_change_alerts
 from src.pipeline.autonomous import execute_retry_task, run_autonomous_loop_impl
 from src.pipeline.daily import run_daily_impl, run_hunt_cycle, run_score_cycle
 from src.pipeline.export import persist_ops_metrics, run_exports, write_icp_coverage_report
@@ -450,6 +450,47 @@ def _run_scoring(conn, settings: Settings, run_date: date) -> str:
                 score.tier_v2 = "tier_4"
 
         db.replace_run_scores(conn, run_id, result.component_scores, result.account_scores)
+
+        # --- Tier-change detection & alerting ---
+        if settings.alert_on_tier_change:
+            try:
+                previous_tiers = db.batch_get_previous_tiers(conn, run_date_str)
+                account_names: dict[str, str] = {}
+                for row in conn.execute("SELECT account_id, company_name FROM accounts").fetchall():
+                    account_names[str(row["account_id"])] = str(row["company_name"])
+
+                changes: list[dict] = []
+                for score in result.account_scores:
+                    key = (score.account_id, score.product)
+                    old_tier = previous_tiers.get(key)
+                    if not old_tier or old_tier == score.tier:
+                        continue
+                    if _tier_rank(score.tier) >= _tier_rank(settings.alert_min_tier):
+                        import json as _json
+
+                        reasons = []
+                        try:
+                            reasons = _json.loads(score.top_reasons_json or "[]")
+                        except (ValueError, TypeError):
+                            pass
+                        changes.append(
+                            {
+                                "company_name": account_names.get(score.account_id, score.account_id),
+                                "product": score.product,
+                                "old_tier": old_tier,
+                                "new_tier": score.tier,
+                                "score": score.score,
+                                "delta_7d": score.delta_7d,
+                                "top_reason": reasons[0] if reasons else "",
+                                "velocity_category": score.velocity_category,
+                            }
+                        )
+                if changes:
+                    send_tier_change_alerts(settings, changes)
+                    typer.echo(f"tier_change_alerts_sent count={len(changes)}")
+            except Exception as exc:
+                typer.echo(f"tier_change_alert_error={str(exc)[:200]}")
+
         db.finish_score_run(conn, run_id, status="completed", error_summary=None)
         return run_id
     except Exception as exc:

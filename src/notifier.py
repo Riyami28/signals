@@ -63,3 +63,52 @@ def send_alert(settings: Settings, title: str, body: str, severity: str = "error
     channels.append("local_log")
 
     return {"delivered_channels": channels, "errors": errors}
+
+
+_TIER_ARROWS = {"high": "\u2b06", "medium": "\u2197", "low": "\u2b07"}
+
+
+def send_tier_change_alerts(
+    settings: Settings,
+    changes: list[dict],
+) -> dict[str, object]:
+    """Send a consolidated tier-change alert.
+
+    Each item in *changes*: ``{company_name, product, old_tier, new_tier, score,
+    delta_7d, top_reason, velocity_category}``.
+    """
+    if not changes:
+        return {"delivered_channels": [], "errors": []}
+
+    upgrades = [c for c in changes if _tier_rank(c["new_tier"]) > _tier_rank(c["old_tier"])]
+    downgrades = [c for c in changes if _tier_rank(c["new_tier"]) < _tier_rank(c["old_tier"])]
+
+    lines: list[str] = []
+    if upgrades:
+        lines.append(f"=== {len(upgrades)} Tier Upgrade(s) ===")
+        for c in upgrades:
+            arrow = _TIER_ARROWS.get(c["new_tier"], "")
+            reason = c.get("top_reason", "")
+            lines.append(
+                f"{arrow} {c['company_name']} [{c['product']}]: "
+                f"{c['old_tier']} -> {c['new_tier']} "
+                f"(score {c['score']:.1f}, 7d {c['delta_7d']:+.1f})" + (f" | {reason}" if reason else "")
+            )
+
+    if downgrades:
+        lines.append(f"=== {len(downgrades)} Tier Downgrade(s) ===")
+        for c in downgrades:
+            arrow = _TIER_ARROWS.get(c["new_tier"], "")
+            lines.append(
+                f"{arrow} {c['company_name']} [{c['product']}]: "
+                f"{c['old_tier']} -> {c['new_tier']} "
+                f"(score {c['score']:.1f}, 7d {c['delta_7d']:+.1f})"
+            )
+
+    title = f"Tier changes: {len(upgrades)} up, {len(downgrades)} down"
+    body = "\n".join(lines)
+    return send_alert(settings, title=title, body=body, severity="info")
+
+
+def _tier_rank(tier: str) -> int:
+    return {"low": 0, "medium": 1, "high": 2}.get(tier, -1)
