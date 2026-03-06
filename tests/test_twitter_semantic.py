@@ -4,18 +4,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.collectors.twitter_classify import (
     VALID_SIGNAL_CODES,
-    TweetClassification,
     build_classification_prompt,
     classify_tweets_batch,
     parse_classification_response,
 )
-
 
 # ---------------------------------------------------------------------------
 # build_classification_prompt tests

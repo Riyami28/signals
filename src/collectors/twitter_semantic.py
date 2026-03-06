@@ -181,7 +181,6 @@ async def _fetch_tweets_for_account(
 
     official_handle = twitter_handles.get(domain, "").strip()
     handle_bare = official_handle.lstrip("@")
-    since_id = db.get_twitter_since_id(None, account.get("account_id", "")) if False else ""
 
     if official_handle:
         query = f"from:{handle_bare} -is:retweet lang:en"
