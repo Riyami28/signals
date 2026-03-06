@@ -20,6 +20,7 @@ from src.collectors import (
     serper_twitter,
     technographics,
     twitter,
+    twitter_semantic,
     website_techscan,
 )
 from src.integrations.crunchbase import CrunchbaseClient, enrich_firmographics, evaluate_firmographic_signals
@@ -135,6 +136,13 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     results["reddit_mcp"] = (
         await reddit_mcp_collector.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("reddit_mcp")
+        else {"inserted": 0, "seen": 0}
+    )
+
+    # Twitter Semantic (LLM-based intent classification — replaces keyword matching)
+    results["twitter_semantic"] = (
+        await twitter_semantic.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("twitter_semantic")
         else {"inserted": 0, "seen": 0}
     )
 
