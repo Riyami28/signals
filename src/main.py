@@ -21,8 +21,16 @@ import typer
 from dotenv import load_dotenv
 
 from src import db
-from src.collectors import community, first_party, jobs, news, serper_twitter, technographics, twitter
-from src.collectors import twitter_mcp_collector
+from src.collectors import (
+    community,
+    first_party,
+    jobs,
+    news,
+    serper_twitter,
+    technographics,
+    twitter,
+    twitter_mcp_collector,
+)
 from src.discovery import hunt as hunt_pipeline
 from src.discovery import pipeline as discovery_pipeline
 from src.discovery import watchlist_builder
