@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import socket
 import subprocess
 import sys
 import time
@@ -114,26 +115,45 @@ Subreddit: r/{subreddit}
 """
 
 
+def _find_free_port() -> int:
+    """Find an available TCP port by binding to port 0."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 class _MCPServerProcess:
     """Thin wrapper around the mcp-server-reddit subprocess."""
 
+    _MCP_STARTUP_TIMEOUT = 10  # seconds to wait for server readiness
+
     def __init__(self) -> None:
         self._proc: subprocess.Popen | None = None
-        self._base_url = "http://127.0.0.1:18765"
+        self._port: int = 0
+        self._base_url: str = ""
 
     async def start(self) -> bool:
         """Start mcp-server-reddit as a local HTTP server. Returns True if started."""
         try:
+            self._port = _find_free_port()
+            self._base_url = f"http://127.0.0.1:{self._port}"
             self._proc = subprocess.Popen(
-                [sys.executable, "-m", "mcp_server_reddit", "--transport", "streamable-http", "--port", "18765"],
+                [
+                    sys.executable,
+                    "-m",
+                    "mcp_server_reddit",
+                    "--transport",
+                    "streamable-http",
+                    "--port",
+                    str(self._port),
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            # Give it time to bind
-            await asyncio.sleep(2.0)
-            if self._proc.poll() is not None:
-                stderr = self._proc.stderr.read().decode(errors="replace") if self._proc.stderr else ""
-                logger.warning("reddit_mcp server exited immediately: %s", stderr[:300])
+            # Wait for server to become ready (health check loop)
+            ready = await self._wait_until_ready()
+            if not ready:
+                self.stop()
                 return False
             return True
         except FileNotFoundError:
@@ -142,6 +162,25 @@ class _MCPServerProcess:
         except Exception as exc:
             logger.warning("Failed to start reddit_mcp server: %s", exc)
             return False
+
+    async def _wait_until_ready(self) -> bool:
+        """Poll the server until it responds or timeout expires."""
+        deadline = time.monotonic() + self._MCP_STARTUP_TIMEOUT
+        async with httpx.AsyncClient() as client:
+            while time.monotonic() < deadline:
+                if self._proc and self._proc.poll() is not None:
+                    stderr = self._proc.stderr.read().decode(errors="replace") if self._proc.stderr else ""
+                    logger.warning("reddit_mcp server exited during startup: %s", stderr[:300])
+                    return False
+                try:
+                    resp = await client.get(f"{self._base_url}/mcp", timeout=2)
+                    if resp.status_code < 500:
+                        return True
+                except (httpx.ConnectError, httpx.TimeoutException):
+                    pass
+                await asyncio.sleep(0.5)
+        logger.warning("reddit_mcp server did not become ready within %ds", self._MCP_STARTUP_TIMEOUT)
+        return False
 
     def stop(self) -> None:
         if self._proc and self._proc.poll() is None:
@@ -271,6 +310,47 @@ def _make_observation(
     )
 
 
+def _build_match_terms(company_name: str, domain: str) -> list[str]:
+    """Build a list of lowercase search terms for fuzzy pre-filtering.
+
+    Generates: full company name, domain, domain root (without TLD),
+    and individual name tokens >=3 chars (e.g. "HashiCorp" → ["hashicorp", "hashi"]).
+    """
+    terms: list[str] = []
+    name_lower = company_name.lower().strip()
+    if name_lower:
+        terms.append(name_lower)
+
+    domain_lower = domain.lower().replace("www.", "").strip()
+    if domain_lower:
+        terms.append(domain_lower)
+        # Domain root without TLD: "hashicorp.com" → "hashicorp"
+        root = domain_lower.split(".")[0] if "." in domain_lower else ""
+        if root and len(root) >= 3 and root != name_lower:
+            terms.append(root)
+
+    # Individual name tokens >=3 chars (skip noise words)
+    _NOISE = {"the", "inc", "ltd", "llc", "corp", "group", "company", "and", "for"}
+    for token in name_lower.split():
+        clean = token.strip(".,()-")
+        if len(clean) >= 3 and clean not in _NOISE and clean != name_lower:
+            terms.append(clean)
+
+    return terms
+
+
+def _post_matches_company(post: dict, company_name: str, domain: str) -> bool:
+    """Check if a post mentions the company by name, domain, or common variants."""
+    terms = _build_match_terms(company_name, domain)
+    if not terms:
+        return False
+    title = str(post.get("title", "")).lower()
+    body = str(post.get("selftext", "") or post.get("body", "")).lower()
+    url = str(post.get("url", "")).lower()
+    text = f"{title} {body} {url}"
+    return any(term in text for term in terms)
+
+
 async def collect(
     conn,
     settings: Settings,
@@ -327,19 +407,10 @@ async def collect(
                         )
                         posts = posts_data if isinstance(posts_data, list) else []
 
-                        # Quick pre-filter: only pass posts where company name or domain
-                        # appears anywhere — avoids wasting Claude tokens on clearly unrelated posts.
-                        # Full semantic relevance check is done by Claude inside _classify_with_claude.
-                        name_lower = company_name.lower()
-                        domain_lower = domain.lower().replace("www.", "")
-                        candidate_posts = [
-                            p
-                            for p in posts
-                            if name_lower in str(p.get("title", "")).lower()
-                            or name_lower in str(p.get("selftext", "")).lower()
-                            or domain_lower in str(p.get("url", "")).lower()
-                            or domain_lower in str(p.get("selftext", "")).lower()
-                        ]
+                        # Pre-filter: match company name, domain, or domain root (without TLD)
+                        # to avoid wasting Claude tokens on clearly unrelated posts.
+                        # Uses multiple name variants to catch abbreviations and common forms.
+                        candidate_posts = [p for p in posts if _post_matches_company(p, company_name, domain)]
 
                         for post in candidate_posts[:3]:  # Max 3 posts per subreddit per account
                             seen += 1
@@ -374,13 +445,7 @@ async def collect(
                     )
                     posts = search_data if isinstance(search_data, list) else []
                     # Pre-filter by name/domain before sending to Claude
-                    relevant = [
-                        p
-                        for p in posts
-                        if name_lower in str(p.get("title", "")).lower()
-                        or name_lower in str(p.get("selftext", "")).lower()
-                        or domain_lower in str(p.get("selftext", "")).lower()
-                    ]
+                    relevant = [p for p in posts if _post_matches_company(p, company_name, domain)]
                     for post in relevant[:2]:
                         seen += 1
                         classification = await _classify_with_claude(
