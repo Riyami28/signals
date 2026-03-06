@@ -147,9 +147,7 @@ def build_classification_prompt(
     domain: str,
 ) -> tuple[str, str]:
     """Build (system_prompt, user_prompt) for batch tweet classification."""
-    signal_list = "\n".join(
-        f"- {code}: {desc}" for code, desc in sorted(_SIGNAL_DESCRIPTIONS.items())
-    )
+    signal_list = "\n".join(f"- {code}: {desc}" for code, desc in sorted(_SIGNAL_DESCRIPTIONS.items()))
     system = _SYSTEM_PROMPT.format(signal_list=signal_list)
 
     lines: list[str] = [_USER_PROMPT_HEADER.format(company_name=company_name, domain=domain)]

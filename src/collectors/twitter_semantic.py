@@ -76,12 +76,7 @@ def _parse_tweets_with_authors(data: dict[str, Any]) -> list[dict[str, Any]]:
     tweets: list[dict[str, Any]] = []
 
     try:
-        instructions = (
-            data.get("result", {})
-            .get("timeline_response", {})
-            .get("timeline", {})
-            .get("instructions", [])
-        )
+        instructions = data.get("result", {}).get("timeline_response", {}).get("timeline", {}).get("instructions", [])
         for instruction in instructions:
             for entry in instruction.get("entries", []):
                 content = entry.get("content", {})
@@ -98,9 +93,7 @@ def _parse_tweets_with_authors(data: dict[str, Any]) -> list[dict[str, Any]]:
                 # Parse created_at
                 created_at_ms = details.get("created_at_ms")
                 if created_at_ms:
-                    created_at = datetime.fromtimestamp(
-                        int(created_at_ms) / 1000, tz=timezone.utc
-                    ).isoformat()
+                    created_at = datetime.fromtimestamp(int(created_at_ms) / 1000, tz=timezone.utc).isoformat()
                 else:
                     created_at_str = details.get("created_at", "")
                     try:
@@ -335,9 +328,7 @@ async def _collect_account(
                             account_id=account_id,
                             person_name=author_name[:200],
                             role_title=clf.author_role_guess[:120],
-                            document_id=stable_hash(
-                                {"tweet_id": tweet_id, "source": SOURCE_NAME}, prefix="doc"
-                            ),
+                            document_id=stable_hash({"tweet_id": tweet_id, "source": SOURCE_NAME}, prefix="doc"),
                             activity_type="twitter_post",
                             summary=clf.reasoning[:200],
                             published_at=observed_at,
@@ -446,9 +437,7 @@ async def collect(
     twitter_handles = load_twitter_handles(twitter_handles_path)
 
     # Load execution policy for concurrency
-    source_policies = load_source_execution_policy(
-        settings.project_root / "config" / "source_execution_policy.csv"
-    )
+    source_policies = load_source_execution_policy(settings.project_root / "config" / "source_execution_policy.csv")
     policy = source_policies.get(SOURCE_NAME)
     if policy:
         concurrency = max(1, policy.max_parallel_workers)

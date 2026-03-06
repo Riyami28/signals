@@ -190,10 +190,10 @@ class TestParseClassificationResponse:
 
     def test_json_with_surrounding_text(self):
         response = (
-            'Here are the classifications:\n'
+            "Here are the classifications:\n"
             '[{"index": 0, "signal_code": "terraform_detected", "confidence": 0.7, '
             '"reasoning": "Terraform mention", "is_decision_maker": false, "author_role_guess": ""}]\n'
-            'Let me know if you need anything else.'
+            "Let me know if you need anything else."
         )
         results = parse_classification_response(response, 1)
         assert len(results) == 1
