@@ -48,8 +48,11 @@ Return ONLY a JSON object with these fields (use null if not confidently found):
 - sub_industry: string or null (e.g. "Snacks & Beverages")
 - company_type: "Public" or "Private" or null
 - founded_year: integer or null (e.g. 1965)
+- it_budget_range: string or null (e.g. "$10M-$50M", "$1M-$5M", "$50M+")
+- it_budget_source_url: string or null (URL where IT budget information was found)
+- it_budget_confidence: float or null (0.0-1.0 confidence in estimate; 1.0 = high confidence)
 
-IMPORTANT: Only include data you are confident about from the snippets. Use null for anything uncertain.
+IMPORTANT: Only include data you are confident about from the snippets. Use null for anything uncertain. For IT budget, search for mentions of "IT budget", "technology spending", "IT spend", "infrastructure investment" or similar phrases.
 
 Snippets:
 {snippets}
@@ -194,6 +197,9 @@ _FIRMOGRAPHIC_FIELDS = frozenset(
         "sub_industry",
         "company_type",
         "founded_year",
+        "it_budget_range",
+        "it_budget_source_url",
+        "it_budget_confidence",
     ]
 )
 
