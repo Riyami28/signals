@@ -324,10 +324,21 @@ def upsert_account_scores_for_run(
             """,
             [
                 (
-                    s.run_id, s.account_id, s.product, s.score, s.tier, s.tier_v2,
-                    s.top_reasons_json, s.delta_7d, s.velocity_7d, s.velocity_14d,
-                    s.velocity_30d, s.velocity_category, s.confidence_band,
-                    s.dimension_scores_json, s.dimension_confidence_json,
+                    s.run_id,
+                    s.account_id,
+                    s.product,
+                    s.score,
+                    s.tier,
+                    s.tier_v2,
+                    s.top_reasons_json,
+                    s.delta_7d,
+                    s.velocity_7d,
+                    s.velocity_14d,
+                    s.velocity_30d,
+                    s.velocity_category,
+                    s.confidence_band,
+                    s.dimension_scores_json,
+                    s.dimension_confidence_json,
                 )
                 for s in account_scores
             ],

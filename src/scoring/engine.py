@@ -6,7 +6,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from typing import Callable
+from typing import Any, Callable
 
 from src.models import AccountScore, ComponentScore
 from src.scoring.explain import rank_top_reasons, reasons_to_json
@@ -465,6 +465,9 @@ def rescore_account(conn: Any, account_id: str, settings: Any) -> dict:
 
     logger.info(
         "rescore_account account_id=%s run_id=%s products=%d tier_changes=%s",
-        account_id, run_id, len(account_scores_out), list(tier_changes.keys()),
+        account_id,
+        run_id,
+        len(account_scores_out),
+        list(tier_changes.keys()),
     )
     return {"account_id": account_id, "status": "rescored", "run_id": run_id, "tier_changes": tier_changes}
