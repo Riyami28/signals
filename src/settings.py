@@ -178,6 +178,10 @@ class Settings(BaseSettings):
     twitter_rapidapi_host: str = Field(default="twitter241.p.rapidapi.com")
     twitter_lookback_days: int = Field(default=7, ge=1, le=7)  # free tier = 7 days; Basic/Pro = up to 30
 
+    # --- Twitter semantic (LLM-based classification) ---
+    twitter_semantic_batch_size: int = Field(default=15, ge=1, le=30)
+    twitter_semantic_max_accounts: int = Field(default=50, ge=1)
+
     # --- BuiltWith technology intelligence ---
     builtwith_api_key: str = Field(default="")  # Free API key from api.builtwith.com
 

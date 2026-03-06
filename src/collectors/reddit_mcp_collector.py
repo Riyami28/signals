@@ -71,8 +71,8 @@ INTENT_CATEGORIES = {
 INTENT_TO_SIGNAL = {
     "active_evaluation": "tech_evaluation_intent",
     "pain_signal": "infrastructure_pain",
-    "migration_signal": "cloud_migration_signal",
-    "hiring_signal": "devops_hiring",
+    "migration_signal": "cloud_migration_intent",
+    "hiring_signal": "hiring_devops",
     "vendor_mention": "vendor_evaluation",
 }
 
@@ -91,7 +91,7 @@ Return a JSON object with exactly these fields:
   "intent": "<one of: active_evaluation | pain_signal | migration_signal | hiring_signal | vendor_mention | passing_mention>",
   "confidence": <float 0.0-1.0>,
   "evidence_sentence": "<1-2 sentence summary of the key signal, max 200 chars>",
-  "signal_code": "<from: tech_evaluation_intent | infrastructure_pain | cloud_migration_signal | devops_hiring | vendor_evaluation | null>"
+  "signal_code": "<from: tech_evaluation_intent | infrastructure_pain | cloud_migration_intent | hiring_devops | vendor_evaluation | null>"
 }}
 
 Relevance rules:

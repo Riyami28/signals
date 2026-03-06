@@ -481,24 +481,31 @@ class TestDiscoverContactsAPI:
             data = resp.json()
             assert data["total_discovered"] == 0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="Mock path stale after discovery_registry refactor (PR #22); needs separate fix",
-    )
-    @patch("src.web.routes.contacts.search_contacts_for_account")
-    def test_discover_with_apollo(self, mock_search):
+    @patch("src.web.routes.contacts.DiscoveryRegistry")
+    def test_discover_with_apollo(self, mock_registry_cls):
         """With Apollo, should store and return discovered contacts."""
-        mock_search.return_value = [
-            {
-                "first_name": "Test",
-                "last_name": "User",
-                "title": "CTO",
-                "email": "test@company.com",
-                "linkedin_url": "https://linkedin.com/in/test",
-                "management_level": "C-Level",
-                "year_joined": None,
-            },
-        ]
+        from src.integrations.discovery_registry import DiscoveredContact, DiscoveryResult
+
+        mock_result = DiscoveryResult(
+            contacts=[
+                DiscoveredContact(
+                    first_name="Test",
+                    last_name="User",
+                    title="CTO",
+                    email="test@company.com",
+                    linkedin_url="https://linkedin.com/in/test",
+                    management_level="C-Level",
+                    enrichment_source="apollo",
+                )
+            ],
+            source="apollo",
+            total_found=1,
+            credits_used=1,
+        )
+        mock_registry = MagicMock()
+        mock_registry.discover.return_value = mock_result
+        mock_registry.list_providers.return_value = {}
+        mock_registry_cls.return_value = mock_registry
 
         settings = load_settings()
         conn = db.get_connection(settings.pg_dsn)

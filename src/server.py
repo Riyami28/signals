@@ -20,14 +20,15 @@ def serve_discovery_webhook_impl(host: str, port: int, log_level: str) -> None:
 
 
 def serve_local_ui_impl(host: str, port: int, log_level: str) -> None:
-    try:
-        import uvicorn  # type: ignore
-    except Exception as exc:
-        raise typer.BadParameter("uvicorn is required. Install project dependencies first.") from exc
+    """Deprecated — use serve_web_impl instead."""
+    import warnings
 
-    from src.ui.local_app import app as local_ui_app
-
-    uvicorn.run(local_ui_app, host=host, port=port, log_level=log_level)
+    warnings.warn(
+        "serve-local-ui is deprecated. Use 'serve-web' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    serve_web_impl(host, port, log_level)
 
 
 def serve_web_impl(host: str, port: int, log_level: str) -> None:
