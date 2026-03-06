@@ -989,7 +989,8 @@ def get_accounts_paginated(
             COALESCE(best.score, 0) AS score,
             COALESCE(best.tier, 'low') AS tier,
             cr.research_status,
-            (SELECT string_agg(al.label, ',') FROM account_labels al WHERE al.account_id = a.account_id) AS labels
+            (SELECT string_agg(al.label, ',') FROM account_labels al WHERE al.account_id = a.account_id) AS labels,
+            (SELECT MAX(so.observed_at) FROM signal_observations so WHERE so.account_id = a.account_id) AS last_signal_date
         FROM accounts a
         LEFT JOIN account_scores best
             ON best.account_id = a.account_id
@@ -1063,6 +1064,12 @@ def get_account_detail(conn, account_id: str) -> dict | None:
     # Dimension scores from the highest-scoring product row
     result["dimension_scores"] = get_dimension_scores(conn, account_id)
 
+    # Per-dimension confidence bands and source lists
+    result["dimension_confidence"] = get_dimension_confidence(conn, account_id)
+
+    # Most recent signal date
+    result["last_signal_date"] = get_last_signal_date(conn, account_id)
+
     # Velocity metrics
     result["velocity"] = get_account_velocity(conn, account_id)
 
@@ -1112,6 +1119,59 @@ def get_dimension_scores(conn, account_id: str) -> dict:
             continue
 
     return merged
+
+
+def get_dimension_confidence(conn, account_id: str) -> dict:
+    """Merge dimension confidence data across all products for the latest completed run.
+
+    Takes the entry with the highest source_count per dimension.
+    """
+    rows = conn.execute(
+        """
+        SELECT s.dimension_confidence_json
+        FROM account_scores s
+        WHERE s.account_id = %s
+          AND s.run_id = (
+              SELECT s2.run_id
+              FROM account_scores s2
+              JOIN score_runs r ON s2.run_id = r.run_id
+              WHERE s2.account_id = %s
+                AND r.status = 'completed'
+              ORDER BY r.started_at DESC LIMIT 1
+          )
+        """,
+        (account_id, account_id),
+    ).fetchall()
+    if not rows:
+        return {}
+
+    merged: dict[str, dict] = {}
+    for row in rows:
+        raw = str(row["dimension_confidence_json"] or "{}").strip()
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                for dim, val in parsed.items():
+                    if not isinstance(val, dict):
+                        continue
+                    existing = merged.get(dim)
+                    if not existing or val.get("source_count", 0) > existing.get("source_count", 0):
+                        merged[dim] = val
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return merged
+
+
+def get_last_signal_date(conn, account_id: str) -> str | None:
+    """Return the ISO date string of the most recent signal for an account."""
+    cur = conn.execute(
+        "SELECT MAX(observed_at) AS last_observed FROM signal_observations WHERE account_id = %s",
+        (account_id,),
+    )
+    row = cur.fetchone()
+    if row and row["last_observed"]:
+        return str(row["last_observed"])
+    return None
 
 
 def get_account_velocity(conn, account_id: str) -> dict:
