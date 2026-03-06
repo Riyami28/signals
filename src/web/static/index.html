@@ -21,21 +21,18 @@
   <div class="header">
     <div style="display:flex;align-items:center;gap:12px;">
       <h1>Signals Pipeline</h1>
-      <!-- Scoring Rubric — anchored left so it stays visible when the detail panel is open -->
-      <button class="btn" style="background:var(--bg-tertiary);color:var(--text);font-size:13px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;"
-              @click="showRubricModal = true; loadRubric()">
-        How Scoring Works
-      </button>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center;">
-      <!-- Theme Toggle -->
-      <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
-              x-text="theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'"></button>
       <!-- Scoring Rubric -->
       <button class="btn" style="background:var(--bg-tertiary);color:var(--text);font-size:13px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;"
               @click="showRubricModal = true; loadRubric()">
         How Scoring Works
       </button>
+      <!-- Separator -->
+      <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
+      <!-- Theme Toggle -->
+      <button class="btn btn-theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+              x-text="theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'"></button>
       <!-- CSV Import -->
       <input type="file" id="csvFileInput" accept=".csv" style="display:none"
              @change="handleCsvUpload($event)">
@@ -505,7 +502,9 @@
                   <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
                     <div class="signal-card"
                          :class="{'signal-card-high': sig.impact === 'high'}"
+                         x-data="{ showLineage: false }"
                          x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
+                      <!-- Row 1: label + badges -->
                       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
                         <span style="font-weight:600;font-size:13px;color:var(--text-primary)" x-text="signalLabel(sig)"></span>
                         <span class="impact-badge" :class="'impact-' + (sig.impact || 'low')"
@@ -513,21 +512,58 @@
                         <template x-if="sig.component_score > 0">
                           <span class="contribution-badge" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
                         </template>
+                        <template x-if="sig.is_breaking">
+                          <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(88,166,255,0.15);color:var(--blue);font-weight:700;letter-spacing:0.05em">NEW</span>
+                        </template>
+                        <template x-if="sig.evidence_quality > 0">
+                          <span class="quality-badge"
+                                :class="sig.evidence_quality >= 0.7 ? 'quality-strong' : sig.evidence_quality >= 0.4 ? 'quality-moderate' : 'quality-weak'"
+                                x-text="sig.evidence_quality >= 0.7 ? 'Strong Evidence' : sig.evidence_quality >= 0.4 ? 'Moderate' : 'Weak'"></span>
+                        </template>
+                        <template x-if="sig.language && sig.language !== 'en' && sig.language !== ''">
+                          <span class="lang-indicator"
+                                :title="sig.evidence_sentence ? 'Original: ' + sig.evidence_sentence : 'Translated'"
+                                x-text="'🌐 ' + sig.language.toUpperCase()"></span>
+                        </template>
                       </div>
+                      <!-- Row 2: source + date -->
                       <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">
                         <span x-text="sig.source"></span>
                         <template x-if="sig.observed_at">
                           <span x-text="' · ' + signalDate(sig)"></span>
                         </template>
                       </div>
-                      <template x-if="!JOB_SOURCES.has(sig.source) && sig.evidence_text">
-                        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;line-height:1.4"
-                             x-text="(sig.evidence_text || '').substring(0,140) + ((sig.evidence_text||'').length > 140 ? '…' : '')"></div>
+                      <!-- Speaker attribution -->
+                      <template x-if="sig.speaker_name">
+                        <div class="speaker-attr">
+                          Quoted: <span class="speaker-name" x-text="sig.speaker_name"></span><template x-if="sig.speaker_role"><span x-text="', ' + sig.speaker_role"></span></template>
+                        </div>
                       </template>
+                      <!-- Evidence text (prefer translated sentence) -->
+                      <template x-if="!JOB_SOURCES.has(sig.source) && (sig.evidence_sentence_en || sig.evidence_text)">
+                        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;line-height:1.4"
+                             x-text="((sig.evidence_sentence_en || sig.evidence_text) || '').substring(0,140) + (((sig.evidence_sentence_en || sig.evidence_text)||'').length > 140 ? '…' : '')"></div>
+                      </template>
+                      <!-- Evidence URL -->
                       <template x-if="sig.evidence_url">
                         <a class="signal-url" :href="sig.evidence_url" target="_blank"
                            x-text="(sig.evidence_url||'').replace(/^https?:\/\//,'').substring(0,70)"
                            style="font-size:11px;display:block"></a>
+                      </template>
+                      <!-- Source article lineage -->
+                      <template x-if="sig.doc_title">
+                        <div style="margin-top:5px">
+                          <button class="lineage-toggle" @click="showLineage = !showLineage"
+                                  x-text="showLineage ? '▲ Hide source' : '▼ View source article'"></button>
+                          <div class="lineage-doc" x-show="showLineage">
+                            <div style="font-weight:600" x-text="sig.doc_title"></div>
+                            <div style="margin-top:2px;color:var(--text-muted)">
+                              <template x-if="sig.doc_author"><span x-text="sig.doc_author"></span></template>
+                              <template x-if="sig.doc_author && sig.doc_published_at"><span> · </span></template>
+                              <template x-if="sig.doc_published_at"><span x-text="(sig.doc_published_at||'').substring(0,10)"></span></template>
+                            </div>
+                          </div>
+                        </div>
                       </template>
                     </div>
                   </template>
@@ -784,28 +820,46 @@
         </template>
         <template x-if="detail && detail.contacts && detail.contacts.length > 0">
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <!-- Header: count + sort controls + refresh -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
               <span style="font-size:12px;color:var(--text-muted)"
                     x-text="detail.contacts.length + ' contact(s)'"></span>
-              <button class="btn btn-sm"
-                      @click="discoverContacts(expandedId)"
-                      :disabled="contactsLoading">
-                <template x-if="contactsLoading">Refreshing...</template>
-                <template x-if="!contactsLoading">Refresh</template>
-              </button>
+              <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:11px;color:var(--text-muted);margin-right:2px">Sort:</span>
+                <button class="sort-btn" :class="contactSortKey==='best'?'active':''" @click="contactSortKey='best'">Best Match</button>
+                <button class="sort-btn" :class="contactSortKey==='authority'?'active':''" @click="contactSortKey='authority'">Authority</button>
+                <button class="sort-btn" :class="contactSortKey==='warmth'?'active':''" @click="contactSortKey='warmth'">Warmth</button>
+                <button class="sort-btn" :class="contactSortKey==='seniority'?'active':''" @click="contactSortKey='seniority'">Seniority</button>
+                <button class="btn btn-sm" style="margin-left:4px"
+                        @click="discoverContacts(expandedId)"
+                        :disabled="contactsLoading">
+                  <template x-if="contactsLoading">Refreshing...</template>
+                  <template x-if="!contactsLoading">Refresh</template>
+                </button>
+              </div>
             </div>
-            <template x-for="c in detail.contacts" :key="c.contact_id">
+            <template x-for="c in sortedContacts()" :key="c.contact_id">
               <div class="contact-card"
-                   :class="{ 'warm-highlight': c.warmth_score > 0 }"
+                   :class="{ 'warm-highlight': c.warmth_score > 0.3 }"
                    :style="c.contact_status === 'ranked' ? 'border-left:3px solid var(--blue)' :
                             c.contact_status === 'verified' ? 'border-left:3px solid var(--green)' :
                             c.contact_status === 'enriched' ? 'border-left:3px solid var(--orange)' : ''">
+                <!-- Recommended banner — shown for ranked contacts or high authority+warmth -->
+                <template x-if="c.contact_status === 'ranked' || (c.authority_score >= 0.7 && c.warmth_score > 0.3)">
+                  <div class="contact-recommended-banner">
+                    &#9733; Recommended
+                    <template x-if="c.warm_path_reason">
+                      <span style="font-weight:400;margin-left:4px" x-text="'\u00B7 ' + c.warm_path_reason"></span>
+                    </template>
+                  </div>
+                </template>
+                <!-- Name + management level + authority badge -->
                 <div style="display:flex;justify-content:space-between;align-items:flex-start">
                   <div>
                     <div class="contact-name" x-text="c.first_name + ' ' + c.last_name"></div>
                     <div class="contact-title" x-text="c.title || 'Unknown Title'"></div>
                   </div>
-                  <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+                  <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
                     <template x-if="c.management_level">
                       <span class="tier"
                             :class="c.management_level === 'C-Level' ? 'tier-high' :
@@ -813,29 +867,48 @@
                             x-text="c.management_level"></span>
                     </template>
                     <template x-if="c.authority_score > 0">
-                      <span style="font-family:var(--mono);font-size:11px;color:var(--blue)"
-                            x-text="'Auth: ' + (c.authority_score * 100).toFixed(0) + '%'"></span>
+                      <span :class="c.authority_score >= 0.7 ? 'authority-high' : c.authority_score >= 0.4 ? 'authority-medium' : 'authority-low'"
+                            x-text="(c.authority_score >= 0.7 ? 'High Authority ' : c.authority_score >= 0.4 ? 'Medium Authority ' : 'Low Authority ') + '(' + (c.authority_score * 100).toFixed(0) + '%)'"></span>
                     </template>
                   </div>
                 </div>
-                <template x-if="c.warmth_score > 0">
-                  <div style="margin-top:6px">
+                <!-- Warmth badge: Warm (green with tooltip) or Cool (gray) -->
+                <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <template x-if="c.warmth_score > 0.3">
+                    <span class="warmth-warm" :title="c.warm_path_reason || ''">&#9679; Warm</span>
+                  </template>
+                  <template x-if="!(c.warmth_score > 0.3)">
+                    <span class="warmth-cool">&#9675; Cool</span>
+                  </template>
+                  <!-- Semantic role pill -->
+                  <template x-if="c.semantic_role">
+                    <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--border-light);color:var(--cyan)"
+                          x-text="c.semantic_role"></span>
+                  </template>
+                  <!-- Employment verified badge -->
+                  <template x-if="c.employment_verified === true">
+                    <span style="font-size:11px;color:var(--green);font-weight:600"
+                          :title="c.employment_note || 'Employment confirmed'">&#10003; Employed</span>
+                  </template>
+                  <template x-if="c.employment_verified === false">
+                    <span style="font-size:11px;color:var(--orange)"
+                          :title="c.employment_note || 'May have left company'">&#9888; Stale</span>
+                  </template>
+                </div>
+                <!-- Warm path reason as subtitle (when no recommended banner shown) -->
+                <template x-if="c.warm_path_reason && c.warmth_score > 0.3 && c.contact_status !== 'ranked' && c.authority_score < 0.7">
+                  <div style="margin-top:4px">
                     <span class="warm-badge" x-text="c.warm_path_reason"></span>
                   </div>
                 </template>
-                <template x-if="c.semantic_role">
-                  <div style="margin-top:4px">
-                    <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--border-light);color:var(--cyan)"
-                          x-text="c.semantic_role"></span>
-                  </div>
-                </template>
+                <!-- Contact details: email + linkedin -->
                 <template x-if="c.contact_status === 'enriched' || c.contact_status === 'verified'">
                   <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
                     <template x-if="c.email">
                       <div style="display:flex;align-items:center;gap:4px">
                         <a class="contact-link" :href="'mailto:' + c.email" x-text="c.email"></a>
                         <template x-if="c.email_verified">
-                          <span style="font-size:10px;color:var(--green);font-weight:600" title="Verified">&#10003;</span>
+                          <span style="font-size:10px;color:var(--green);font-weight:600" title="Email verified">&#10003;</span>
                         </template>
                         <template x-if="c.verification_status === 'catch_all'">
                           <span style="font-size:10px;color:var(--orange)" title="Catch-all domain">&#9888;</span>
@@ -870,6 +943,7 @@
                     </button>
                   </div>
                 </template>
+                <!-- Footer: source + status -->
                 <div style="margin-top:6px;display:flex;gap:8px;font-size:10px;color:var(--text-muted)">
                   <template x-if="c.enrichment_source">
                     <span x-text="'Source: ' + c.enrichment_source"></span>

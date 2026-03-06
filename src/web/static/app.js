@@ -351,6 +351,7 @@ function detailPanel() {
     // Contacts state
     contactsLoading: false,
     enrichingContactId: null,
+    contactSortKey: 'best',
 
     async load(accountId) {
       this.researchData = null;
@@ -509,6 +510,27 @@ function detailPanel() {
       } finally {
         this.enrichingContactId = null;
       }
+    },
+
+    sortedContacts() {
+      if (!this.detail || !this.detail.contacts) return [];
+      const contacts = [...this.detail.contacts];
+      const mgmtOrder = { 'C-Level': 1, 'VP': 2, 'Director': 3, 'Manager': 4, 'IC': 5 };
+      const key = this.contactSortKey;
+      contacts.sort((a, b) => {
+        // Ranked always first regardless of sort key
+        const aRanked = a.contact_status === 'ranked' ? 0 : 1;
+        const bRanked = b.contact_status === 'ranked' ? 0 : 1;
+        if (aRanked !== bRanked) return aRanked - bRanked;
+        if (key === 'authority') return (b.authority_score || 0) - (a.authority_score || 0);
+        if (key === 'warmth') return (b.warmth_score || 0) - (a.warmth_score || 0);
+        if (key === 'seniority') return (mgmtOrder[a.management_level] || 9) - (mgmtOrder[b.management_level] || 9);
+        // 'best': authority × warmth, fall back to authority if warmth = 0
+        const scoreA = (a.authority_score || 0) * (a.warmth_score > 0 ? a.warmth_score : 0.5);
+        const scoreB = (b.authority_score || 0) * (b.warmth_score > 0 ? b.warmth_score : 0.5);
+        return scoreB - scoreA;
+      });
+      return contacts;
     },
 
     contactStatusColor(status) {

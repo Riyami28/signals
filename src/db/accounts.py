@@ -1033,7 +1033,18 @@ def get_account_detail(conn, account_id: str) -> dict | None:
         """
         SELECT so.signal_code, so.source, so.evidence_url, so.evidence_text,
                so.observed_at, so.confidence,
-               sc.component_score
+               sc.component_score,
+               (so.observed_at::date = CURRENT_DATE) AS is_breaking,
+               so.speaker_name,
+               so.speaker_role,
+               so.evidence_quality,
+               so.relevance_score,
+               so.language,
+               so.evidence_sentence,
+               so.evidence_sentence_en,
+               doc.title        AS doc_title,
+               doc.author       AS doc_author,
+               doc.published_at AS doc_published_at
         FROM signal_observations so
         LEFT JOIN LATERAL (
             SELECT sc2.component_score
@@ -1048,6 +1059,13 @@ def get_account_detail(conn, account_id: str) -> dict | None:
             ORDER BY sc2.component_score DESC
             LIMIT 1
         ) sc ON true
+        LEFT JOIN LATERAL (
+            SELECT d.title, d.author, d.published_at
+            FROM observation_lineage ol
+            JOIN documents d ON d.document_id = ol.document_id
+            WHERE ol.obs_id = so.obs_id
+            LIMIT 1
+        ) doc ON true
         WHERE so.account_id = %s
           AND so.observed_at::timestamptz >= NOW() - INTERVAL '14 days'
         ORDER BY so.observed_at DESC
