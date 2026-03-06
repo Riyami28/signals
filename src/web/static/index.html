@@ -702,10 +702,10 @@
             </div>
 
             <!-- Recommended Approach (from dossier) -->
-            <template x-if="dossierData && dossierData.sections && dossierData.sections.recommended_approach">
+            <template x-if="dossierData && dossierData.sections && dossierData.sections.find(s => s.title === 'Recommended Approach')">
               <div class="recommended-approach-card">
                 <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Recommended Approach</div>
-                <div style="font-size:13px;color:var(--text)" x-text="dossierData.sections.recommended_approach"></div>
+                <div style="font-size:13px;color:var(--text);white-space:pre-line" x-text="dossierData.sections.find(s => s.title === 'Recommended Approach').content"></div>
               </div>
             </template>
 
@@ -751,7 +751,7 @@
                       <button class="btn btn-sm" @click="showDossier = false">&times; Close</button>
                     </div>
                   </div>
-                  <div class="dossier-content" x-text="dossierData.markdown || 'No dossier content'"></div>
+                  <div class="dossier-content" style="white-space:pre-line" x-text="dossierData.markdown || 'No dossier content'"></div>
                 </div>
               </div>
             </template>
