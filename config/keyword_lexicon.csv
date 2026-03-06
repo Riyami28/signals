@@ -498,3 +498,16 @@ twitter_semantic,general_hiring_activity,we're hiring,0.50
 twitter_semantic,launch_or_scale_event,product launch,0.62
 twitter_semantic,vendor_consolidation_program,vendor consolidation,0.75
 twitter_semantic,devops_bottleneck_language,slow deployments,0.68
+conference_event,conference_attendance,kubecon,0.85
+conference_event,conference_attendance,aws re:invent,0.85
+conference_event,conference_attendance,hashiconf,0.80
+conference_event,conference_attendance,gophercon,0.80
+conference_event,conference_attendance,dockercon,0.80
+conference_event,conference_attendance,google cloud next,0.85
+conference_event,conference_attendance,microsoft ignite,0.85
+conference_event,conference_sponsorship,platinum sponsor,0.85
+conference_event,conference_sponsorship,gold sponsor,0.80
+conference_event,conference_sponsorship,conference sponsor,0.75
+conference_event,conference_speaking,keynote speaker,0.85
+conference_event,conference_speaking,panel discussion,0.75
+conference_event,conference_speaking,tech talk,0.70

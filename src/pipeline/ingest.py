@@ -9,6 +9,7 @@ from datetime import date
 from src import db
 from src.collectors import (
     community,
+    conference_events,
     first_party,
     gnews_collector,
     jobs,
@@ -85,6 +86,13 @@ async def _collect_all_async(conn, settings: Settings) -> dict[str, dict[str, in
     results["first_party"] = (
         first_party.collect(conn, settings, lexicon, source_reliability)
         if _collector_enabled("first_party_csv")
+        else {"inserted": 0, "seen": 0}
+    )
+
+    # Conference/event attendance signals (CSV-based)
+    results["conference_events"] = (
+        await conference_events.collect(conn, settings, lexicon, source_reliability)
+        if _collector_enabled("conference_event_csv")
         else {"inserted": 0, "seen": 0}
     )
 

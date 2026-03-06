@@ -62,3 +62,6 @@ data_platform_detected,shared,technographic,6,45,0.4,true,tech_fit
 tech_evaluation_intent,shared,tooling_eval,12,21,0.5,true,tech_fit
 infrastructure_pain,shared,behavioral,14,14,0.5,true,trigger_intent
 vendor_evaluation,shared,tooling_eval,10,30,0.5,true,tech_fit
+conference_attendance,shared,trigger_events,10,60,0.6,true,trigger_intent
+conference_sponsorship,shared,trigger_events,14,90,0.65,true,trigger_intent
+conference_speaking,shared,trigger_events,12,60,0.6,true,trigger_intent
