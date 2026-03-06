@@ -510,7 +510,9 @@ def _run_pipeline_sync(
                         "type": "stage",
                         "stage": "ingest",
                         "status": "completed",
-                        "message": f"Ingested {total_inserted} new signals in {dt:.1f}s" if total_inserted > 0 else f"No new signals (all sources already crawled today) in {dt:.1f}s",
+                        "message": f"Ingested {total_inserted} new signals in {dt:.1f}s"
+                        if total_inserted > 0
+                        else f"No new signals (all sources already crawled today) in {dt:.1f}s",
                     },
                 )
             except Exception as exc:

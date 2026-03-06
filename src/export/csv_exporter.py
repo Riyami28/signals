@@ -453,7 +453,10 @@ def export_sales_ready(
                 if completeness < 1.0:
                     logger.info(
                         "enrichment_completeness account=%s score=%.2f missing=%d/%d",
-                        account_id, completeness, len(missing), len(fields_to_check),
+                        account_id,
+                        completeness,
+                        len(missing),
+                        len(fields_to_check),
                     )
 
             except Exception as exc:

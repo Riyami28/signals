@@ -10,11 +10,13 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from src import db
 from src.export.dossier import render_dossier
 from src.scoring.engine import DEFAULT_DIMENSION_WEIGHTS
 from src.settings import load_settings
+from src.utils import normalize_domain
 
 router = APIRouter(tags=["accounts"])
 
@@ -950,3 +952,27 @@ def get_scoring_rubric():
         "sources": sources[:30],  # Top 30 by reliability
         "top_signals": signals[:20],  # Top 20 by base_weight
     }
+
+
+class AddCompanyRequest(BaseModel):
+    company_name: str
+    domain: str
+
+
+@router.post("/accounts/add")
+def add_company(body: AddCompanyRequest):
+    """Add a single company and return its account_id."""
+    name = body.company_name.strip()
+    domain = body.domain.strip()
+    if not domain:
+        raise HTTPException(status_code=400, detail="Domain is required")
+    domain = normalize_domain(domain)
+    if not name:
+        name = domain
+    conn = _get_conn()
+    try:
+        acct_id = db.upsert_account(conn, name, domain, source_type="discovered")
+        conn.commit()
+        return {"account_id": acct_id, "domain": domain, "company_name": name}
+    finally:
+        conn.close()

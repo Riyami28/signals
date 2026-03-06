@@ -101,6 +101,11 @@ function signalsApp() {
     // CSV Import/Export
     csvUploading: false,
 
+    // Add Company modal
+    showAddCompanyModal: false,
+    newCompanyName: '',
+    newCompanyDomain: '',
+
     // Theme
     theme: localStorage.getItem('signals_theme') || 'dark',
 
@@ -136,6 +141,30 @@ function signalsApp() {
     },
 
     // --- CSV Import ---
+    async addSingleCompany() {
+      const name = (this.newCompanyName || '').trim();
+      const domain = (this.newCompanyDomain || '').trim();
+      if (!name || !domain) { alert('Both fields are required'); return; }
+      try {
+        const resp = await fetch('/api/accounts/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_name: name, domain }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          alert('Error: ' + (data.detail || 'Failed to add company'));
+          return;
+        }
+        this.showAddCompanyModal = false;
+        this.newCompanyName = '';
+        this.newCompanyDomain = '';
+        await this._runPipeline([data.account_id], ['ingest', 'score', 'research', 'export']);
+      } catch (err) {
+        alert('Failed to add company: ' + err.message);
+      }
+    },
+
     async handleCsvUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
