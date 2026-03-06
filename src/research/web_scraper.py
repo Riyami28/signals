@@ -85,6 +85,10 @@ def scrape_company_info(domain: str, llm_client, settings=None) -> dict:
         elif "```" in raw:
             raw = raw.split("```", 1)[1].split("```", 1)[0]
 
+        if not raw:
+            logger.warning("web scrape LLM returned empty response for domain=%s", domain)
+            return {}
+
         data = json.loads(raw)
         logger.info("web_scrape enrichment domain=%s fields=%d", domain, len(data))
         return data
