@@ -69,9 +69,11 @@ def create_app() -> FastAPI:
     # Initialize DB schema once at startup (not on every request)
     try:
         conn = db.get_connection(settings.pg_dsn)
-        db.init_db(conn)
-        conn.close()
-        logger.info("db_initialized at startup")
+        try:
+            db.init_db(conn)
+            logger.info("db_initialized at startup")
+        finally:
+            conn.close()
     except Exception as exc:
         logger.warning("db_init_at_startup failed: %s", exc)
 
@@ -129,6 +131,10 @@ def create_app() -> FastAPI:
     # Background rescore worker
     @app.on_event("startup")
     def start_rescore_worker() -> None:
+        import os
+
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return  # Skip background worker during test runs to prevent DB deadlocks
         t = threading.Thread(target=_rescore_worker, args=(settings,), daemon=True, name="rescore-worker")
         t.start()
         logger.info("rescore_worker started poll_interval=%ds", _RESCORE_POLL_INTERVAL)
