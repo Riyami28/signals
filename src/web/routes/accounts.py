@@ -33,6 +33,9 @@ def _get_conn():
 # Cache signal registry metadata for timeline enrichment
 _signal_meta_cache: dict[str, dict] | None = None
 
+# Cache source registry metadata for reliability lookup
+_source_meta_cache: dict[str, float] | None = None
+
 
 def _get_signal_meta() -> dict[str, dict]:
     """Load signal registry as a lookup: signal_code → {dimension, category, base_weight}."""
@@ -69,6 +72,30 @@ def _get_signal_meta() -> dict[str, dict]:
                     "min_confidence": min_conf,
                 }
     _signal_meta_cache = meta
+    return meta
+
+
+def _get_source_meta() -> dict[str, float]:
+    """Load source registry as a lookup: source → reliability score."""
+    global _source_meta_cache  # noqa: PLW0603
+    if _source_meta_cache is not None:
+        return _source_meta_cache
+
+    settings = load_settings()
+    meta: dict[str, float] = {}
+    path = settings.source_registry_path
+    if path.exists():
+        with path.open("r", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                src = (row.get("source") or "").strip()
+                if not src:
+                    continue
+                try:
+                    reliability = float(row.get("reliability", 0.5))
+                except (ValueError, TypeError):
+                    reliability = 0.5
+                meta[src] = reliability
+    _source_meta_cache = meta
     return meta
 
 
@@ -320,6 +347,8 @@ def get_account(account_id: str):
 
         # Enrich signals with impact metadata from registry
         signal_meta = _get_signal_meta()
+        source_meta = _get_source_meta()
+        now = datetime.now(timezone.utc)
         if detail.get("signals") and isinstance(detail["signals"], list):
             for sig in detail["signals"]:
                 code = sig.get("signal_code", "")
@@ -331,6 +360,32 @@ def get_account(account_id: str):
                 sig["half_life_days"] = meta.get("half_life_days", 30.0)
                 sig["min_confidence"] = meta.get("min_confidence", 0.5)
                 sig["impact"] = "high" if weight >= 18 else "medium" if weight >= 10 else "low"
+
+                # Source reliability from registry
+                sig["source_reliability"] = source_meta.get(sig.get("source", ""), 0.5)
+
+                # Recency factor and decay label
+                half_life = float(sig.get("half_life_days") or 30.0)
+                observed_str = str(sig.get("observed_at", "") or "")
+                if observed_str:
+                    try:
+                        obs_dt = _parse_signal_dt(observed_str)
+                        age_days = max((now - obs_dt).total_seconds() / 86400, 0)
+                        recency = 2 ** (-age_days / half_life) if half_life > 0 else 0
+                    except (ValueError, TypeError):
+                        recency = 1.0
+                else:
+                    recency = 1.0
+                sig["recency_factor"] = round(recency, 3)
+                decay_pct = 1.0 - recency
+                if decay_pct < 0.25:
+                    sig["decay_label"] = "fresh"
+                elif decay_pct < 0.50:
+                    sig["decay_label"] = "active"
+                elif decay_pct < 0.80:
+                    sig["decay_label"] = "aging"
+                else:
+                    sig["decay_label"] = "stale"
             # Sort by component_score DESC (actual contribution), then base_weight, then date
             detail["signals"].sort(
                 key=lambda s: (
@@ -340,6 +395,18 @@ def get_account(account_id: str):
                 ),
                 reverse=True,
             )
+
+            # Dedup by evidence_url — keep highest-scoring signal per URL
+            seen_urls: set[str] = set()
+            deduped: list[dict] = []
+            for sig in detail["signals"]:
+                url = (sig.get("evidence_url") or "").strip()
+                if url and url in seen_urls:
+                    continue
+                if url:
+                    seen_urls.add(url)
+                deduped.append(sig)
+            detail["signals"] = deduped
 
         # Calculate dimension contributions (score * weight)
         if detail.get("dimension_scores") and isinstance(detail["dimension_scores"], dict):
