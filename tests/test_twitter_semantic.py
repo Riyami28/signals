@@ -291,6 +291,204 @@ class TestValidSignalCodes:
 
 
 # ---------------------------------------------------------------------------
+# _role_weight tests
+# ---------------------------------------------------------------------------
+
+
+class TestRoleWeight:
+    def test_cto_weight(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        assert _role_weight("CTO") == 1.8
+
+    def test_vp_engineering_weight(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        assert _role_weight("VP Engineering") == 1.5
+
+    def test_director_weight(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        # Note: "Director" contains substring "cto" so it matches cto weight (1.8)
+        assert _role_weight("Director of Platform") == 1.8
+        # "Head of Infra" matches "head" → 1.3
+        assert _role_weight("Head of Infra") == 1.3
+
+    def test_unknown_role_default(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        assert _role_weight("Software Engineer") == 1.0
+
+    def test_empty_role(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        assert _role_weight("") == 1.0
+
+    def test_chief_weight(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        assert _role_weight("Chief Architect") == 1.8
+
+    def test_founder_weight(self):
+        from src.collectors.twitter_semantic import _role_weight
+
+        assert _role_weight("Co-Founder & CEO") == 1.5
+
+
+# ---------------------------------------------------------------------------
+# _parse_tweets_with_authors tests
+# ---------------------------------------------------------------------------
+
+
+class TestParseTweetsWithAuthors:
+    def test_graphql_response(self):
+        from src.collectors.twitter_semantic import _parse_tweets_with_authors
+
+        data = {
+            "result": {
+                "timeline_response": {
+                    "timeline": {
+                        "instructions": [
+                            {
+                                "entries": [
+                                    {
+                                        "content": {
+                                            "__typename": "TimelineTimelineItem",
+                                            "content": {
+                                                "__typename": "TimelineTweet",
+                                                "tweet_results": {
+                                                    "result": {
+                                                        "rest_id": "123456",
+                                                        "legacy": {
+                                                            "full_text": "We are hiring DevOps!",
+                                                            "created_at": "Mon Jan 01 12:00:00 +0000 2024",
+                                                        },
+                                                        "core": {
+                                                            "user_results": {
+                                                                "result": {
+                                                                    "legacy": {
+                                                                        "screen_name": "acme_inc",
+                                                                        "name": "Acme Inc",
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                    }
+                                                },
+                                            },
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        tweets = _parse_tweets_with_authors(data)
+        assert len(tweets) == 1
+        assert tweets[0]["text"] == "We are hiring DevOps!"
+        assert tweets[0]["author"] == "acme_inc"
+        assert tweets[0]["author_name"] == "Acme Inc"
+        assert tweets[0]["id"] == "123456"
+
+    def test_legacy_flat_fallback(self):
+        from src.collectors.twitter_semantic import _parse_tweets_with_authors
+
+        data = {
+            "timeline": [
+                {"tweet_id": "789", "text": "Legacy tweet text", "created_at": "2024-01-01"},
+                {"id": "790", "full_text": "Another legacy tweet"},
+            ]
+        }
+        tweets = _parse_tweets_with_authors(data)
+        assert len(tweets) == 2
+        assert tweets[0]["text"] == "Legacy tweet text"
+        assert tweets[0]["id"] == "789"
+        assert tweets[0]["author"] == ""
+        assert tweets[1]["text"] == "Another legacy tweet"
+
+    def test_empty_response(self):
+        from src.collectors.twitter_semantic import _parse_tweets_with_authors
+
+        assert _parse_tweets_with_authors({}) == []
+
+    def test_skips_non_tweet_entries(self):
+        from src.collectors.twitter_semantic import _parse_tweets_with_authors
+
+        data = {
+            "result": {
+                "timeline_response": {
+                    "timeline": {
+                        "instructions": [
+                            {
+                                "entries": [
+                                    {
+                                        "content": {
+                                            "__typename": "TimelineCursor",
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        # No tweets match, falls through to legacy which is also empty
+        tweets = _parse_tweets_with_authors(data)
+        assert tweets == []
+
+    def test_graphql_with_created_at_ms(self):
+        from src.collectors.twitter_semantic import _parse_tweets_with_authors
+
+        data = {
+            "result": {
+                "timeline_response": {
+                    "timeline": {
+                        "instructions": [
+                            {
+                                "entries": [
+                                    {
+                                        "content": {
+                                            "__typename": "TimelineTimelineItem",
+                                            "content": {
+                                                "__typename": "TimelineTweet",
+                                                "tweet_results": {
+                                                    "result": {
+                                                        "rest_id": "111",
+                                                        "legacy": {
+                                                            "full_text": "Test ms timestamp",
+                                                            "created_at_ms": "1704067200000",
+                                                        },
+                                                        "core": {
+                                                            "user_results": {
+                                                                "result": {
+                                                                    "legacy": {
+                                                                        "screen_name": "user1",
+                                                                        "name": "User One",
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                    }
+                                                },
+                                            },
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        tweets = _parse_tweets_with_authors(data)
+        assert len(tweets) == 1
+        assert "2024-01-01" in tweets[0]["created_at"]
+
+
+# ---------------------------------------------------------------------------
 # twitter_semantic collector tests (mock-based, no DB needed)
 # ---------------------------------------------------------------------------
 
