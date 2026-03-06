@@ -228,6 +228,10 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
 .badge-private { background: var(--tint-blue); color: var(--blue); }
 .badge-size { background: var(--tint-purple); color: var(--purple); }
 .badge-revenue { background: var(--tint-orange); color: var(--orange); }
+.badge-budget { background: var(--tint-cyan); color: var(--cyan); }
+.firmo-confidence { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+.firmo-evidence { display: inline-block; margin-left: 8px; font-size: 11px; color: var(--blue); text-decoration: none; }
+.firmo-evidence:hover { text-decoration: underline; }
 .firmo-tech-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
 .firmo-tech-pill {
   display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px;

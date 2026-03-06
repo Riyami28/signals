@@ -589,6 +589,14 @@
                       <span class="firmo-badge badge-revenue" x-text="fdata.revenue_range"></span>
                     </div>
                   </div>
+                  <div class="firmo-item" x-show="fdata.it_budget_range">
+                    <div class="firmo-label">IT Budget</div>
+                    <div class="firmo-value">
+                      <span class="firmo-badge badge-budget" x-text="fdata.it_budget_range"></span>
+                      <span class="firmo-confidence" x-show="fdata.it_budget_confidence" x-text="'(' + Math.round(fdata.it_budget_confidence * 100) + '%)'"></span>
+                      <a class="firmo-evidence" :href="fdata.it_budget_source_url" target="_blank" x-show="fdata.it_budget_source_url">View Source →</a>
+                    </div>
+                  </div>
                 </div>
               </div>
 
