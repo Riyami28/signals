@@ -98,6 +98,7 @@
       <option value="serper_reddit">Reddit</option>
       <option value="serper_twitter">Twitter</option>
       <option value="github_stargazers">GitHub Stars</option>
+      <option value="serper_conference">Conferences</option>
       <option value="first_party_csv">First Party</option>
     </select>
   </div>
@@ -390,6 +391,7 @@
                           {keys:['serper_reddit','reddit_api'], label:'Reddit'},
                           {keys:['serper_twitter','twitter_api'], label:'Twitter'},
                           {keys:['github_stargazers'], label:'GitHub Stars'},
+                          {keys:['serper_conference','conference_event_csv'], label:'Conferences'},
                         ] }">
           <button class="signal-filter-pill" :class="{'active': signalSourceFilter === ''}" @click="signalSourceFilter = ''">
             All <span class="pill-count" x-text="_real().length"></span>

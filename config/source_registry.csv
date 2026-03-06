@@ -34,4 +34,5 @@ linkedin_mcp,0.75,true
 gnews,0.78,true
 github_stargazers,0.60,true
 crunchbase,0.82,true
-conference_event_csv,0.85,true
+conference_event_csv,0.85,false
+serper_conference,0.75,true
