@@ -450,17 +450,11 @@ def export_sales_ready(
                     logger.warning("Enrichment data for %s is missing fields: %s", domain, ", ".join(missing))
 
                 completeness = 1.0 - (len(missing) / len(fields_to_check)) if fields_to_check else 1.0
-
-                # Record ops metric
-                db.insert_ops_metric(
-                    conn,
-                    run_date=score_run_id.split("_")[0]
-                    if "_" in score_run_id
-                    else score_run_id,  # Or use today's date if safer, but since this exports via run_id we can use it. Wait, `insert_ops_metric` expects `run_date`
-                    metric="enrichment_completeness",
-                    value=completeness,
-                    meta_json=json.dumps({"account_id": account_id}, ensure_ascii=True),
-                )
+                if completeness < 1.0:
+                    logger.info(
+                        "enrichment_completeness account=%s score=%.2f missing=%d/%d",
+                        account_id, completeness, len(missing), len(fields_to_check),
+                    )
 
             except Exception as exc:
                 logger.warning("Failed to parse enrichment JSON for account %s: %s", account_id, exc)

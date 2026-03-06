@@ -416,22 +416,23 @@ async def collect(
 
         async def _run_one(account: dict) -> tuple[int, int]:
             async with semaphore:
-                # Use SAVEPOINT so one account's DB error doesn't abort the whole batch
+                # Use uniquely-named SAVEPOINT so one account's DB error doesn't abort the whole batch
+                sp_name = f"techscan_{account.get('account_id', 'x')[-8:]}"
                 try:
-                    conn.execute("SAVEPOINT techscan_worker")
+                    conn.execute(f"SAVEPOINT {sp_name}")
                     result = await _collect_one_account(
                         conn=conn,
                         client=client,
                         account=account,
                         source_reliability=source_reliability,
                     )
-                    conn.execute("RELEASE SAVEPOINT techscan_worker")
+                    conn.execute(f"RELEASE SAVEPOINT {sp_name}")
                     # Small delay to be polite
                     await asyncio.sleep(0.1)
                     return result
                 except Exception as exc:
                     try:
-                        conn.execute("ROLLBACK TO SAVEPOINT techscan_worker")
+                        conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
                     except Exception:
                         pass
                     logger.warning("website_techscan_worker_error: %s", exc)
