@@ -2,9 +2,10 @@
 
 Fetches company firmographic data (employees, revenue, HQ, industry, type)
 from Google search snippets via Serper, then extracts structured fields
-using MiniMax LLM. Merges results into company_research.enrichment_json.
+using MiniMax LLM (primary) or Claude API (fallback). Merges results into
+company_research.enrichment_json.
 
-Cost per account: 1 Serper call + 1 MiniMax call (~3s total).
+Cost per account: 1 Serper call + 1 LLM call (~3s total).
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 MINIMAX_URL = "https://api.minimax.io/v1/chat/completions"
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 SOURCE_NAME = "firmographic_google"
 
 # ─── LLM prompt ──────────────────────────────────────────────────────
@@ -178,6 +180,71 @@ async def _extract_with_llm(
         return None
     except Exception as exc:
         logger.warning("firmographic_llm_error company=%s error=%s", company_name, exc)
+        return None
+
+
+# ─── Claude API LLM extraction ───────────────────────────────────────
+
+
+async def _extract_with_claude(
+    client: httpx.AsyncClient,
+    claude_key: str,
+    claude_model: str,
+    company_name: str,
+    snippets_text: str,
+) -> dict[str, Any] | None:
+    """Use Claude API to extract structured firmographic data from snippets."""
+    if not snippets_text.strip():
+        return None
+
+    user_prompt = _USER_PROMPT_TEMPLATE.format(
+        company=company_name,
+        snippets=snippets_text[:3000],
+    )
+
+    try:
+        resp = await client.post(
+            ANTHROPIC_URL,
+            json={
+                "model": claude_model,
+                "max_tokens": 1024,
+                "system": _SYSTEM_PROMPT,
+                "messages": [{"role": "user", "content": user_prompt}],
+            },
+            headers={
+                "x-api-key": claude_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data.get("content", [{}])[0].get("text", "")
+
+        # Extract JSON from markdown code blocks if present
+        if "```" in text:
+            parts = text.split("```")
+            for part in parts[1:]:
+                cleaned = part.replace("json", "", 1).strip()
+                if cleaned.startswith("{"):
+                    text = cleaned
+                    break
+
+        # Find JSON object in response
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(text[start:end])
+
+        logger.warning("firmographic_claude_no_json company=%s response=%s", company_name, text[:200])
+        return None
+
+    except json.JSONDecodeError as exc:
+        logger.warning("firmographic_claude_json_error company=%s error=%s", company_name, exc)
+        return None
+    except Exception as exc:
+        logger.warning("firmographic_claude_error company=%s error=%s", company_name, exc)
         return None
 
 
@@ -385,6 +452,8 @@ async def _collect_one_account(
     minimax_key: str,
     minimax_model: str,
     account: dict[str, Any],
+    claude_key: str = "",
+    claude_model: str = "",
 ) -> str:
     """Enrich one account with firmographic data.
 
@@ -422,8 +491,13 @@ async def _collect_one_account(
         db.mark_crawled(conn, source=SOURCE_NAME, account_id=account_id, endpoint=endpoint, commit=False)
         return "error"
 
-    # Step 2: Extract via LLM
-    extracted = await _extract_with_llm(client, minimax_key, minimax_model, company_name, snippets)
+    # Step 2: Extract via LLM — prefer MiniMax, fall back to Claude
+    if minimax_key:
+        extracted = await _extract_with_llm(client, minimax_key, minimax_model, company_name, snippets)
+    elif claude_key:
+        extracted = await _extract_with_claude(client, claude_key, claude_model, company_name, snippets)
+    else:
+        extracted = None
     if not extracted:
         db.record_crawl_attempt(
             conn,
@@ -477,14 +551,21 @@ async def collect(
     serper_key = settings.serper_api_key
     minimax_key = settings.minimax_api_key
     minimax_model = settings.minimax_model
+    claude_key = getattr(settings, "claude_api_key", "")
+    claude_model = getattr(settings, "claude_model", "claude-sonnet-4-5")
 
     if not serper_key:
         logger.warning("serper_api_key is empty, skipping firmographic collection")
         return {"enriched": 0, "skipped": 0, "errors": 0, "accounts_processed": 0}
 
-    if not minimax_key:
-        logger.warning("minimax_api_key is empty, skipping firmographic collection")
+    if not minimax_key and not claude_key:
+        logger.warning("no LLM key (minimax_api_key or claude_api_key), skipping firmographic collection")
         return {"enriched": 0, "skipped": 0, "errors": 0, "accounts_processed": 0}
+
+    if minimax_key:
+        logger.info("firmographic using MiniMax LLM")
+    else:
+        logger.info("firmographic using Claude API (minimax_api_key not set)")
 
     # Fetch accounts
     cursor = conn.cursor()
@@ -531,6 +612,8 @@ async def collect(
                     minimax_key,
                     minimax_model,
                     account,
+                    claude_key=claude_key,
+                    claude_model=claude_model,
                 )
                 if result == "enriched":
                     enriched += 1

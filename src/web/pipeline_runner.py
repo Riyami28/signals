@@ -202,7 +202,7 @@ def _run_pipeline_sync(
                 firmographic_enabled = (
                     _collector_enabled("firmographic_google")
                     and settings.serper_api_key
-                    and getattr(settings, "minimax_api_key", "")
+                    and (getattr(settings, "minimax_api_key", "") or getattr(settings, "claude_api_key", ""))
                 )
 
                 any_external = (
