@@ -254,6 +254,73 @@ def get_latest_account_tier(conn: Any, account_id: str) -> dict[str, str]:
     return {str(row["product"]): str(row["tier"]) for row in cur.fetchall()}
 
 
+def batch_get_previous_tiers(
+    conn: Any,
+    run_date: str,
+) -> dict[tuple[str, str], str]:
+    """Get the previous tier for all account-product pairs before *run_date*.
+
+    Returns ``{(account_id, product): tier}`` from the most recent completed run
+    strictly before *run_date*.
+    """
+    cur = conn.execute(
+        """
+        SELECT DISTINCT ON (s.account_id, s.product)
+               s.account_id, s.product, s.tier
+        FROM account_scores s
+        JOIN score_runs r ON s.run_id = r.run_id
+        WHERE r.run_date::date < %s::date
+          AND r.status = 'completed'
+        ORDER BY s.account_id, s.product, r.run_date::date DESC, r.started_at DESC
+        """,
+        (run_date,),
+    )
+    return {(str(row["account_id"]), str(row["product"])): str(row["tier"]) for row in cur.fetchall()}
+
+
+def get_tier_changes_today(
+    conn: Any,
+) -> list[dict[str, Any]]:
+    """Compare the latest two completed runs and return accounts whose tier changed.
+
+    Returns list of dicts with: account_id, company_name, product, old_tier,
+    new_tier, score, delta_7d, top_reasons_json, velocity_category.
+    """
+    cur = conn.execute(
+        """
+        WITH latest_runs AS (
+            SELECT run_id, run_date,
+                   ROW_NUMBER() OVER (ORDER BY run_date DESC, started_at DESC) AS rn
+            FROM score_runs
+            WHERE status = 'completed'
+            LIMIT 2
+        ),
+        curr AS (
+            SELECT s.account_id, s.product, s.tier, s.score, s.delta_7d,
+                   s.top_reasons_json, s.velocity_category
+            FROM account_scores s
+            JOIN latest_runs r ON s.run_id = r.run_id
+            WHERE r.rn = 1
+        ),
+        prev AS (
+            SELECT s.account_id, s.product, s.tier
+            FROM account_scores s
+            JOIN latest_runs r ON s.run_id = r.run_id
+            WHERE r.rn = 2
+        )
+        SELECT c.account_id, a.company_name, c.product,
+               p.tier AS old_tier, c.tier AS new_tier,
+               c.score, c.delta_7d, c.top_reasons_json, c.velocity_category
+        FROM curr c
+        JOIN prev p ON c.account_id = p.account_id AND c.product = p.product
+        JOIN accounts a ON a.account_id = c.account_id
+        WHERE c.tier != p.tier
+        ORDER BY c.score DESC
+        """
+    )
+    return [dict(row) for row in cur.fetchall()]
+
+
 def fetch_observations_for_account(
     conn: Any,
     account_id: str,

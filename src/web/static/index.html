@@ -61,6 +61,9 @@
     <div class="stat orange"><div class="n" x-text="stats.medium"></div><div class="l">Medium Tier</div></div>
     <div class="stat purple"><div class="n" x-text="stats.researched"></div><div class="l">Researched</div></div>
     <div class="stat blue"><div class="n" x-text="stats.labeled"></div><div class="l">Labeled</div></div>
+    <template x-if="stats.tierChanges > 0">
+      <div class="stat red"><div class="n" x-text="stats.tierChanges"></div><div class="l">Tier Changes</div></div>
+    </template>
   </div>
 
   <!-- Toolbar -->

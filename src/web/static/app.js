@@ -76,7 +76,7 @@ function signalsApp() {
   return {
     // Data
     accounts: [],
-    stats: { total: 0, high: 0, medium: 0, researched: 0, labeled: 0 },
+    stats: { total: 0, high: 0, medium: 0, researched: 0, labeled: 0, tierChanges: 0 },
     selected: [],
     search: '',
     tierFilter: '',
@@ -221,6 +221,11 @@ function signalsApp() {
         const medResp = await fetch('/api/accounts?tier=medium&per_page=1');
         const medData = await medResp.json();
         this.stats.medium = medData.total || 0;
+
+        // Load tier-change count
+        const tcResp = await fetch('/api/tier-changes');
+        const tcData = await tcResp.json();
+        this.stats.tierChanges = tcData.count || 0;
       } catch (e) {}
     },
 
