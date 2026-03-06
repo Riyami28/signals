@@ -1032,7 +1032,8 @@ def get_account_detail(conn, account_id: str) -> dict | None:
         """
         SELECT so.signal_code, so.source, so.evidence_url, so.evidence_text,
                so.observed_at, so.confidence,
-               sc.component_score
+               sc.component_score,
+               (so.observed_at::date = CURRENT_DATE) AS is_breaking
         FROM signal_observations so
         LEFT JOIN LATERAL (
             SELECT sc2.component_score

@@ -112,6 +112,31 @@ def _insert_event(payload: DiscoveryEventPayload) -> bool:
         conn.close()
 
 
+def _maybe_enqueue_rescore(domain: str) -> None:
+    """If domain maps to a known account, queue an immediate rescore task."""
+    try:
+        settings = load_settings()
+        conn = db.get_connection(settings.pg_dsn)
+        try:
+            account = db.get_account_by_domain(conn, domain)
+            if account:
+                db.enqueue_retry_task(
+                    conn=conn,
+                    task_type="rescore_account",
+                    payload_json=json.dumps(
+                        {"account_id": str(account["account_id"]), "domain": domain},
+                        sort_keys=True,
+                    ),
+                    due_at=utc_now_iso(),
+                    max_attempts=3,
+                )
+                logger.info("rescore_enqueued domain=%s account_id=%s", domain, account["account_id"])
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception("_maybe_enqueue_rescore failed domain=%s", domain)
+
+
 def create_app():
     if FastAPI is None:  # pragma: no cover - dependency may be absent in lightweight envs.
         raise RuntimeError("fastapi is required for webhook serving. Install dependencies first.")
@@ -138,6 +163,8 @@ def create_app():
         if resolved_domain and is_placeholder_domain(resolved_domain):
             raise HTTPException(status_code=422, detail="placeholder/test domains are not allowed")
         inserted = _insert_event(payload)
+        if inserted and resolved_domain:
+            _maybe_enqueue_rescore(resolved_domain)
         return {"accepted": 1, "inserted": int(inserted)}
 
     return app

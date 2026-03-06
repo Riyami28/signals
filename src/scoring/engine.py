@@ -411,3 +411,60 @@ def run_scoring(
         )
 
     return EngineOutput(component_scores=component_models, account_scores=account_models)
+
+
+def rescore_account(conn: Any, account_id: str, settings: Any) -> dict:
+    """Re-score a single account and upsert into the latest score run.
+
+    Returns a dict with status and any tier_changes detected.
+    Safe to call concurrently — does not touch other accounts' scores.
+    """
+    from src.db import scoring as db_scoring
+    from src.scoring.rules import load_signal_rules, load_source_registry, load_thresholds
+
+    # 1. Capture previous tiers for change detection
+    prev_tiers = db_scoring.get_latest_account_tier(conn, account_id)
+
+    # 2. Fetch observations for this account only
+    observations = db_scoring.fetch_observations_for_account(conn, account_id)
+    if not observations:
+        logger.info("rescore_account account_id=%s status=no_observations", account_id)
+        return {"account_id": account_id, "status": "no_observations"}
+
+    # 3. Load rules and thresholds (same config as daily pipeline)
+    rules = load_signal_rules(settings.signal_registry_path)
+    thresholds = load_thresholds(settings.thresholds_path)
+    source_reliability = load_source_registry(settings.source_registry_path)
+
+    # 4. Reuse or create a score run
+    run_id = db_scoring.get_latest_completed_run_id(conn)
+    if not run_id:
+        run_id = db_scoring.create_score_run(conn, str(date.today()))
+        db_scoring.finish_score_run(conn, run_id, "completed")
+
+    # 5. Run scoring (engine processes all observations, we filter output to this account)
+    output = run_scoring(run_id, date.today(), observations, rules, thresholds, source_reliability)
+
+    account_components = [c for c in output.component_scores if c.account_id == account_id]
+    account_scores_out = [s for s in output.account_scores if s.account_id == account_id]
+
+    # 6. Upsert without touching other accounts
+    db_scoring.upsert_account_scores_for_run(conn, run_id, account_components, account_scores_out)
+
+    # 7. Detect tier changes
+    tier_changes: dict[str, dict] = {}
+    for score in account_scores_out:
+        prev = prev_tiers.get(score.product)
+        if prev and prev != score.tier:
+            tier_changes[score.product] = {
+                "from": prev,
+                "to": score.tier,
+                "score": round(score.score, 2),
+                "delta": round(score.score - (score.delta_7d or 0), 2),
+            }
+
+    logger.info(
+        "rescore_account account_id=%s run_id=%s products=%d tier_changes=%s",
+        account_id, run_id, len(account_scores_out), list(tier_changes.keys()),
+    )
+    return {"account_id": account_id, "status": "rescored", "run_id": run_id, "tier_changes": tier_changes}
