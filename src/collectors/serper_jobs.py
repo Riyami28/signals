@@ -245,7 +245,7 @@ def _extract_company_keywords(company_name: str, domain: str) -> list[str]:
 
     Handles: articles ("The ..."), suffixes ("Inc.", "Company"),
     accented chars ("Nestlé"), hyphenated names ("Coca-Cola"),
-    and short domains ("pg.com", "3m.com").
+    and short names/domains ("3M", "pg.com").
     """
     keywords: list[str] = []
     name_ascii = _ascii_lower(company_name)
@@ -254,8 +254,10 @@ def _extract_company_keywords(company_name: str, domain: str) -> list[str]:
     words = re.split(r"[\s,&.]+", name_ascii)
     for w in words:
         w = w.strip().rstrip(".")
-        if w and len(w) > 2 and w not in _COMPANY_STOP_WORDS:
-            keywords.append(w)
+        if w and w not in _COMPANY_STOP_WORDS:
+            # Allow short brand names (2-3 chars) like "3m", "ibm", "sap"
+            if len(w) >= 2:
+                keywords.append(w)
 
     # Hyphenated compounds: "coca-cola" from "The Coca-Cola Company"
     hyphenated = re.findall(r"\b[\w]+-[\w]+(?:-[\w]+)*\b", name_ascii)
@@ -269,7 +271,7 @@ def _extract_company_keywords(company_name: str, domain: str) -> list[str]:
         for suffix in ("company", "india", "global", "worldwide", "online"):
             if domain_base.endswith(suffix) and len(domain_base) > len(suffix) + 2:
                 domain_base = domain_base[: -len(suffix)]
-        if domain_base and len(domain_base) > 2 and domain_base not in keywords:
+        if domain_base and len(domain_base) >= 2 and domain_base not in keywords:
             keywords.append(domain_base)
 
     return keywords
@@ -282,11 +284,8 @@ def _is_company_job(title: str, snippet: str, link: str, company_name: str, doma
     reference the target as a client/competitor/case-study.  We verify the
     company is the actual EMPLOYER via title, URL, and snippet patterns.
 
-    Strategy (ordered from most → least reliable):
-    1. Any brand keyword in the job title → pass
-    2. Any brand keyword in the result URL → pass (career pages, LinkedIn slugs)
-    3. Strong employer patterns in snippet ("at X", "X hiring") → pass
-    4. If no keywords extractable → pass (can't filter)
+    For short keywords (≤3 chars like "3M", "SAP", "IBM"), we require word-
+    boundary matches to avoid false positives ("3m" matching "13mm").
     """
     keywords = _extract_company_keywords(company_name, domain)
     if not keywords:
@@ -296,24 +295,38 @@ def _is_company_job(title: str, snippet: str, link: str, company_name: str, doma
     link_norm = _ascii_lower(link)
     snippet_norm = _ascii_lower(snippet)
 
-    # 1. STRONG: any keyword in the job title
-    #    e.g. "Senior DevOps Engineer - Stripe | LinkedIn" → "stripe" matches
-    #    e.g. "Cloud Engineer at Coca-Cola" → "coca-cola" matches
-    for kw in keywords:
-        if kw in title_norm:
+    def _keyword_in_text(kw: str, text: str) -> bool:
+        """Match keyword in text, using word boundaries for short keywords."""
+        if len(kw) <= 3:
+            # Short names like "3m", "sap", "ibm" — require word boundary
+            return bool(re.search(r"(?:^|[\s\-/|,.])" + re.escape(kw) + r"(?:$|[\s\-/|,.])", text))
+        return kw in text
+
+    # 1. STRONG: company domain in the URL (careers.3m.com, linkedin.com/...-at-3m-...)
+    if domain:
+        domain_base = _ascii_lower(domain.split(".")[0])
+        if domain_base and domain_base in link_norm:
             return True
 
-    # 2. STRONG: any keyword in the URL
+    # 2. STRONG: keyword in the job title with proper boundaries
+    #    e.g. "Senior DevOps Engineer - 3M | LinkedIn" → "3m" matches as word
+    #    e.g. "Cloud Engineer at Coca-Cola" → "coca-cola" matches
+    for kw in keywords:
+        if _keyword_in_text(kw, title_norm):
+            return True
+
+    # 3. MEDIUM: keyword in the URL path
     #    Career pages: careers.coca-colacompany.com/job/...
     #    LinkedIn slugs: linkedin.com/jobs/view/...-at-pepsico-...
     for kw in keywords:
-        if kw in link_norm:
+        if _keyword_in_text(kw, link_norm):
             return True
 
-    # 3. MEDIUM: strong employer patterns in snippet
-    #    Catches: "PepsiCo is hiring", "at Nestlé", "join Instacart"
-    #    Avoids: "clients include Condé Nast, Disney..."
+    # 4. WEAK: strong employer patterns in snippet (only for longer keywords)
+    #    Short keywords are too ambiguous for snippet matching
     for kw in keywords:
+        if len(kw) <= 3:
+            continue  # Skip short keywords for snippet matching — too noisy
         employer_patterns = [
             f"at {kw}",
             f"{kw} hiring",
@@ -457,9 +470,16 @@ async def _collect_one_account(
     seen = 0
     seen_links: set[str] = set()  # Deduplicate URLs across multiple queries
 
+    # For short company names (≤3 chars like "3M", "IBM"), use domain-based
+    # search to avoid matching unrelated results
+    use_domain_search = len(company_name.strip()) <= 3 and domain
+
     # Search for jobs at this company using multiple queries
     for suffix in _JOB_SEARCH_SUFFIXES:
-        query = f'"{company_name}" jobs {suffix}'
+        if use_domain_search:
+            query = f'site:linkedin.com/jobs "{company_name}" {suffix}'
+        else:
+            query = f'"{company_name}" jobs {suffix}'
         results = await _fetch_serper_search(client, query, api_key, num_results)
 
         for item in results:
