@@ -346,55 +346,6 @@
               </template>
             </div>
 
-            <!-- Dimension Bars (drill-down to signals) -->
-            <div style="margin:16px 0 6px">
-              <span style="font-size:11px;color:var(--text-muted)">Raw signal strength per dimension</span>
-              <span style="font-size:10px;color:var(--text-muted);opacity:0.7"> (0–100 · click to filter signals)</span>
-            </div>
-            <div class="dimension-grid">
-              <template x-for="[dim, score] in Object.entries(detail.dimension_scores)" :key="dim">
-                <div class="dimension-row dimension-row-clickable"
-                     @click="dtab='signals'; signalSourceFilter = dim === 'firmographic' ? 'firmographic' : 'dim:' + dim"
-                     :title="'Click to view ' + dim.replace(/_/g, ' ') + ' signals'">
-                  <div class="dimension-label" x-text="dim.replace(/_/g, ' ')"></div>
-                  <div class="dimension-bar-bg">
-                    <div class="dimension-bar-fill"
-                         :style="'width:' + Math.min(100, Math.max(0, rawScore(score))) + '%'"
-                         :class="rawScore(score) >= 70 ? 'bar-high' : rawScore(score) >= 40 ? 'bar-medium' : 'bar-low'">
-                    </div>
-                    <span class="dimension-score" x-text="Math.round(contrib.dimension_score)"></span>
-                    <span class="dimension-contrib-pts" x-text="'(+' + contrib.contribution + ')'"></span>
-                  </div>
-
-                  <!-- Expanded signals list (shown when clicked) -->
-                  <template x-if="expandedDim === dim && detail.signals_by_dimension && detail.signals_by_dimension[dim]">
-                    <div class="dimension-signals-list">
-                      <template x-if="detail.signals_by_dimension[dim].length > 0">
-                        <template x-for="sig in detail.signals_by_dimension[dim]" :key="sig.signal_code + '-' + sig.source">
-                          <div class="signal-row-item">
-                            <div class="signal-row">
-                              <span class="sig-code" x-text="sig.signal_code"></span>
-                              <span class="sig-score" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
-                              <span class="sig-source" x-text="sig.source"></span>
-                              <template x-if="sig.evidence_url">
-                                <a :href="sig.evidence_url" target="_blank" class="sig-link" title="View evidence">↗</a>
-                              </template>
-                            </div>
-                            <template x-if="sig.evidence_snippet">
-                              <div class="signal-snippet" x-text="sig.evidence_snippet"></div>
-                            </template>
-                          </div>
-                        </template>
-                      </template>
-                      <template x-if="!detail.signals_by_dimension[dim] || detail.signals_by_dimension[dim].length === 0">
-                        <div style="font-size:11px;color:var(--text-muted);padding:6px 0">No signals in this dimension</div>
-                      </template>
-                    </div>
-                  </template>
-                </div>
-              </template>
-            </div>
-
             <!-- Top Reasons from scoring engine -->
             <template x-if="detail.scores && detail.scores.length > 0 && detail.scores[0].top_reasons_json">
               <div x-data="{ get reasons() { try { return JSON.parse(detail.scores[0].top_reasons_json || '[]') } catch(e) { return [] } } }">
@@ -501,7 +452,8 @@
                 <div>
                   <template x-for="sig in detail.signals.filter(s => !s.evidence_url || !s.evidence_url.startsWith('internal://'))">
                     <div class="signal-card"
-                         :class="{'signal-card-high': sig.impact === 'high'}"
+                         :class="{'signal-card-high': sig.impact === 'high', 'signal-card-stale': sig.decay_label === 'stale'}"
+                         :title="'base_weight: ' + (sig.base_weight||0) + ' | confidence: ' + Number(sig.confidence||0).toFixed(2) + ' | source_reliability: ' + Number(sig.source_reliability||0).toFixed(2) + ' | recency: ' + Number(sig.recency_factor||0).toFixed(3) + ' | half_life: ' + (sig.half_life_days||30) + 'd'"
                          x-data="{ showLineage: false }"
                          x-show="!signalSourceFilter || signalSourceFilter.split(',').includes(sig.source) || (signalSourceFilter.startsWith('dim:') && signalSourceFilter.slice(4) === sig.dimension)">
                       <!-- Row 1: label + badges -->
@@ -511,6 +463,9 @@
                               x-text="(sig.impact || 'low').toUpperCase()"></span>
                         <template x-if="sig.component_score > 0">
                           <span class="contribution-badge" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                        </template>
+                        <template x-if="sig.decay_label">
+                          <span class="decay-badge" :class="'decay-' + sig.decay_label" x-text="sig.decay_label"></span>
                         </template>
                         <template x-if="sig.is_breaking">
                           <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(88,166,255,0.15);color:var(--blue);font-weight:700;letter-spacing:0.05em">NEW</span>

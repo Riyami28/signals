@@ -28,11 +28,11 @@ PRODUCTS = ("zopdev", "zopday", "zopnight")
 MAX_OBSERVATIONS_PER_SIGNAL = 3
 MAX_OBSERVATIONS_PER_SOURCE_PER_SIGNAL = 1
 DEFAULT_DIMENSION_WEIGHTS: dict[str, DimensionWeight] = {
-    "trigger_intent": DimensionWeight(dimension="trigger_intent", weight=0.35, ceiling=60.0),
-    "tech_fit": DimensionWeight(dimension="tech_fit", weight=0.20, ceiling=40.0),
-    "engagement_pql": DimensionWeight(dimension="engagement_pql", weight=0.25, ceiling=50.0),
-    "firmographic": DimensionWeight(dimension="firmographic", weight=0.10, ceiling=30.0),
-    "hiring_growth": DimensionWeight(dimension="hiring_growth", weight=0.10, ceiling=30.0),
+    "trigger_intent": DimensionWeight(dimension="trigger_intent", weight=0.40, ceiling=70.0),
+    "engagement_pql": DimensionWeight(dimension="engagement_pql", weight=0.30, ceiling=60.0),
+    "hiring_growth": DimensionWeight(dimension="hiring_growth", weight=0.15, ceiling=40.0),
+    "tech_fit": DimensionWeight(dimension="tech_fit", weight=0.10, ceiling=30.0),
+    "firmographic": DimensionWeight(dimension="firmographic", weight=0.05, ceiling=20.0),
 }
 
 

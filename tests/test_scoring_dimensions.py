@@ -49,20 +49,20 @@ DIMENSIONS = [
 
 # Dimension weights from Issue #18
 DIMENSION_WEIGHTS = {
-    "trigger_intent": 0.35,
-    "tech_fit": 0.20,
-    "engagement_pql": 0.25,
-    "firmographic": 0.10,
-    "hiring_growth": 0.10,
+    "trigger_intent": 0.40,
+    "engagement_pql": 0.30,
+    "hiring_growth": 0.15,
+    "tech_fit": 0.10,
+    "firmographic": 0.05,
 }
 
-# Dimension ceilings from Issue #18 (raw score sum that maps to 100)
+# Dimension ceilings (raw score sum that maps to 100)
 DIMENSION_CEILINGS = {
-    "trigger_intent": 60,
-    "tech_fit": 40,
-    "engagement_pql": 50,
-    "firmographic": 30,
-    "hiring_growth": 30,
+    "trigger_intent": 70,
+    "engagement_pql": 60,
+    "hiring_growth": 40,
+    "tech_fit": 30,
+    "firmographic": 20,
 }
 
 RUN_DATE = date(2026, 2, 20)
@@ -375,9 +375,9 @@ class TestScoreCalculation:
             base_weight * confidence * source_rel * recency_decay(days_since, half_life),
             4,
         )
-        # Dimension-weighted scoring: normalize by ceiling (60.0), then weight (0.35)
-        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
-        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
+        # Dimension-weighted scoring: normalize by ceiling (70.0), then weight (0.40)
+        dim_normalized = min(100.0, round((expected_component / 70.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.40, 2))
 
         rules = {
             "sig_a": _make_rule(
@@ -591,8 +591,8 @@ class TestSourceReliability:
         output = _score(obs, rules, source_defaults={"capped_source": 0.3})
 
         expected_component = round(10 * 1.0 * 0.3 * recency_decay(1, 30), 4)
-        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
-        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
+        dim_normalized = min(100.0, round((expected_component / 70.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.40, 2))
         assert output.account_scores[0].score == expected_score
 
     def test_zero_registry_reliability_blocks_source(self):
@@ -627,8 +627,8 @@ class TestSourceReliability:
 
         # Defaults to 0.6 when both registry and observation are missing
         expected_component = round(10 * 0.9 * 0.6 * recency_decay(1, 30), 4)
-        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
-        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
+        dim_normalized = min(100.0, round((expected_component / 70.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.40, 2))
         assert output.account_scores[0].score == expected_score
 
 
@@ -1005,17 +1005,17 @@ class TestDimensionCeiling:
 
         zopdev_scores = [s for s in output.account_scores if s.product == "zopdev"]
         assert len(zopdev_scores) == 1
-        # All signals in trigger_intent (weight=0.35), dimension capped at 100 → 35.0
-        assert zopdev_scores[0].score == 35.0
+        # All signals in trigger_intent (weight=0.40), dimension capped at 100 → 40.0
+        assert zopdev_scores[0].score == 40.0
 
     def test_dimension_ceiling_normalization(self):
         """Reference test for dimension ceiling normalization.
 
-        Once Issue #18 is implemented, a dimension with ceiling=60 and
-        raw score=60 should normalize to 100 for that dimension.
+        Once Issue #18 is implemented, a dimension with ceiling=70 and
+        raw score=70 should normalize to 100 for that dimension.
         """
-        ceiling = 60
-        raw_score = 60
+        ceiling = 70
+        raw_score = 70
         normalized = min(100.0, (raw_score / ceiling) * 100)
         assert normalized == 100.0
 
@@ -1025,8 +1025,8 @@ class TestDimensionCeiling:
 
     def test_dimension_ceiling_partial(self):
         """Raw score below ceiling → proportional normalization."""
-        ceiling = 60
-        raw_score = 30
+        ceiling = 70
+        raw_score = 35
         normalized = min(100.0, (raw_score / ceiling) * 100)
         assert normalized == 50.0
 
@@ -1046,11 +1046,11 @@ class TestCompositeScore:
         assert composite == 100.0
 
     def test_composite_formula_single_dimension(self):
-        """Only trigger_intent at 100, rest 0 → composite = 35."""
+        """Only trigger_intent at 100, rest 0 → composite = 40."""
         dimension_scores = {dim: 0.0 for dim in DIMENSIONS}
         dimension_scores["trigger_intent"] = 100.0
         composite = sum(dimension_scores[dim] * DIMENSION_WEIGHTS[dim] for dim in DIMENSIONS)
-        assert composite == 35.0
+        assert composite == 40.0
 
     def test_composite_formula_weights_sum_to_one(self):
         """Dimension weights must sum to 1.0."""
@@ -1071,10 +1071,10 @@ class TestCompositeScore:
             "firmographic": 0.0,
             "hiring_growth": 60.0,
         }
-        expected = 80 * 0.35 + 50 * 0.20 + 0 * 0.25 + 0 * 0.10 + 60 * 0.10
+        expected = 80 * 0.40 + 50 * 0.10 + 0 * 0.30 + 0 * 0.05 + 60 * 0.15
         composite = sum(dimension_scores[dim] * DIMENSION_WEIGHTS[dim] for dim in DIMENSIONS)
         assert round(composite, 2) == round(expected, 2)
-        assert round(composite, 2) == 44.0
+        assert round(composite, 2) == 46.0
 
 
 # ===================================================================
@@ -1397,8 +1397,8 @@ class TestEdgeCases:
         output = _score(obs, rules)
 
         raw_component = 10 * 0.9 * 0.75 * 1.0  # source capped by registry
-        dim_normalized = min(100.0, round((raw_component / 60.0) * 100.0, 2))
-        expected = round(dim_normalized * 0.35, 2)
+        dim_normalized = min(100.0, round((raw_component / 70.0) * 100.0, 2))
+        expected = round(dim_normalized * 0.40, 2)
         assert round(output.account_scores[0].score, 4) == round(expected, 4)
 
     def test_none_source_reliability_uses_default(self):
@@ -1419,8 +1419,8 @@ class TestEdgeCases:
 
         # Registry has news_csv=0.75, that's used as both value and cap
         expected_component = round(10 * 0.9 * 0.75 * recency_decay(1, 30), 4)
-        dim_normalized = min(100.0, round((expected_component / 60.0) * 100.0, 2))
-        expected_score = min(100.0, round(dim_normalized * 0.35, 2))
+        dim_normalized = min(100.0, round((expected_component / 70.0) * 100.0, 2))
+        expected_score = min(100.0, round(dim_normalized * 0.40, 2))
         assert output.account_scores[0].score == expected_score
 
     def test_zero_confidence_observation_filtered(self):
