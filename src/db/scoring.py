@@ -66,54 +66,58 @@ def replace_run_scores(
     component_scores: list[ComponentScore],
     account_scores: list[AccountScore],
 ) -> None:
-    conn.execute("DELETE FROM score_components WHERE run_id = %s", (run_id,))
-    conn.execute("DELETE FROM account_scores WHERE run_id = %s", (run_id,))
+    try:
+        conn.execute("DELETE FROM score_components WHERE run_id = %s", (run_id,))
+        conn.execute("DELETE FROM account_scores WHERE run_id = %s", (run_id,))
 
-    # --- Batch insert components (1 executemany instead of N individual INSERTs) ---
-    if component_scores:
-        conn.cursor().executemany(
-            """
-            INSERT INTO score_components (run_id, account_id, product, signal_code, component_score)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            [(c.run_id, c.account_id, c.product, c.signal_code, c.component_score) for c in component_scores],
-        )
-
-    # --- Batch insert account scores ---
-    if account_scores:
-        conn.cursor().executemany(
-            """
-            INSERT INTO account_scores (
-                run_id, account_id, product, score, tier, tier_v2,
-                top_reasons_json, delta_7d, velocity_7d, velocity_14d,
-                velocity_30d, velocity_category, confidence_band,
-                dimension_scores_json, dimension_confidence_json
+        # --- Batch insert components (1 executemany instead of N individual INSERTs) ---
+        if component_scores:
+            conn.executemany(
+                """
+                INSERT INTO score_components (run_id, account_id, product, signal_code, component_score)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                [(c.run_id, c.account_id, c.product, c.signal_code, c.component_score) for c in component_scores],
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            [
-                (
-                    s.run_id,
-                    s.account_id,
-                    s.product,
-                    s.score,
-                    s.tier,
-                    s.tier_v2,
-                    s.top_reasons_json,
-                    s.delta_7d,
-                    s.velocity_7d,
-                    s.velocity_14d,
-                    s.velocity_30d,
-                    s.velocity_category,
-                    s.confidence_band,
-                    s.dimension_scores_json,
-                    s.dimension_confidence_json,
-                )
-                for s in account_scores
-            ],
-        )
 
-    conn.commit()
+        # --- Batch insert account scores ---
+        if account_scores:
+            conn.executemany(
+                """
+                INSERT INTO account_scores (
+                    run_id, account_id, product, score, tier, tier_v2,
+                    top_reasons_json, delta_7d, velocity_7d, velocity_14d,
+                    velocity_30d, velocity_category, confidence_band,
+                    dimension_scores_json, dimension_confidence_json
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                [
+                    (
+                        s.run_id,
+                        s.account_id,
+                        s.product,
+                        s.score,
+                        s.tier,
+                        s.tier_v2,
+                        s.top_reasons_json,
+                        s.delta_7d,
+                        s.velocity_7d,
+                        s.velocity_14d,
+                        s.velocity_30d,
+                        s.velocity_category,
+                        s.confidence_band,
+                        s.dimension_scores_json,
+                        s.dimension_confidence_json,
+                    )
+                    for s in account_scores
+                ],
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def _get_score_at_offset(conn: Any, account_id: str, product: str, run_date: str, days_back: int) -> float | None:

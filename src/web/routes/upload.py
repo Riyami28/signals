@@ -146,27 +146,27 @@ def _ai_detect_columns(
         sample_text += json.dumps(row, ensure_ascii=False) + "\n"
 
     if provider == "minimax":
-        http_client = httpx.Client(
+        with httpx.Client(
             base_url="https://api.minimax.io/v1",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
-        )
-        response = http_client.post(
-            "/chat/completions",
-            json={
-                "model": model,
-                "max_tokens": 256,
-                "messages": [
-                    {"role": "system", "content": _AI_PARSE_SYSTEM},
-                    {"role": "user", "content": sample_text},
-                ],
-            },
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
+        ) as http_client:
+            response = http_client.post(
+                "/chat/completions",
+                json={
+                    "model": model,
+                    "max_tokens": 256,
+                    "messages": [
+                        {"role": "system", "content": _AI_PARSE_SYSTEM},
+                        {"role": "user", "content": sample_text},
+                    ],
+                },
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
         choices = data.get("choices") or []
         first = choices[0] if choices else {}
         msg = first.get("message") if isinstance(first, dict) else {}

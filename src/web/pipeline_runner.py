@@ -49,14 +49,17 @@ async def _run_in_thread(
         try:
             settings = load_settings()
             conn = db.get_connection(settings.pg_dsn)
-            db.finish_ui_pipeline_run(conn, run_id, "failed", {"error": "Pipeline timeout"})
-            conn.close()
+            try:
+                db.finish_ui_pipeline_run(conn, run_id, "failed", {"error": "Pipeline timeout"})
+            finally:
+                conn.close()
         except Exception:
             pass
     except Exception as exc:
         await queue.put({"type": "error", "message": str(exc)})
     finally:
         await queue.put({"type": "done", "pipeline_run_id": run_id})
+        ACTIVE_QUEUES.pop(run_id, None)
 
 
 def _emit(queue: asyncio.Queue, event: dict):
