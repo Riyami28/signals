@@ -15,6 +15,7 @@ Epic:  https://github.com/talvinder/signals/issues/11
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import date
 
@@ -25,7 +26,9 @@ from src.scoring.engine import (
     MAX_OBSERVATIONS_PER_SOURCE_PER_SIGNAL,
     EngineOutput,
     _resolve_products,
+    classify_confidence_band,
     classify_tier,
+    overall_confidence_band,
     recency_decay,
     run_scoring,
 )
@@ -756,56 +759,71 @@ class TestConfidenceBands:
     - 1 source only → low
     """
 
-    @staticmethod
-    def compute_confidence_band(source_count: int) -> str:
-        """Reference implementation for confidence bands.
-
-        Once Issue #20 is implemented, import from the engine.
-        """
-        if source_count >= 3:
-            return "high"
-        if source_count == 2:
-            return "medium"
-        return "low"
-
-    @staticmethod
-    def compute_overall_confidence(dimension_bands: dict[str, str]) -> str:
-        """Overall confidence = lowest of all non-zero dimensions."""
-        band_priority = {"low": 0, "medium": 1, "high": 2}
-        if not dimension_bands:
-            return "low"
-        return min(dimension_bands.values(), key=lambda b: band_priority.get(b, 0))
-
     def test_three_sources_high_confidence(self):
-        assert self.compute_confidence_band(3) == "high"
+        assert classify_confidence_band(3) == "high"
 
     def test_five_sources_high_confidence(self):
-        assert self.compute_confidence_band(5) == "high"
+        assert classify_confidence_band(5) == "high"
 
     def test_two_sources_medium_confidence(self):
-        assert self.compute_confidence_band(2) == "medium"
+        assert classify_confidence_band(2) == "medium"
 
     def test_one_source_low_confidence(self):
-        assert self.compute_confidence_band(1) == "low"
+        assert classify_confidence_band(1) == "low"
 
     def test_zero_sources_low_confidence(self):
-        assert self.compute_confidence_band(0) == "low"
+        assert classify_confidence_band(0) == "low"
 
     def test_overall_confidence_all_high(self):
         bands = {"trigger_intent": "high", "tech_fit": "high"}
-        assert self.compute_overall_confidence(bands) == "high"
+        assert overall_confidence_band(bands) == "high"
 
     def test_overall_confidence_mixed_high_low(self):
         """Mixed: high in trigger, low in tech → overall = low."""
         bands = {"trigger_intent": "high", "tech_fit": "low"}
-        assert self.compute_overall_confidence(bands) == "low"
+        assert overall_confidence_band(bands) == "low"
 
     def test_overall_confidence_mixed_high_medium(self):
         bands = {"trigger_intent": "high", "tech_fit": "medium"}
-        assert self.compute_overall_confidence(bands) == "medium"
+        assert overall_confidence_band(bands) == "medium"
 
     def test_overall_confidence_empty(self):
-        assert self.compute_overall_confidence({}) == "low"
+        assert overall_confidence_band({}) == "low"
+
+    def test_confidence_fields_populated_in_account_scores(self):
+        """run_scoring populates confidence_band and dimension_confidence_json."""
+        rules = {"sig_a": _make_rule("sig_a", base_weight=10, product_scope="zopdev")}
+        obs = [
+            _make_observation(signal_code="sig_a", product="zopdev", source="news_csv"),
+            _make_observation(signal_code="sig_a", product="zopdev", source="technographics_csv"),
+            _make_observation(signal_code="sig_a", product="zopdev", source="first_party_csv"),
+        ]
+        source_defaults = {
+            "news_csv": 0.75,
+            "technographics_csv": 0.8,
+            "first_party_csv": 0.9,
+        }
+        output = _score(obs, rules, source_defaults=source_defaults)
+        assert len(output.account_scores) == 1
+        score = output.account_scores[0]
+        assert score.confidence_band == "high"
+        dim_conf = json.loads(score.dimension_confidence_json)
+        # sig_a maps to trigger_intent (default category=trigger_events)
+        assert "trigger_intent" in dim_conf
+        assert dim_conf["trigger_intent"]["band"] == "high"
+        assert dim_conf["trigger_intent"]["source_count"] == 3
+        assert set(dim_conf["trigger_intent"]["sources"]) == {"news_csv", "technographics_csv", "first_party_csv"}
+
+    def test_single_source_low_confidence_in_output(self):
+        """Single source → confidence_band=low in AccountScore output."""
+        rules = {"sig_a": _make_rule("sig_a", base_weight=10, product_scope="zopdev")}
+        obs = [_make_observation(signal_code="sig_a", product="zopdev", source="news_csv")]
+        output = _score(obs, rules)
+        score = output.account_scores[0]
+        assert score.confidence_band == "low"
+        dim_conf = json.loads(score.dimension_confidence_json)
+        assert dim_conf["trigger_intent"]["band"] == "low"
+        assert dim_conf["trigger_intent"]["source_count"] == 1
 
     def test_source_diversity_in_scoring(self):
         """3 different sources for same signal → all contribute (up to cap)."""

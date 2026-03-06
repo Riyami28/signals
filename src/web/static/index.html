@@ -130,6 +130,7 @@
           <th>Tier</th>
           <th>Research</th>
           <th>Labels</th>
+          <th>Last Signal</th>
           <th style="width:36px"></th>
         </tr>
       </thead>
@@ -151,6 +152,16 @@
             <td>
               <template x-for="lbl in (acc.labels || '').split(',').filter(l => l)">
                 <span class="label-badge" :class="'label-' + lbl" x-text="lbl.toUpperCase()"></span>
+              </template>
+            </td>
+            <td>
+              <template x-if="acc.last_signal_date">
+                <span class="freshness-indicator"
+                      :class="(() => { const days = Math.floor((Date.now() - new Date(acc.last_signal_date)) / 86400000); return days < 7 ? 'freshness-green' : days <= 30 ? 'freshness-yellow' : 'freshness-red'; })()"
+                      x-text="(() => { const days = Math.floor((Date.now() - new Date(acc.last_signal_date)) / 86400000); return days === 0 ? 'Today' : days + 'd ago'; })()"></span>
+              </template>
+              <template x-if="!acc.last_signal_date">
+                <span class="freshness-none">--</span>
               </template>
             </td>
             <td style="color:var(--text-muted);font-size:12px;cursor:pointer">
@@ -264,6 +275,16 @@
            }">
         <template x-if="detail && detail.dimension_scores && Object.keys(detail.dimension_scores).length > 0">
           <div>
+            <!-- Staleness Warning Banner -->
+            <template x-if="detail.staleness && detail.staleness.is_stale">
+              <div class="staleness-banner">
+                <span class="staleness-icon">&#9888;</span>
+                <span>Most signals are aging &mdash;
+                  <template x-if="detail.last_signal_date"><span>last fresh signal: <strong x-text="(() => { const days = Math.floor((Date.now() - new Date(detail.last_signal_date)) / 86400000); return days + ' days ago'; })()"></strong></span></template>
+                </span>
+              </div>
+            </template>
+
             <template x-if="detail.velocity">
               <div class="velocity-banner">
                 <span class="velocity-category" :class="'velocity-' + (detail.velocity.category || 'stable')"
@@ -288,8 +309,46 @@
                     <div class="dimension-bar-bg">
                       <div class="dimension-bar-fill"
                            :style="'width:' + Math.min(100, contrib.dimension_score) + '%'"
-                           :class="contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'">
+                           :class="[(contrib.dimension_score >= 70 ? 'bar-high' : contrib.dimension_score >= 40 ? 'bar-medium' : 'bar-low'), contrib.confidence_band === 'medium' ? 'confidence-medium' : '', contrib.confidence_band === 'low' ? 'confidence-low' : '']"
+                           :title="'Based on ' + (contrib.source_count || 0) + ' source(s): ' + (contrib.sources || []).join(', ')">
                       </div>
+                    </div>
+                    <span class="dimension-score" x-text="Math.round(contrib.dimension_score)"></span>
+                    <span class="dimension-contrib-pts" x-text="'(+' + contrib.contribution + ')'"></span>
+                    <template x-if="contrib.confidence_band === 'low'">
+                      <span class="confidence-low-label">Low confidence</span>
+                    </template>
+                  </div>
+
+                  <!-- Expanded signals list (shown when clicked) -->
+                  <template x-if="expandedDim === dim && detail.signals_by_dimension && detail.signals_by_dimension[dim]">
+                    <div class="dimension-signals-list">
+                      <template x-if="detail.signals_by_dimension[dim].length > 0">
+                        <template x-for="sig in detail.signals_by_dimension[dim]" :key="sig.signal_code + '-' + sig.source">
+                          <div class="signal-row-item">
+                            <div class="signal-row">
+                              <span class="sig-code" x-text="sig.signal_code"></span>
+                              <span class="sig-score" x-text="'+' + Number(sig.component_score).toFixed(1) + ' pts'"></span>
+                              <span class="sig-source" x-text="sig.source"></span>
+                              <template x-if="sig.evidence_url">
+                                <a :href="sig.evidence_url" target="_blank" class="sig-link" title="View evidence">&#8599;</a>
+                              </template>
+                            </div>
+                            <template x-if="sig.evidence_snippet">
+                              <div class="signal-snippet" x-text="sig.evidence_snippet"></div>
+                            </template>
+                          </div>
+                        </template>
+                      </template>
+                      <template x-if="!detail.signals_by_dimension[dim] || detail.signals_by_dimension[dim].length === 0">
+                        <div style="font-size:11px;color:var(--text-muted);padding:6px 0">No signals in this dimension</div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
             <!-- Dimension Bars (drill-down to signals) -->
             <div style="margin:16px 0 6px">
               <span style="font-size:11px;color:var(--text-muted)">Raw signal strength per dimension</span>

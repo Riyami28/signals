@@ -52,7 +52,16 @@ class TestAccountsAPI:
 
         with patch("src.web.routes.accounts.db.get_accounts_paginated") as mock_paginated:
             mock_paginated.return_value = (
-                [{"account_id": "a1", "company_name": "Acme", "domain": "acme.com", "score": 25.0, "tier": "high"}],
+                [
+                    {
+                        "account_id": "a1",
+                        "company_name": "Acme",
+                        "domain": "acme.com",
+                        "score": 25.0,
+                        "tier": "high",
+                        "last_signal_date": "2026-03-01T12:00:00+00:00",
+                    }
+                ],
                 1,
             )
             app = create_app()
@@ -77,6 +86,8 @@ class TestAccountsAPI:
                 "domain": "acme.com",
                 "signals": [],
                 "scores": [],
+                "dimension_confidence": {},
+                "last_signal_date": None,
             }
             app = create_app()
             client = TestClient(app)

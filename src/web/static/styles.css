@@ -642,3 +642,31 @@ input[type="checkbox"] { accent-color: var(--blue); width: 15px; height: 15px; c
   border-radius: 5px;
   flex-wrap: wrap;
 }
+
+/* Confidence Overlay on Dimension Bars */
+.dimension-bar-fill.confidence-medium {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent, transparent 4px,
+    rgba(255,255,255,0.15) 4px,
+    rgba(255,255,255,0.15) 8px
+  );
+}
+.dimension-bar-fill.confidence-low { opacity: 0.35; }
+.confidence-low-label { font-size: 9px; color: var(--text-muted); font-style: italic; margin-left: 6px; }
+
+/* Staleness Warning Banner */
+.staleness-banner {
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 14px; background: var(--tint-orange); border: 1px solid var(--warm-border);
+  border-radius: 8px; margin-bottom: 12px; font-size: 12px; color: var(--orange);
+}
+.staleness-banner .staleness-icon { font-size: 16px; flex-shrink: 0; }
+
+/* Signal Freshness Indicator on Account List */
+.freshness-indicator { font-size: 11px; font-weight: 500; }
+.freshness-green { color: var(--green); }
+.freshness-yellow { color: var(--orange); }
+.freshness-red { color: var(--red); }
+.freshness-none { color: var(--text-muted); }

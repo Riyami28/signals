@@ -78,6 +78,16 @@ def _sanitize_search(q: str) -> str:
     return cleaned[:_MAX_SEARCH_LENGTH]
 
 
+def _parse_signal_dt(observed_at_str: str) -> datetime:
+    """Parse an observed_at string into a timezone-aware datetime."""
+    if observed_at_str.endswith("Z"):
+        return datetime.fromisoformat(observed_at_str.replace("Z", "+00:00"))
+    dt = datetime.fromisoformat(observed_at_str.split("+")[0])
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _calculate_readiness_score(account_detail: dict) -> dict:
     """Calculate Account Readiness Score from 5 weighted components.
 
@@ -110,14 +120,7 @@ def _calculate_readiness_score(account_detail: dict) -> dict:
             observed_at_str = sig.get("observed_at", "")
             if observed_at_str:
                 try:
-                    # Handle both ISO format and timezone-aware strings
-                    if observed_at_str.endswith("Z"):
-                        obs_dt = datetime.fromisoformat(observed_at_str.replace("Z", "+00:00"))
-                    else:
-                        obs_dt = datetime.fromisoformat(observed_at_str.split("+")[0])
-                        # Make naive datetime timezone-aware
-                        if obs_dt.tzinfo is None:
-                            obs_dt = obs_dt.replace(tzinfo=timezone.utc)
+                    obs_dt = _parse_signal_dt(str(observed_at_str))
                     age_days = (now - obs_dt).days
                     if age_days <= 14:
                         fresh_count += 1
@@ -355,7 +358,39 @@ def get_account(account_id: str):
                         "ceiling": weight_config.ceiling,
                         "contribution": round(contribution, 1),
                     }
+            # Merge per-dimension confidence data into contributions
+            dim_conf = detail.get("dimension_confidence", {})
+            for dim, conf in dim_conf.items():
+                if dim in dimension_contributions and isinstance(conf, dict):
+                    dimension_contributions[dim]["confidence_band"] = conf.get("band", "low")
+                    dimension_contributions[dim]["source_count"] = conf.get("source_count", 0)
+                    dimension_contributions[dim]["sources"] = conf.get("sources", [])
+
             detail["dimension_contributions"] = dimension_contributions
+
+        # Staleness: % of signals past their half_life
+        if detail.get("signals") and isinstance(detail["signals"], list):
+            now = datetime.now(timezone.utc)
+            total_count = len(detail["signals"])
+            stale_count = 0
+            for sig in detail["signals"]:
+                observed_at_str = str(sig.get("observed_at", "") or "")
+                half_life = float(sig.get("half_life_days", 30.0) or 30.0)
+                if observed_at_str:
+                    try:
+                        obs_dt = _parse_signal_dt(observed_at_str)
+                        age_days = (now - obs_dt).days
+                        if age_days > half_life:
+                            stale_count += 1
+                    except (ValueError, TypeError):
+                        pass
+            stale_pct = (stale_count / total_count * 100) if total_count > 0 else 0
+            detail["staleness"] = {
+                "stale_pct": round(stale_pct, 1),
+                "is_stale": stale_pct > 80,
+                "stale_count": stale_count,
+                "total_count": total_count,
+            }
 
         # Export dimension weights configuration for API transparency
         detail["dimension_weights"] = {
