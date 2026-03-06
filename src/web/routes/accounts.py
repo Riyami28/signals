@@ -750,7 +750,7 @@ def get_scoring_rubric():
             for row in csv.DictReader(fh):
                 src = (row.get("source") or "").strip()
                 if src:
-                    exec_policy[src] = (row.get("enabled", "true").strip().lower() == "true")
+                    exec_policy[src] = row.get("enabled", "true").strip().lower() == "true"
 
     # Load sources — only show those enabled in execution policy (or not in policy = CSV-based passive sources)
     # Explicitly exclude known-unintegrated sources regardless
